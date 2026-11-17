@@ -144,6 +144,9 @@ RoadPass1:
 .cx:    exx
         ld a, l
         exx
+        rra                     ; even line: no events, just accumulate
+        jr nc, .acc
+        rla
 .nb:    cp $FF
         call z, NextCurve
         exx
@@ -151,10 +154,6 @@ RoadPass1:
         exx
 .nz:    cp $FF
         call z, NextZone
-        exx
-        bit 0, l
-        exx
-        jr z, .acc
         ; ---- odd line: edges and centre line from cx = total
         ld a, l
         ld ixl, a
@@ -272,12 +271,14 @@ RoadBands:
         ld c, a
         ld hl, ZLo
         ld de, Band
-        ld b, ROAD_LINES
+        ld b, ROAD_LINES / 2    ; even lines only: lines are drawn in pairs
 .band:  ld a, (hl)
         add a, c
         and STRIPE_BIT
         ld (de), a
         inc l
+        inc l
+        inc e
         inc e
         djnz .band
         ret
@@ -468,6 +469,11 @@ DrawRoadRow:
         ld a, (RowBand)
         ld (hl), a
         call RowAttrs
+        ld a, (CurRow)
+        cp CAR_ROW
+        jr c, .lines
+        ld a, 1
+        ld (CarAttrDirty), a
 
 .lines: ; ---- per-row constants for the line renderer
         ld a, (RowForced)
@@ -513,6 +519,32 @@ DrawRoadRow:
         ld a, $FF               ; road too narrow for a centre line
         ld (DrawRoadLine.lb + 1), a
 .laneOk:
+        ; ---- rows under the player's car: no centre line (hidden anyway), and
+        ;      tell the car when the road may have written into its block
+        ld a, (CurRow)
+        cp CAR_ROW
+        jr c, .notCar
+        ld a, $FF
+        ld (DrawRoadLine.lb + 1), a
+        ld a, (RowForced)
+        or a
+        jr nz, .carDirty
+        ld a, (RowA)            ; left kerb cells [a, b) overlap columns 12-19?
+        cp CAR_COL + CAR_W
+        jr nc, .k2
+        ld a, (RowB)
+        cp CAR_COL + 1
+        jr nc, .carDirty
+.k2:    ld a, (RowC)            ; right kerb cells [c, d)?
+        cp CAR_COL + CAR_W
+        jr nc, .notCar
+        ld a, (RowD)
+        cp CAR_COL + 1
+        jr c, .notCar
+.carDirty:
+        ld a, 1
+        ld (CarDirty), a
+.notCar:
         ; ---- bitmap address of the row's first pixel line -> IX
         ld a, (CurRow)
         ld b, a
@@ -621,69 +653,59 @@ StalePieces:
         add a, a
         ld l, a
 .rs:    ld h, 0
-        ld a, (hl)
-        ld (OldA), a
+        ld b, (hl)              ; old a
         inc l
-        ld a, (hl)
-        ld (OldB), a
+        ld c, (hl)              ; old b
         inc l
-        ld a, (hl)
-        ld (OldC), a
+        ld d, (hl)              ; old c
         inc l
-        ld a, (hl)
-        ld (OldD), a
-        ; piece 1: [oA, min(oB, a))
-        ld a, (OldB)
-        ld b, a
+        ld e, (hl)              ; old d
+        ; piece 1: [old a, min(old b, a))
         ld a, (RowA)
-        cp b
-        jr c, .p1
-        ld a, b
-.p1:    ld b, a
-        ld a, (OldA)
-        call .piece
-        ld (ZeroStaleRow.p1 + 1), hl
-        ; piece 2: [max(oA, b), oB)
-        ld a, (OldB)
-        ld b, a
-        ld a, (RowB)
-        ld c, a
-        ld a, (OldA)
         cp c
-        jr nc, .p2
+        jr c, .e1
         ld a, c
-.p2:    call .piece
-        ld (ZeroStaleRow.p2 + 1), hl
-        ; piece 3: [oC, min(oD, c))
-        ld a, (OldD)
-        ld b, a
-        ld a, (RowC)
-        cp b
-        jr c, .p3
-        ld a, b
-.p3:    ld b, a
-        ld a, (OldC)
-        call .piece
-        ld (ZeroStaleRow.p3 + 1), hl
-        ; piece 4: [max(oC, d), oD)
-        ld a, (OldD)
-        ld b, a
-        ld a, (RowD)
-        ld c, a
-        ld a, (OldC)
-        cp c
-        jr nc, .p4
-        ld a, c
-.p4:    call .piece
-        ld (ZeroStaleRow.p4 + 1), hl
-        ret
-; A = start, B = end -> L = start, H = count (0 if end <= start)
-.piece: ld l, a
-        ld a, b
-        sub l
-        jr nc, .pc
+.e1:    sub b
+        jr nc, .n1
         xor a
-.pc:    ld h, a
+.n1:    ld h, a
+        ld l, b
+        ld (ZeroStaleRow.p1 + 1), hl
+        ; piece 2: [max(old a, b), old b)
+        ld a, (RowB)
+        cp b
+        jr nc, .s2
+        ld a, b
+.s2:    ld l, a
+        ld a, c
+        sub l
+        jr nc, .n2
+        xor a
+.n2:    ld h, a
+        ld (ZeroStaleRow.p2 + 1), hl
+        ; piece 3: [old c, min(old d, c))
+        ld a, (RowC)
+        cp e
+        jr c, .e3
+        ld a, e
+.e3:    sub d
+        jr nc, .n3
+        xor a
+.n3:    ld h, a
+        ld l, d
+        ld (ZeroStaleRow.p3 + 1), hl
+        ; piece 4: [max(old c, d), old d)
+        ld a, (RowD)
+        cp d
+        jr nc, .s4
+        ld a, d
+.s4:    ld l, a
+        ld a, e
+        sub l
+        jr nc, .n4
+        xor a
+.n4:    ld h, a
+        ld (ZeroStaleRow.p4 + 1), hl
         ret
 
 ; Clear the stale kerb cells (pieces patched by StalePieces) on all 8 lines
@@ -715,15 +737,13 @@ ZeroStaleRow:
         ld a, e
         add a, c
         ld l, a
-        ld h, d
         xor a
-.col:   push hl
-        ld c, 8
-.ln:    ld (hl), a
+.col:   ld h, d                 ; a column of 8 lines, unrolled
+        DUP 7
+        ld (hl), a
         inc h
-        dec c
-        jr nz, .ln
-        pop hl
+        EDUP
+        ld (hl), a
         inc l
         djnz .col
         ret

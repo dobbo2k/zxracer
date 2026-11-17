@@ -29,10 +29,10 @@ MainLoop:
         call SelectBackBuffer
         BORDER 3                ; magenta: sprites
         call EraseSprites
-        BORDER 4                ; green: horizon
-        call DrawHorizon
         BORDER 2                ; red: road
         call DrawRoad
+        BORDER 4                ; green: horizon
+        call DrawHorizonIfTime
         BORDER 3                ; magenta: sprites
         call DrawSprites
         call DrawCar

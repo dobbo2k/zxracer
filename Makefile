@@ -44,6 +44,7 @@ build/cputest.sna: tests/cputest.asm | build
 test: $(ZXSIM) build/cputest.sna build/zxracer.sna
 	$(PYTHON) tests/run_cputest.py $(ZXSIM) build/cputest.sna
 	$(PYTHON) tests/smoke.py $(ZXSIM) build/zxracer.sna build
+	$(PYTHON) tests/carcheck.py $(ZXSIM) build/zxracer.sna build
 
 # Border-bar profile: T-states per phase per game frame
 profile: $(ZXSIM) build/zxracer.sna

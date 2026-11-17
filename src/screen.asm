@@ -82,6 +82,11 @@ SelectBackBuffer:
         ld bc, HudCacheB
 .msgA:  ld (MsgLast), hl
         ld (HudCache), bc
+        ld hl, CarShownA
+        or a
+        jr z, .carA
+        ld hl, CarShownB
+.carA:  ld (CarShown), hl
         pop bc
         ld a, e
         ld a, d

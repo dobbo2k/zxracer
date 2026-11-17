@@ -1,11 +1,29 @@
 ; ---------------------------------------------------------------------------
 ; Horizon panorama: a 256-pixel tiling band of mountains in character rows
-; 9-11, scrolled sideways by the road's curvature. Four copies are stored,
+; 10-11, scrolled sideways by the road's curvature. Four copies are stored,
 ; pre-rotated by 0/2/4/6 pixels; a copy plus a whole-byte rotation (two LDI
 ; runs per line) gives any even scroll position. Redrawn only when the
 ; scroll position changed since this buffer last showed it.
 ; ---------------------------------------------------------------------------
-PANO_Y          EQU 72                  ; first line (character row 9)
+PANO_Y          EQU 80                  ; first line (character row 10)
+
+; When this game frame already runs late (2 TV frames since the last flip)
+; and the panorama is only 2 pixels behind, skip it: it is a distant band and
+; catching up a frame later is invisible. 4+ pixels behind always redraws.
+DrawHorizonIfTime:
+        ld a, (HorizonX + 1)
+        and $FE
+        ld hl, (PanoLast)
+        sub (hl)
+        ret z                   ; up to date
+        add a, 2
+        cp 5
+        jr nc, DrawHorizon      ; 4+ pixels behind: always redraw
+        ld a, (FrameCount)      ; only 2 behind: skip if running late
+        ld hl, LastFlip
+        sub (hl)
+        cp MIN_FRAMES
+        ret nc
 
 DrawHorizon:
         ld a, (HorizonX + 1)            ; scroll in pixels

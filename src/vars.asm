@@ -102,3 +102,8 @@ SfxTimer:       db 0
 SfxType:        db 0
 RandSeed:       dw $A5C3
 EnginePeriod:   dw ENGINE_IDLE
+CarDirty:       db 1            ; something wrote into the car block this frame
+CarAttrDirty:   db 1
+CarShown:       dw CarShownA
+CarShownA:      db $FF          ; car frame each buffer shows
+CarShownB:      db $FF

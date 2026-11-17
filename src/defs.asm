@@ -22,7 +22,7 @@ STACK_TOP       EQU $C000       ; stack grows down from here ($BF01-$BFFF)
 PORT_7FFD       EQU $7FFD
 P7FFD_ROM48     EQU $10
 P7FFD_SHADOW    EQU $08         ; display bank 7 instead of bank 5
-MIN_FRAMES      EQU 2           ; at most 25 game frames per second
+MIN_FRAMES      EQU 3           ; locked 16.7 fps: steadier than a 25/16.7 mix
 
 ; Screen layout
 ROAD_Y0         EQU 96          ; first screen line of the road
@@ -34,7 +34,7 @@ ATTR_SKY        EQU %01101000   ; bright cyan paper, black ink (silhouettes)
 ATTR_PANO       EQU %01101001   ; bright cyan paper, blue ink (distant mountains)
 ATTR_HUD        EQU %01101001   ; HUD text: blue ink on the sky
 ATTR_TIME       EQU %01101010   ; big timer: red ink on the sky
-PANO_ROW0       EQU 9           ; panorama rows 9-11
+PANO_ROW0       EQU 10          ; panorama rows 10-11
 ATTR_GRASS_L    EQU %01100000   ; bright green paper, black ink
 ATTR_GRASS_D    EQU %00100000   ; green paper, black ink
 ATTR_ROAD       EQU %01000111   ; black paper, bright white ink

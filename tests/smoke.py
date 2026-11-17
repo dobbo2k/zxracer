@@ -19,7 +19,7 @@ for line in open(sna.replace(".sna", ".sym")):
         name, val = line.split(": EQU ")
         syms[name.strip()] = int(val, 16)
 cmd = [zxsim, sna, "-n", "560", "-a", "-d", f"{syms['Pos']}:2",
-       "-k", "350:Q", "-k", "420:Q+P", "-k", "490:Q+O"]
+       "-k", "350:Q", "-k", "420:Q+P", "-k", "440:Q", "-k", "490:Q+O", "-k", "510:Q"]
 for f, name in shots.items():
     cmd += ["-s", f"{f}:{outdir}/{name}.ppm"]
 res = subprocess.run(cmd, capture_output=True, text=True)

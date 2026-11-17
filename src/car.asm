@@ -4,6 +4,9 @@
 ; writes its own bitmap and attributes there every frame: no masking, no
 ; shifting and no attribute clash. Frames: 0 straight, 1 left, 2 right.
 ; ---------------------------------------------------------------------------
+        IFNDEF CAR_ALWAYS
+CAR_ALWAYS      EQU 0               ; 1: redraw every frame (for verification)
+        ENDIF
 CAR_COL         EQU 12
 CAR_ROW         EQU 20
 CAR_W           EQU 8               ; bytes (must match the car_data.asm built from car.png)
@@ -25,13 +28,37 @@ DrawCar:
         ld a, 1 << IN_RIGHT
 .frame:
         ld hl, CarGfx
+        ld c, 0
         cp 1 << IN_LEFT
         jr nz, .notL
         ld hl, CarGfx + CAR_FRAME
+        ld c, 1
 .notL:  cp 1 << IN_RIGHT
         jr nz, .notR
         ld hl, CarGfx + 2 * CAR_FRAME
-.notR:
+        ld c, 2
+.notR:  ; skip the redraw if this buffer already shows this frame and nothing
+        ; has written into the car's block since
+        ld de, (CarShown)
+        ld a, (de)
+        cp c
+        jr nz, .draw
+        ld a, (CarDirty)
+        or a
+        jr nz, .draw
+        IF CAR_ALWAYS
+        jr .draw
+        ENDIF
+        ld a, (CarAttrDirty)
+        or a
+        ret z
+        ld bc, CAR_W * CAR_H
+        add hl, bc              ; bitmap unchanged: attributes only
+        jp .attrs
+.draw:  ld a, c
+        ld (de), a
+        xor a
+        ld (CarDirty), a
         ; bitmap: rows 20-23 lie in the bottom third ($5000), line k of a
         ; cell row is 256 bytes after line 0
         ld a, (BufHiOr)
@@ -55,6 +82,8 @@ DrawCar:
         ld e, a
         dec ixl
         jp nz, .row
+.attrs: xor a
+        ld (CarAttrDirty), a
         ; attributes. The top cell row is the open cockpit: its paper is
         ; whatever lies underneath (grass, kerb or road, from the road
         ; renderer's row state), with white ink for heads and screen frame.

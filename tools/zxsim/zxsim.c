@@ -598,7 +598,8 @@ typedef struct { long frame; char arg[256]; } event;
 int main(int argc, char **argv) {
     const char *sna = NULL;
     long nframes = 50;
-    event shots[64], keys[64], joys[64];
+    enum { MAX_EVENTS = 1024 };
+    static event shots[MAX_EVENTS], keys[MAX_EVENTS], joys[MAX_EVENTS];
     int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
     long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1;
     const char *prof_file = NULL;
@@ -609,6 +610,8 @@ int main(int argc, char **argv) {
         else if ((!strcmp(a, "-s") || !strcmp(a, "-k") || !strcmp(a, "-j")) && i + 1 < argc) {
             char *v = argv[++i], *colon = strchr(v, ':');
             if (!colon) { fprintf(stderr, "zxsim: expected F:VALUE for %s\n", a); return 2; }
+            int *cnt = a[1] == 's' ? &nshots : a[1] == 'k' ? &nkeys : &njoys;
+            if (*cnt >= MAX_EVENTS) { fprintf(stderr, "zxsim: too many %s options\n", a); return 2; }
             event *e = a[1] == 's' ? &shots[nshots++] : a[1] == 'k' ? &keys[nkeys++] : &joys[njoys++];
             e->frame = atol(v);
             strncpy(e->arg, colon + 1, 255); e->arg[255] = 0;

@@ -73,7 +73,10 @@ BuildCurveList:
         push hl
         call ZLine              ; A = first line (from the bottom) in the new segment
         pop hl
-        ld (ix + 0), a
+        cp $FF
+        jr z, .odd
+        or 1                    ; events are checked on odd lines only
+.odd:   ld (ix + 0), a
         ; next segment (looping)
         ld a, (hl)
         inc hl
@@ -163,7 +166,7 @@ NextCurve:
 ; straightens gradually instead of snapping when a segment boundary passes
 ; under the car.
 ZoneLines:
-        db 64, 48, 34, 24, 17, 12, $FF
+        db 65, 49, 35, 25, 17, 13, $FF     ; odd: pass 1 checks events on odd lines
 
 ; A = segment curvature -> patch RoadPass1's dx increment for the current zone
 SetCurve:

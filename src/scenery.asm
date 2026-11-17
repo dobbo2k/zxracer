@@ -460,14 +460,19 @@ MulS8U8:
         jr z, .pos
         neg
 .pos:   ld hl, 0
-        ld d, 0
-        ld b, 8
-.m:     add hl, hl
-        rla
-        jr nc, .n
+        ld d, h
+        ; |A| < 128: 7 bits, unrolled, stopping when no bits are left
+        DUP 7
+        add hl, hl
+        add a, a
+        jr nc, $ + 3
         add hl, de
-.n:     djnz .m
-        bit 7, c
+        EDUP
+        add hl, hl
+        add a, a
+        jr nc, .done
+        add hl, de
+.done:  bit 7, c
         ret z
         ex de, hl
         ld hl, 0
@@ -477,6 +482,30 @@ MulS8U8:
 
 ; HL -> draw command. XOR the sprite into the back buffer.
 RunCommand:
+        ; does the sprite overlap the player's car block (rows 20-23, cols 12-19)?
+        push hl
+        ld a, (hl)              ; y top
+        ld b, a
+        inc hl
+        ld c, (hl)              ; column
+        inc hl
+        ld e, (hl)              ; n
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        add a, (hl)             ; y top + height
+        cp CAR_ROW * 8 + 1
+        jr c, .noCar
+        ld a, c
+        cp CAR_COL + CAR_W
+        jr nc, .noCar
+        add a, e
+        cp CAR_COL + 1
+        jr c, .noCar
+        ld a, 1
+        ld (CarDirty), a
+.noCar: pop hl
         ld a, (hl)              ; y top
         ld c, a
         inc hl
