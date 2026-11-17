@@ -75,10 +75,13 @@ SelectBackBuffer:
 .cmdA:  ld (CmdList), hl
         ld (PanoLast), bc
         ld hl, MsgLastA
+        ld bc, HudCacheA
         or a
         jr z, .msgA
         ld hl, MsgLastB
+        ld bc, HudCacheB
 .msgA:  ld (MsgLast), hl
+        ld (HudCache), bc
         pop bc
         ld a, e
         ld a, d

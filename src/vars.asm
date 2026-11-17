@@ -89,3 +89,6 @@ MsgLast:        dw MsgLastA
 MsgLastA:       dw 0            ; message each buffer shows
 MsgLastB:       dw 0
 HudOr:          db 0
+HudCache:       dw HudCacheA
+HudCacheA:      db $FF, $FF, $FF, $FF, $FF, $FF     ; score, time, speed shown
+HudCacheB:      db $FF, $FF, $FF, $FF, $FF, $FF

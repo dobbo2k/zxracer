@@ -43,20 +43,41 @@ InitHud:
 DrawHud:
         ld a, (BufHiOr)
         ld (HudOr), a
-        ; ---- score: 7 digits from the 8-digit BCD score
+        ld ix, (HudCache)       ; what this buffer shows: score (4), time, speed
+        ; ---- score: 7 digits; redraw only the BCD bytes that changed
+        ld a, (Score + 3)
+        cp (ix + 3)
+        jr z, .s3
+        ld (ix + 3), a
         ld bc, $0101
         call CellAddr
-        ld de, Score + 3
-        ld a, (de)
         call PrintLowNib
-        ld b, 3
-.sc:    dec de
-        ld a, (de)
-        push bc
+.s3:    ld a, (Score + 2)
+        cp (ix + 2)
+        jr z, .s2
+        ld (ix + 2), a
+        ld bc, $0102
+        call CellAddr
         call PrintBcd
-        pop bc
-        djnz .sc
-        ; ---- time: two big digits
+.s2:    ld a, (Score + 1)
+        cp (ix + 1)
+        jr z, .s1
+        ld (ix + 1), a
+        ld bc, $0104
+        call CellAddr
+        call PrintBcd
+.s1:    ld a, (Score)
+        cp (ix + 0)
+        jr z, .s0
+        ld (ix + 0), a
+        ld bc, $0106
+        call CellAddr
+        call PrintBcd
+.s0:    ; ---- time: two big digits
+        ld a, (Time)
+        cp (ix + 4)
+        jr z, .t0
+        ld (ix + 4), a
         ld bc, $010E
         call CellAddr
         ld a, (Time)
@@ -71,8 +92,11 @@ DrawHud:
         ld a, (Time)
         and $0F
         call PrintBig
-        ; ---- speed: Speed * 14 km/h, 3 digits
+.t0:    ; ---- speed: Speed * 14 km/h, 3 digits
         ld a, (Speed)
+        cp (ix + 5)
+        jr z, .v0
+        ld (ix + 5), a
         ld l, a
         ld h, 0
         add hl, hl
@@ -92,6 +116,7 @@ DrawHud:
         call .digit
         ld a, e
         call PrintDigit
+.v0:
         ; ---- message line, only if it changed for this buffer
         ld hl, (MsgLast)
         ld de, (Message)
