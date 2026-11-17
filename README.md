@@ -39,14 +39,14 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   light/dark grass bands, centre line, and curves that build up in the distance.
 - **Car:** original convertible sprite with steering frames, centrifugal force,
   off-road slowdown and braking.
-- **Scenery:** palm trees along the track (XOR-drawn, pre-scaled, pre-shifted)
-  and a mountain panorama that scrolls with the bends.
+- **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,
+  pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
 - **Game:** HUD with score, big countdown timer and speed; extra time each lap,
   game over, attract mode.
 - **Traffic:** cars in two lanes. Running into one from behind slows you right
   down; driving into a palm off the road is a crash that stops you and spins the
   car. The attract-mode driver changes lane to avoid traffic.
 - **Sound:** AY engine note that follows the speed, gravel noise off-road, tyre squeal.
-- **Speed:** about 16.5 fps on average on a curvy lap with scenery and traffic, up
-  to 25 fps on straights (PLAN.md §3.6).
+- **Speed:** locked at 16.7 fps; sharp bends with traffic still drop some frames to
+  12.5 fps (PLAN.md §3.6).
 - **Next:** a performance pass, then more scenery and music. See PLAN.md §7.

@@ -20,7 +20,7 @@
 MAX_SPR         EQU 14             ; draw commands per buffer
 MAX_SCN         EQU 8              ; scenery objects considered per frame
 Z_NEARV         EQU 130             ; objects nearer than this have passed the bottom line
-Z_FARV          EQU 3000            ; and further than this are not drawn
+Z_FARV          EQU 2000            ; and further than this (specks) are not drawn
 CMD_SIZE        EQU 8
 PALM_HALFWIDTH  EQU 48             ; car half-width + the palm's crown
 

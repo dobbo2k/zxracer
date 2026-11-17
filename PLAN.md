@@ -169,6 +169,7 @@ Main loop @25 Hz:
 | M1b (v7) | standing / straight / steering hard | ~55,000 / 75,300 / 137,000 | 25 / 25 / 19 fps |
 | M2+M3 | attract-mode lap of the curvy test track, road + car | 147,000 + 5,800 | 18.6 fps |
 | M4+M5 | lap with scenery and panorama; road paired lines, depth-weighted curves | 117,400 (peak 160,000) | 19.3 fps (2 TV frames 43%, 3 frames 54%, 4 frames 3%) |
+| M7 | traffic, signs, frame rate locked to 3 TV frames | 118,000 (peak 152,000) + sprites 43,000 | 15.7 fps (3 TV frames 83%, 4 frames 17%) |
 
 The 30k road budget was unrealistic for 96 scanlines on a 3.5 MHz Z80. **Decision:**
 the guaranteed minimum is 16.7 fps (212,700 T per game frame) with scenery and
@@ -192,12 +193,17 @@ What the renderer does now (§3.2 still applies):
   they snapped straight in a few frames, because the bottom half of the screen
   spans only about 170 depth units.
 
+The frame rate is locked at 3 TV frames (16.7 fps): an even pace looks smoother
+than a 25/16.7/12.5 mix. The remaining overruns come from sharp bends with traffic.
+
 Optimisation backlog for M11 (by expected gain):
-1. Sprites: about 32k on average, 63k at peak. Store per-line spans so that empty
-   bytes are not XORed (palm trunks are 1-2 bytes wide).
-2. Row overhead (~24k): fewer patched constants per row, inline the line loop.
-3. Pass 1 (~25k on curves): accumulator-only steps for the even lines are still per line.
-4. Horizon redraw (19k peak): split across frames or cut to 16 lines.
+1. Road row setup (~5k patching, ~4k line loop, ~7k attributes per frame): table-driven
+   row constants instead of self-modifying patches; patch the narrow-road path only when used.
+2. Pass 1 (~25k on curves): unroll the line pair (no per-line parity test).
+3. Sprites (~43k with traffic): skip erase+redraw when a buffer's command is
+   unchanged (cars driving at the player's speed); cheaper projection.
+4. Per-stage sprite cache in bank 5, loaded from the free banks (0, 1, 3, 4, 6), so
+   that more object types fit.
 
 Border-colour timing bars (`PROFILE=1`) show each phase on screen; `make profile`
 and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
@@ -270,7 +276,7 @@ docs/       Technical notes, profiling results
 | **M1b** | Road optimisation | Cut the road's per-line cost | ✅ v7 renderer; more in M11 |
 | **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | 🟡 curves, YAML track compiler and test loop done; hills to do |
 | **M3** | Player car | Car with steering frames, no colour clash, basic steering/speed physics | ✅ car owns a fixed 8×4-cell block; centrifugal force; attract-mode driver |
-| **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | 🟡 palms with XOR draw/erase; more object types and hills to do |
+| **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | 🟡 palms and automatic curve-warning signs; per-stage sets need the bank cache |
 | **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | 🟡 scrolling mountain band; clouds and per-stage palettes to do |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | 🟡 3 cars in lanes, respawn ahead, bumps, palm crashes with spin-out; lane changes to do |
