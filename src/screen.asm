@@ -20,8 +20,14 @@ ClearScreen:
         ld h, d
         ld l, e
         inc de
+        ld (hl), ATTR_HUD
+        ld bc, 32 * 3 - 1
+        ldir
+        ld h, d
+        ld l, e
+        inc de
         ld (hl), ATTR_SKY
-        ld bc, 32 * PANO_ROW0 - 1
+        ld bc, 32 * (PANO_ROW0 - 3) - 1
         ldir
         ld h, d
         ld l, e
@@ -68,6 +74,11 @@ SelectBackBuffer:
         ld bc, PanoLastB
 .cmdA:  ld (CmdList), hl
         ld (PanoLast), bc
+        ld hl, MsgLastA
+        or a
+        jr z, .msgA
+        ld hl, MsgLastB
+.msgA:  ld (MsgLast), hl
         pop bc
         ld a, e
         ld a, d

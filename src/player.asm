@@ -6,8 +6,12 @@ PX_MAX          EQU 200
 MAX_SPEED       EQU 20          ; depth units per 50 Hz frame
 ACCEL           EQU 1
 DECEL           EQU 1
+BRAKE           EQU 2
+OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
+OFFROAD_SPEED   EQU 8
 
 UpdatePlayer:
+        call GameUpdate
         call DemoDriver
         ; frames elapsed since the last update (1..4)
         ld a, (FrameCount)
@@ -100,6 +104,12 @@ UpdatePlayer:
 
         ; speed
         ld a, (Speed)
+        bit IN_DOWN, c
+        jr z, .noBrake
+        sub BRAKE
+        jr nc, .noBrake
+        xor a
+.noBrake:
         bit IN_UP, c
         jr z, .coast
         add a, ACCEL
@@ -111,6 +121,25 @@ UpdatePlayer:
         jr nc, .spd
         xor a
 .spd:   ld (Speed), a
+        ; off the road (past the kerb): speed limited, sheds speed quickly
+        push af
+        ld hl, (PlayerX)
+        bit 7, h
+        jr z, .absX
+        ex de, hl
+        ld hl, 0
+        or a
+        sbc hl, de
+.absX:  ld de, OFFROAD_X
+        or a
+        sbc hl, de
+        pop af
+        jr c, .onRoad
+        cp OFFROAD_SPEED + 1
+        jr c, .onRoad
+        sub 2
+        ld (Speed), a
+.onRoad:
 
         ; position += speed * elapsed
         ld e, a
@@ -119,8 +148,12 @@ UpdatePlayer:
         ld a, (Elapsed)
         ld b, a
 .adv:   add hl, de
-        djnz .adv
+        jr nc, .noLap
+        ld a, 1
+        ld (LapFlag), a
+.noLap: djnz .adv
         ld (Pos), hl
+        call AddScore
         call UpdateTrack
         jp UpdateObjects
 
@@ -128,33 +161,11 @@ UpdatePlayer:
 ; (accelerate, steer back towards the middle of the road).
 DEMO_DEADBAND   EQU 6
 
-DEMO_IDLE       EQU 100             ; game frames without input before attract mode
-
 DemoDriver:
-        ld a, (Input)
-        or a
-        ld hl, IdleCount
-        jr z, .idle
-        ld (hl), 0
-        jr .mode
-.idle:  ld a, (hl)
-        cp DEMO_IDLE
-        jr nc, .resume
-        inc (hl)
-        jr .mode
-.resume:
-        ld a, 1
-        ld (DemoMode), a
-.mode:  ld a, (DemoMode)
+        ld a, (DemoMode)
         or a
         ret z
         ld a, (Input)
-        and (1 << IN_LEFT) | (1 << IN_RIGHT)
-        jr z, .auto
-        xor a
-        ld (DemoMode), a
-        ret
-.auto:  ld a, (Input)
         set IN_UP, a
         ld c, a
         ld hl, (PlayerX)

@@ -14,6 +14,10 @@ start:
         ld bc, PORT_7FFD
         out (c), a
         call InitScreens
+        xor a
+        call InitHud
+        ld a, $80
+        call InitHud
         call InitInterrupts
         ei
 
@@ -31,6 +35,8 @@ MainLoop:
         BORDER 3                ; magenta: sprites
         call DrawSprites
         call DrawCar
+        BORDER 5                ; cyan: HUD
+        call DrawHud
         BORDER 0                ; black: waiting for flip
         call FlipBuffers
         jr MainLoop
@@ -45,6 +51,8 @@ MainLoop:
         INCLUDE "car.asm"
         INCLUDE "scenery.asm"
         INCLUDE "horizon.asm"
+        INCLUDE "hud.asm"
+        INCLUDE "game.asm"
         INCLUDE "horizon_data.asm"
         INCLUDE "vars.asm"
         INCLUDE "track_data.asm"
@@ -99,6 +107,7 @@ FillBlock:
 ; Scenery sprites in the spare part of bank 5 (visible whichever buffer is drawn)
         ORG SCN_DATA
         INCLUDE "scenery_data.asm"
+        INCLUDE "font_data.asm"
 ScnEnd:
         ASSERT ScnEnd <= $8000
 

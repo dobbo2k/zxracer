@@ -28,7 +28,10 @@ build/scenery_data.asm: tools/make_scenery.py | build
 build/horizon_data.asm: tools/make_horizon.py | build
 	$(PYTHON) tools/make_horizon.py $@
 
-build/zxracer.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm build/scenery_data.asm build/horizon_data.asm | build
+build/font_data.asm: tools/make_font.py | build
+	$(PYTHON) tools/make_font.py $@
+
+build/zxracer.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm build/scenery_data.asm build/horizon_data.asm build/font_data.asm | build
 	$(ASM) $(ASMFLAGS) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build

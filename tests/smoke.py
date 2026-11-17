@@ -9,10 +9,10 @@ import subprocess, sys
 from PIL import Image
 
 zxsim, sna, outdir = sys.argv[1:4]
-shots = {59: "straight", 129: "steer_right", 199: "steer_left",
-         749: "attract_1", 899: "attract_2"}
-# frames 0-199 under keyboard control; idle afterwards, so attract mode resumes
-cmd = [zxsim, sna, "-n", "900", "-k", "0:Q", "-k", "60:Q+P", "-k", "130:Q+O", "-k", "200:none"]
+shots = {199: "attract_1", 349: "attract_2",
+         419: "straight", 489: "steer_right", 559: "steer_left"}
+# attract mode (demo driver) until frame 350, then a game: accelerate, steer
+cmd = [zxsim, sna, "-n", "560", "-k", "350:Q", "-k", "420:Q+P", "-k", "490:Q+O"]
 for f, name in shots.items():
     cmd += ["-s", f"{f}:{outdir}/{name}.ppm"]
 res = subprocess.run(cmd, capture_output=True, text=True)

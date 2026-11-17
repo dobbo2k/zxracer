@@ -13,7 +13,6 @@ StatePage:      db 0
 
 Input:          db 0
 DemoMode:       db 1            ; attract mode until a steering key is pressed
-IdleCount:      db 0
 PlayerX:        dw 0
 Speed:          db 0
 Pos:            dw 0
@@ -77,3 +76,16 @@ HorizonX:       dw 0            ; scroll, 8.8 pixels
 PanoLast:       dw PanoLastA
 PanoLastA:      db $FF          ; scroll each buffer shows ($FF: none yet)
 PanoLastB:      db $FF
+
+; game
+GameState:      db ST_ATTRACT
+Time:           db START_TIME   ; BCD seconds
+SecTick:        db 0
+LapFlag:        db 0
+StateTimer:     db 0
+Score:          ds 4            ; BCD, low byte first
+Message:        dw MsgAttract
+MsgLast:        dw MsgLastA
+MsgLastA:       dw 0            ; message each buffer shows
+MsgLastB:       dw 0
+HudOr:          db 0

@@ -32,6 +32,8 @@ ROAD_ROW0       EQU 12          ; first character row of the road
 ; Attributes: bit 6 bright, bits 5-3 paper, bits 2-0 ink
 ATTR_SKY        EQU %01101000   ; bright cyan paper, black ink (silhouettes)
 ATTR_PANO       EQU %01101001   ; bright cyan paper, blue ink (distant mountains)
+ATTR_HUD        EQU %01101001   ; HUD text: blue ink on the sky
+ATTR_TIME       EQU %01101010   ; big timer: red ink on the sky
 PANO_ROW0       EQU 9           ; panorama rows 9-11
 ATTR_GRASS_L    EQU %01100000   ; bright green paper, black ink
 ATTR_GRASS_D    EQU %00100000   ; green paper, black ink
