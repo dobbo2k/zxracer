@@ -68,6 +68,32 @@ def main(path):
     lines += page("DEPage", ("RoadD", [0xFF] * ROAD_LINES),             # first road pixel
                   ("RoadE", [0] * ROAD_LINES))                          # last road pixel
     lines += page("LXPage", ("LaneX", [0xFF] * ROAD_LINES))             # centre line x
+    # Scenery: perspective scale (i+1)/96 in 1/256 and pre-scaled size per line
+    sizes = [64, 48, 36, 27, 20, 15, 11, 8, 6]         # must match tools/make_scenery.py
+    scale = [min(255, round((i + 1) * 256 / ROAD_LINES)) for i in range(ROAD_LINES)]
+    size_for = []
+    for i in range(ROAD_LINES):
+        want = 64 * (i + 1) / ROAD_LINES
+        k = min(range(len(sizes)), key=lambda k: abs(sizes[k] - want))
+        size_for.append(k if want >= 4 else 0xFF)
+    lines += page("ObjPage", ("ObjScale", scale), ("SizeForLine", size_for))
+    # Depth -> screen line for scenery: largest i with Z[i] >= z.
+    # ZNear[z >> 2] for z < 1024, ZFar[z >> 4] for z < 4096 ($FF: none).
+    zs = [road_line(i)[3] for i in range(ROAD_LINES)]
+    def zline(z):
+        best = 0xFF
+        for i in range(ROAD_LINES):
+            if zs[i] >= z:
+                best = i
+        return best
+    lines += ["        ALIGN 256", "ZNear:"]
+    vals = [zline(max(1, k * 4)) for k in range(256)]
+    for k in range(0, 256, 16):
+        lines.append("        db " + ", ".join(f"${v:02X}" for v in vals[k:k + 16]))
+    lines += ["ZFar:"]
+    vals = [zline(max(1, k * 16)) for k in range(256)]
+    for k in range(0, 256, 16):
+        lines.append("        db " + ", ".join(f"${v:02X}" for v in vals[k:k + 16]))
 
     # Per-buffer state (three consecutive pages per buffer):
     #   St1: first / last road pixel per line (kerb bytes drawn for those)

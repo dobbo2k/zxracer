@@ -112,7 +112,8 @@ UpdatePlayer:
 .adv:   add hl, de
         djnz .adv
         ld (Pos), hl
-        jp UpdateTrack
+        call UpdateTrack
+        jp UpdateObjects
 
 ; Demo / attract mode: until a steering key is pressed, drive automatically
 ; (accelerate, steer back towards the middle of the road).

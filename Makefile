@@ -22,7 +22,10 @@ build/track_data.asm: tools/track.py assets/tracks/test.yaml | build
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
 	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32
 
-build/zxracer.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm | build
+build/scenery_data.asm: tools/make_scenery.py | build
+	$(PYTHON) tools/make_scenery.py $@
+
+build/zxracer.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm build/scenery_data.asm | build
 	$(ASM) $(ASMFLAGS) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build

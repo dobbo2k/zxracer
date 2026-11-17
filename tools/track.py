@@ -31,6 +31,26 @@ def main(src, dst):
         out.append(f"        dw {length}")
         out.append(f"        db {curve & 0xFF}, 0")
     out += ["TrackEnd:", "        dw 0", ""]
+
+    # Scenery: expand the rules into one z-sorted list of 4-byte objects:
+    # dw z ; db x / 4 (signed) ; db type. A type of $FF ends the list.
+    types = {"palm": 0}
+    objs = []
+    for rule in track.get("scenery", []):
+        z = int(rule.get("from", 0))
+        while z <= int(rule.get("to", LAP - 1)) and z < LAP:
+            x = int(rule["x"]) // 4
+            if not -128 <= x <= 127:
+                sys.exit(f"{src}: scenery x {rule['x']} out of range")
+            objs.append((z, x, types[rule["type"]]))
+            z += int(rule["every"])
+    objs.sort()
+    out.append(f"; {len(objs)} scenery objects")
+    out.append("Objects:")
+    for z, x, t in objs:
+        out.append(f"        dw {z}")
+        out.append(f"        db {x & 0xFF}, {t}")
+    out += ["ObjectsEnd:", "        dw 0", "        db 0, $FF", ""]
     open(dst, "w").write("\n".join(out))
 
 

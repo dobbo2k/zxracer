@@ -22,9 +22,12 @@ MainLoop:
         call ReadInput
         call UpdatePlayer
         call SelectBackBuffer
+        BORDER 3                ; magenta: sprites
+        call EraseSprites
         BORDER 2                ; red: road
         call DrawRoad
         BORDER 3                ; magenta: sprites
+        call DrawSprites
         call DrawCar
         BORDER 0                ; black: waiting for flip
         call FlipBuffers
@@ -38,6 +41,7 @@ MainLoop:
         INCLUDE "track.asm"
         INCLUDE "car_data.asm"
         INCLUDE "car.asm"
+        INCLUDE "scenery.asm"
         INCLUDE "vars.asm"
         INCLUDE "track_data.asm"
 CodeEnd:
@@ -46,7 +50,19 @@ CodeEnd:
         ORG TABLES
         INCLUDE "tables.asm"
 TablesEnd:
-        ASSERT TablesEnd <= LDI_END - 2 * STRIP_PAD
+        ASSERT TablesEnd <= XOR_END - 5 * 8
+
+; Unrolled XOR chain for sprites: entered at XorEnd - 5*n for n bytes
+        ORG XOR_END - 5 * 8
+        DUP 8
+        ld a, (de)
+        xor (hl)
+        ld (hl), a
+        inc l
+        inc de
+        EDUP
+XorEnd: jp (iy)
+        ASSERT $ <= LDI_END - 2 * STRIP_PAD
 
 ; Unrolled LDI chain: entered at LdiEnd - 2*n to copy n bytes (HL) -> (DE)
         ORG LDI_END - 2 * STRIP_PAD
@@ -66,5 +82,11 @@ FillBlock:
 
         ORG ISR_JP
         jp Isr
+
+; Scenery sprites in the spare part of bank 5 (visible whichever buffer is drawn)
+        ORG SCN_DATA
+        INCLUDE "scenery_data.asm"
+ScnEnd:
+        ASSERT ScnEnd <= $8000
 
         SAVESNA "build/zxracer.sna", start

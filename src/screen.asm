@@ -52,6 +52,13 @@ SelectBackBuffer:
         pop bc
         ld a, e
         ld (BufHiOr), a
+        ld (RunCommand.bufOr + 1), a
+        ld hl, CmdListA
+        or a
+        jr z, .cmdA
+        ld hl, CmdListB
+.cmdA:  ld (CmdList), hl
+        ld a, e
         ld a, d
         ld (StatePage), a
         ld a, c

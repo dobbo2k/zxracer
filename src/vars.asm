@@ -49,3 +49,22 @@ OldA:           db 0
 OldB:           db 0
 OldC:           db 0
 OldD:           db 0
+
+; scenery
+ObjFirst:       dw Objects      ; first object not yet passed
+ObjZ:           dw 0
+ObjX:           db 0
+ObjI:           db 0
+SprW:           db 0
+SprH:           db 0
+SprMask:        db 0
+SprN:           db 0
+SprSkip:        db 0
+SprSrc:         dw 0
+SprStride:      dw 0
+CmdPtr:         dw 0
+CmdList:        dw CmdListA
+CmdListA:       db 0
+                ds MAX_SPR * CMD_SIZE
+CmdListB:       db 0
+                ds MAX_SPR * CMD_SIZE
