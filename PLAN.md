@@ -274,8 +274,8 @@ docs/       Technical notes, profiling results
 | **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | 🟡 scrolling mountain band; clouds and per-stage palettes to do |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | |
-| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | |
-| **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | |
+| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 HUD, timer, lap bonus, score, game over, attract mode; stages and forks to do |
+| **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
 | **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | |
 | **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | |
 
@@ -301,6 +301,8 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 
 ## 9. Immediate next steps
 
-1. HUD (time, score, speed) and the game structure: checkpoints, timer, game over (M8).
-2. AY engine sound (M9).
-3. Traffic cars (M7), more scenery types, then hills (M2b).
+1. M7: traffic cars (sprites on the road) and collisions with traffic and scenery
+   (crash and recovery), which make it a game rather than a drive.
+2. M4: more scenery types (signs, rocks, bushes) and per-stage variety.
+3. M11 backlog items in §3.6, to get closer to 25 fps everywhere.
+4. M9: music (PT3 player) with the engine moved to channel C.
