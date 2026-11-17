@@ -1,0 +1,51 @@
+; ---------------------------------------------------------------------------
+; ZX Racer - global constants and macros
+; ---------------------------------------------------------------------------
+
+; Build options
+        IFNDEF PROFILE
+PROFILE         EQU 1           ; 1 = border colour timing bars
+        ENDIF
+
+; Memory map (bank 2, $8000-$BFFF, always paged)
+TABLES          EQU $A800       ; page-aligned lookup tables (build/tables.asm)
+LDI_END         EQU $BC00       ; unrolled LDI chain ends here (with RET)
+FILL_END        EQU $BD00       ; unrolled fill block ends here (with RET)
+ISR_JP          EQU $BDBD       ; IM2 lands here: JP Isr
+IM2_TABLE       EQU $BE00       ; 257-byte vector table, all bytes = $BD
+STACK_TOP       EQU $C000       ; stack grows down from here ($BF01-$BFFF)
+
+; 128K paging
+PORT_7FFD       EQU $7FFD
+P7FFD_ROM48     EQU $10
+P7FFD_SHADOW    EQU $08         ; display bank 7 instead of bank 5
+MIN_FRAMES      EQU 2           ; at most 25 game frames per second
+
+; Screen layout
+ROAD_Y0         EQU 96          ; first screen line of the road
+ROAD_LINES      EQU 96
+ROAD_ROW0       EQU 12          ; first character row of the road
+
+; Attributes: bit 6 bright, bits 5-3 paper, bits 2-0 ink
+ATTR_SKY        EQU %01101111   ; bright cyan paper, white ink
+ATTR_GRASS_L    EQU %01100000   ; bright green paper, black ink
+ATTR_GRASS_D    EQU %00100000   ; green paper, black ink
+ATTR_ROAD       EQU %01000111   ; black paper, bright white ink
+ATTR_KERB_L     EQU %01111000   ; bright white paper, black ink
+ATTR_KERB_D     EQU %01010000   ; bright red paper, black ink
+
+STRIPE_BIT      EQU $40         ; bit of (z + position) selecting light/dark band
+
+; Input bits (same layout as Kempston)
+IN_RIGHT        EQU 0
+IN_LEFT         EQU 1
+IN_DOWN         EQU 2
+IN_UP           EQU 3
+IN_FIRE         EQU 4
+
+        MACRO BORDER col
+        IF PROFILE
+        ld a, col
+        out ($FE), a
+        ENDIF
+        ENDM

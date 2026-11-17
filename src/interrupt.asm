@@ -1,0 +1,45 @@
+; ---------------------------------------------------------------------------
+; IM2 interrupt handling and tear-free screen flipping
+; ---------------------------------------------------------------------------
+
+InitInterrupts:
+        ld hl, IM2_TABLE
+        ld de, IM2_TABLE + 1
+        ld bc, 256
+        ld (hl), high ISR_JP
+        ldir
+        ld a, high IM2_TABLE
+        ld i, a
+        im 2
+        ret
+
+; 50 Hz handler. Counts frames and performs a pending flip at the top of the
+; frame (before the beam reaches the display), at most every MIN_FRAMES frames.
+Isr:
+        push af
+        push hl
+        ld hl, FrameCount
+        inc (hl)
+        ld a, (FlipPending)
+        or a
+        jr z, .done
+        ld a, (hl)
+        ld hl, LastFlip
+        sub (hl)
+        cp MIN_FRAMES
+        jr c, .done
+        ld a, (FrameCount)
+        ld (hl), a
+        ld a, (FlipValue)
+        ld (Port7FFD), a
+        push bc
+        ld bc, PORT_7FFD
+        out (c), a
+        pop bc
+        xor a
+        ld (FlipPending), a
+.done:
+        pop hl
+        pop af
+        ei
+        reti

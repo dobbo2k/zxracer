@@ -1,0 +1,36 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python packages
+        run: pip install pillow
+
+      - name: Build sjasmplus
+        run: |
+          git clone --depth 1 --branch v1.21.0 https://github.com/z00m128/sjasmplus.git /tmp/sjasmplus
+          make -C /tmp/sjasmplus -j"$(nproc)" USE_LUA=0
+          sudo install /tmp/sjasmplus/sjasmplus /usr/local/bin/
+
+      - name: Build
+        run: make
+
+      - name: Test (CPU self-test + headless smoke run)
+        run: make test
+
+      - name: Profile
+        run: make profile
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zxracer
+          path: |
+            build/zxracer.sna
+            build/*.png

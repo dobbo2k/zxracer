@@ -71,10 +71,16 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 - **Sky rows:** bright cyan/blue paper, white ink for clouds and the horizon skyline.
 - **Horizon/scenery band:** stage-specific (yellow desert, white snow, green forest,
   magenta sunset…). Rewritten when the horizon moves vertically over a hill crest.
-- **Road rows:** green paper (grass), black/white ink — the road is drawn as dither
-  patterns so we get grey tarmac, white rumble strips and centre lines.
-- **Outrun-style alternating light/dark bands** are done in the *bitmap* with two dither
-  sets that switch per scanline, so stripes are scanline-accurate despite 8×8 attributes.
+- **Road rows (as built in M1):** each character row is split into five attribute runs:
+  grass | kerb | road | kerb | grass.
+  - *Grass* cells: green paper; bright/dark alternates with the light/dark bands.
+  - *Kerb* cells (the cells the road edges pass through on that row): white/red paper
+    alternating with the bands, black ink. The bitmap holds the road's pixels as black
+    ink, so the road edge is pixel-smooth while the kerb colour fills the cell
+    outside it — red/white kerbs with no clash.
+  - *Road* cells: black paper, white ink for the centre line.
+  - Grass and road bitmaps are zero, so the bands cost nothing: they are attribute
+    changes. Only kerb-cell bytes and the centre line are ever written.
 - **Player car:** cells *entirely* covered by the car's body get red ink (no clash
   possible — no background shows through them); edge cells stay in the row palette.
 - **HUD:** top 2 rows in full colour (speed, time, score, stage), never overdrawn.
@@ -97,15 +103,18 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 5. Each line becomes a *span list*: grass | rumble | road | line | road | rumble | grass.
    Light/dark is chosen by `(z + trackPosition) & stripeBit`.
 
-### 3.2 Fast span filling
+### 3.2 Road drawing (as built in M1)
 
-- 192-entry, page-aligned **screen line address table** (handles Spectrum row interleave).
-- Left/right partial bytes from 256-byte **edge mask tables** (`and`/`or` per pixel x).
-- Whole-byte runs via a jump into an unrolled 32 × `ld (hl),a : inc l` block (Duff's
-  device) — about 11 T/byte; grass runs via `push` with SP trick where long enough.
-- Lines whose spans are unchanged since 2 frames ago (same buffer) are skipped —
-  big win on straights at constant speed with mostly horizontal stripes moving.
-- Budget: **~30k T** for the road.
+- Pass 1: road centre `cx` per line from a 16.8 fixed-point accumulator (one
+  multiply per frame), plus the band bit `(z + position) & STRIPE_BIT`.
+- Pass 2, per character row: kerb cell ranges from the row's top and bottom lines;
+  attributes rewritten only when ranges or band change.
+- Per line: kerb bytes come from a prebuilt strip (`0…0, edge mask, $FF…$FF`) copied
+  with an unrolled `LDI` chain; the centre line is two OR-mask bytes.
+- **Per-buffer state** (each buffer is redrawn every second frame) records `cx`, the
+  centre-line x and each row's kerb ranges, so unchanged lines are skipped and moved
+  rows only clear the stale cells.
+- Per-row constants are patched into the line routine (self-modifying code).
 
 ### 3.3 Horizon / background
 
@@ -140,19 +149,43 @@ Main loop @25 Hz:
 
 ### 3.6 Performance budget per game frame (25 fps)
 
-| Task | T-states |
+| Task | Budget (T-states) |
 |---|---|
 | Interrupts (music ×2, input) | 6,000 |
 | Game logic & physics | 10,000 |
 | Horizon / sky | 10,000 |
-| Road | 30,000 |
+| Road | 30,000 → revised to 60,000 (see below) |
 | Scenery & traffic sprites | 50,000 |
 | Player car | 8,000 |
 | HUD | 3,000 |
-| Slack | ~25,000 |
 | **Total** | **~141,800** |
 
-Border-colour timing bars (dev build flag) show each phase on screen for profiling.
+**Measured in M1** (zxsim, cycle-counted with 128K contention, road only, no sprites):
+
+| Situation | Road T-states / game frame | Frame rate |
+|---|---|---|
+| Standing still | 75,800 | 25 fps |
+| Straight at full speed | 105,500 | 24 fps |
+| Steering hard (every line moves) | 158,000 | 17.7 fps |
+
+The first straightforward renderer cost 274,000 T. Four profile-driven rewrites brought
+it to the figures above. The 30k budget was unrealistic for 96 scanlines on a 3.5 MHz
+Z80. **Decision:** keep 25 fps as the target for straights and 16.7 fps as the guaranteed
+minimum. The road is now budgeted at **≤ 60k** worst case through the M1b optimisations
+below, which leaves room for sprites.
+
+M1b road optimisation backlog (by expected gain):
+1. Fixed per-frame overhead (75k when nothing moves): pass 1 only when the
+   road shape changes, per-row constant tables instead of ~30 patches per row,
+   cheaper band and centre-line checks.
+2. Centre line: about 220 T per line today. Precompute its mask pointer per line in
+   pass 1 and only touch lines whose band flipped.
+3. Contended writes: draw buffer A while the beam is in the border.
+4. Fewer road lines: a dashboard on the bottom 2 character rows (common on 8-bit
+   conversions) removes 16 of the 96 lines.
+
+Border-colour timing bars (`PROFILE=1`) show each phase on screen; `make profile`
+and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 
 ---
 
@@ -191,12 +224,14 @@ Border-colour timing bars (dev build flag) show each phase on screen for profili
 | Tool | Purpose |
 |---|---|
 | **sjasmplus** | Z80 assembler; `DEVICE ZXSPECTRUM128`, banked `PAGE`/`SLOT`, writes `.sna` / `.tap` |
-| **Python 3 tools** (`tools/`) | PNG → Spectrum bitmap+mask converter; sprite pre-scaler; panorama pre-shifter; track compiler (YAML → segment binary); Z-table generator; edge-mask table generator |
+| **zxsim** (`tools/zxsim`) | Our own headless 128K emulator in C: cycle counting with contention, IM2, paging, scripted keys, screenshots, border-change log, per-PC T-state profiler, breakpoints, memory dumps |
+| **Python 3 tools** (`tools/`) | `gen_tables.py` (screen/road/mask tables); `profile.py` (phase timings from border bars); `hotspots.py` (profile by routine/label); planned: sprite converter/pre-scaler, panorama pre-shifter, track compiler |
+| **Tests** (`tests/`) | `cputest.asm` — Z80 core self-test (40 checks); `smoke.py` — headless run with screenshot checks |
 | **ZX0** | Compression of graphics/track data; tiny, fast decompressor |
 | **Vortex Tracker II** | Music authoring (PT3) |
-| **Fuse / ZEsarUX / ZXSpin** | Emulators for testing; Fuse for profiling via debugger |
-| **GitHub Actions** | CI: build sjasmplus, run Python tools, assemble, upload `.tap` artifact |
-| **Make** | `make` builds `build/zxracer.sna`; `make run` launches Fuse |
+| **Fuse / ZEsarUX** | Real emulators for playtesting |
+| **GitHub Actions** | CI: builds sjasmplus, runs `make test` and `make profile`, uploads `.sna` and screenshots |
+| **Make** | `make`, `make test`, `make profile`, `make run` |
 
 Source layout:
 
@@ -213,20 +248,21 @@ docs/       Technical notes, profiling results
 
 ## 7. Milestones
 
-| # | Milestone | Deliverable / exit criterion |
-|---|---|---|
-| **M0** | Toolchain & skeleton | `make` produces a bootable 128K `.sna`; CI builds it |
-| **M1** | Road prototype | Straight striped road, Z table, double-buffered flip, measured ≥25 fps with timing bars |
-| **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage |
-| **M3** | Player car | Masked car with steering frames, colour patch, basic steering/speed physics |
-| **M4** | Scenery | Pre-scaler pipeline, scaled masked sprites, depth sort, hill clipping; palms/signs/rocks |
-| **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes |
-| **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation |
-| **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions |
-| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes |
-| **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen |
-| **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores |
-| **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release |
+| # | Milestone | Deliverable / exit criterion | Status |
+|---|---|---|---|
+| **M0** | Toolchain & skeleton | `make` produces a bootable 128K `.sna`; CI builds it | ✅ done |
+| **M1** | Road prototype | Straight striped road, Z table, double-buffered flip, measured ≥25 fps with timing bars | 🟡 works; 24 fps straight, 17.7 fps hard steering |
+| **M1b** | Road optimisation | Road ≤ 60k T worst case (backlog in §3.6) | next |
+| **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | |
+| **M3** | Player car | Masked car with steering frames, colour patch, basic steering/speed physics | |
+| **M4** | Scenery | Pre-scaler pipeline, scaled masked sprites, depth sort, hill clipping; palms/signs/rocks | |
+| **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | |
+| **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
+| **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | |
+| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | |
+| **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | |
+| **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | |
+| **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | |
 
 **Risk-first ordering:** M1 is the make-or-break milestone — if the road plus a
 representative sprite load can't hit 25 fps, we fall back to (a) narrower play area
@@ -250,6 +286,7 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 
 ## 9. Immediate next steps
 
-1. Install sjasmplus locally (and in CI) and confirm `make` boots in Fuse (M0).
-2. Write `tools/gen_tables.py` (line addresses, Z table, edge masks).
-3. Build the M1 straight-road renderer with border-colour profiling.
+1. M1b: work through the road optimisation backlog in §3.6 until hard steering
+   holds 25 fps with room left for sprites.
+2. M2: track segments (curves/hills), `tools/track.py` compiler, moving horizon.
+3. M3: player car sprite and the masked sprite blitter (shared with M4).
