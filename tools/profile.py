@@ -25,11 +25,24 @@ def main():
         elif line.startswith("frames="):
             summary = line
     totals = defaultdict(int)
+    peak = defaultdict(int)
+    cur = defaultdict(int)
     loops = 0
+    starts = []
     for (t0, c), (t1, _) in zip(events, events[1:]):
         totals[c] += t1 - t0
         if c == 1:
+            for k, v in cur.items():
+                peak[k] = max(peak[k], v)
+            cur = defaultdict(int)
+        cur[c] += t1 - t0
+        if c == 1:
             loops += 1
+            starts.append(t0)
+    # game frame lengths in TV frames (start of logic to the next start)
+    hist = defaultdict(int)
+    for a, b in zip(starts, starts[1:]):
+        hist[round((b - a) / FRAME_T)] += 1
     loops = max(loops - 1, 1)
     print(summary)
     print(f"{loops} game frames profiled; average T-states per game frame:")
@@ -38,8 +51,9 @@ def main():
         avg = total // loops
         if c != 0:
             busy += avg
-        print(f"  {PHASES.get(c, f'colour {c}'):10s} {avg:8d}")
+        print(f"  {PHASES.get(c, f'colour {c}'):10s} {avg:8d}   max {peak[c]:8d}")
     print(f"  {'busy':10s} {busy:8d}  (25 fps budget 141816, 16.7 fps budget 212724)")
+    print("TV frames per game frame: " + ", ".join(f"{k}: {v}" for k, v in sorted(hist.items())))
 
 
 if __name__ == "__main__":

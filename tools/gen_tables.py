@@ -75,7 +75,7 @@ def main(path):
     for i in range(ROAD_LINES):
         want = 64 * (i + 1) / ROAD_LINES
         k = min(range(len(sizes)), key=lambda k: abs(sizes[k] - want))
-        size_for.append(k if want >= 4 else 0xFF)
+        size_for.append(max(k, 1) if want >= 4 else 0xFF)     # largest size not used: too costly
     lines += page("ObjPage", ("ObjScale", scale), ("SizeForLine", size_for))
     # Depth -> screen line for scenery: largest i with Z[i] >= z.
     # ZNear[z >> 2] for z < 1024, ZFar[z >> 4] for z < 4096 ($FF: none).

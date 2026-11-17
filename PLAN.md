@@ -168,29 +168,36 @@ Main loop @25 Hz:
 | M1 | standing / straight / steering hard | 75,800 / 105,500 / 158,000 | 25 / 24 / 17.7 fps |
 | M1b (v7) | standing / straight / steering hard | ~55,000 / 75,300 / 137,000 | 25 / 25 / 19 fps |
 | M2+M3 | attract-mode lap of the curvy test track, road + car | 147,000 + 5,800 | 18.6 fps |
+| M4+M5 | lap with scenery and panorama; road paired lines, depth-weighted curves | 117,400 (peak 160,000) | 19.3 fps (2 TV frames 43%, 3 frames 54%, 4 frames 3%) |
 
 The 30k road budget was unrealistic for 96 scanlines on a 3.5 MHz Z80. **Decision:**
 the guaranteed minimum is 16.7 fps (212,700 T per game frame) with scenery and
-traffic. 25 fps is reached on straights and stays the goal for the M11 optimisation
-pass. Remaining budget at 16.7 fps on curves is about 55k for scenery and traffic sprites.
+traffic. Straights run at 25 fps, and 25 fps everywhere stays the goal for the M11
+optimisation pass. Averages hid a very uneven frame rate, so `make profile` now
+reports per-phase peaks and how many TV frames each game frame took.
 
-What the v7 renderer does (§3.2 still applies):
+What the renderer does now (§3.2 still applies):
 - Pass 1 (only when the road shape changes) computes each line's first and last
   road pixel and the centre-line x, clamped to the screen. A line is redrawn only
   when those change.
+- **Paired lines:** pass 1 computes one line in two. Every kerb, edge and
+  centre-line write goes to both lines of the pair, so edges have 2-pixel vertical
+  steps. That halves the per-line logic, which was the dominant cost.
 - The 8 pixel lines of a character row are 256 bytes apart, so the line address is
-  `inc ixh`.
-- Curves: one 16.8 accumulator per frame, from the bottom line up:
-  `dx += curvature; x += dx`. The player's lateral offset is folded into the start
-  value. Curvature changes are found once per frame by a binary search over the
-  depth table, not per line.
+  `inc ixh`; stale kerb cells are cleared per row, a column at a time.
+- **Curves:** one 16.8 accumulator per frame from the bottom line up,
+  `dx += curvature × weight; x += dx`. The weight doubles in zones going up (¼ near
+  the camera, 16 near the horizon) to follow how much depth each screen line spans.
+  Bends therefore build up in the distance and unwind gradually. With a flat weight
+  they snapped straight in a few frames, because the bottom half of the screen
+  spans only about 170 depth units.
 
 Optimisation backlog for M11 (by expected gain):
-1. Pass 1 on curves (~33k): compute every second line and interpolate the rest.
-2. Row overhead (~25k): fewer patched constants per row, inline the line loop.
-3. Centre line (~17k when steering): only touch lines whose band flipped or whose
-   byte position changed.
-4. A dashboard on the bottom 2 character rows would remove 16 of the 96 road lines.
+1. Sprites: about 32k on average, 63k at peak. Store per-line spans so that empty
+   bytes are not XORed (palm trunks are 1-2 bytes wide).
+2. Row overhead (~24k): fewer patched constants per row, inline the line loop.
+3. Pass 1 (~25k on curves): accumulator-only steps for the even lines are still per line.
+4. Horizon redraw (19k peak): split across frames or cut to 16 lines.
 
 Border-colour timing bars (`PROFILE=1`) show each phase on screen; `make profile`
 and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
@@ -263,8 +270,8 @@ docs/       Technical notes, profiling results
 | **M1b** | Road optimisation | Cut the road's per-line cost | ✅ v7 renderer; more in M11 |
 | **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | 🟡 curves, YAML track compiler and test loop done; hills to do |
 | **M3** | Player car | Car with steering frames, no colour clash, basic steering/speed physics | ✅ car owns a fixed 8×4-cell block; centrifugal force; attract-mode driver |
-| **M4** | Scenery | Pre-scaler pipeline, scaled masked sprites, depth sort, hill clipping; palms/signs/rocks | |
-| **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | |
+| **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | 🟡 palms with XOR draw/erase; more object types and hills to do |
+| **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | 🟡 scrolling mountain band; clouds and per-stage palettes to do |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | |
 | **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | |
@@ -294,7 +301,6 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 
 ## 9. Immediate next steps
 
-1. M4: scenery: pre-scaled roadside objects (palms, signs, rocks), masked blitter,
-   per-buffer erase that keeps the zero-background road design intact.
-2. M5: horizon panorama with parallax that scrolls with the curves.
-3. M2b: hills (moving horizon), once the scenery pipeline exists.
+1. HUD (time, score, speed) and the game structure: checkpoints, timer, game over (M8).
+2. AY engine sound (M9).
+3. Traffic cars (M7), more scenery types, then hills (M2b).

@@ -420,6 +420,12 @@ RunCommand:
         inc hl
         ld a, (hl)
         ld (.skp + 1), a
+        or a
+        ld de, ((.adv - .back - 2) << 8) | $18      ; JR .adv: nothing clipped
+        jr z, .noClip
+        ld de, $007B            ; LD A,E : NOP -> source adjustment
+.noClip:
+        ld (.back), de
         inc hl
         ld e, (hl)
         inc hl
@@ -432,13 +438,13 @@ RunCommand:
 .ln:
 .lcol:  ld l, 0
 .jent:  jp XorEnd - 256         ; low byte patched (n > 0 always)
-.back:  ld a, e
+.back:  jr .adv                 ; patched: JR .adv or LD A,E : NOP
 .skp:   add a, 0
         ld e, a
         adc a, d
         sub e
         ld d, a
-        inc c
+.adv:   inc c
         inc h
         ld a, h
         and 7

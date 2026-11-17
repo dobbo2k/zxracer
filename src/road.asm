@@ -121,8 +121,14 @@ RoadPass1:
         sbc hl, de
         pop de
         ld c, 0
-        ; curvature at the bottom line and the first boundary
+        ; curvature at the bottom line, the first boundary and the first zone
         push hl
+        xor a
+        ld (CurK), a
+        ld hl, ZoneLines
+        ld (ZonePtr), hl
+        ld a, (hl)
+        ld (.nz + 1), a
         ld a, (CurveList)
         call SetCurve
         ld hl, CurveList + 1
@@ -133,17 +139,65 @@ RoadPass1:
         exx
         ld l, ROAD_LINES - 1
         exx
+        ; Lines are computed in pairs: each odd line exactly, and the even
+        ; line above it takes the same edges (the renderer copies it).
 .cx:    exx
         ld a, l
         exx
 .nb:    cp $FF
         call z, NextCurve
-        ; IX = cx = total
+        exx
+        ld a, l
+        exx
+.nz:    cp $FF
+        call z, NextZone
+        exx
+        bit 0, l
+        exx
+        jr z, .acc
+        ; ---- odd line: edges and centre line from cx = total
         ld a, l
         ld ixl, a
         ld a, h
         ld ixh, a
-        ; advance to the next line up: dx += curvature, total += dx
+        or a
+        exx
+        ld h, high X1Page
+        ld c, (hl)              ; C' = X1
+        jr nz, .slow            ; cx outside 0..255
+        ld a, ixl
+        ld b, a                 ; B' = cx
+        sub c                   ; cx - X1
+        jr c, .slow
+        ld d, a                 ; D' = first road pixel
+        ld a, b
+        dec a
+        add a, c                ; cx + X1 - 1
+        jr c, .slow
+        ld e, a                 ; E' = last road pixel
+        ld a, b
+        ld h, high LWPage
+        sub (hl)                ; centre line x = cx - LW (LW = 255: none)
+        jr nc, .lane
+        ld a, $FF
+.lane:  ld c, a                 ; C' = centre line x
+.store: ; this line and the one above it
+        ld h, high DEPage
+        ld (hl), d
+        dec l
+        ld (hl), d
+        set 7, l
+        ld (hl), e
+        inc l
+        ld (hl), e
+        res 7, l
+        ld h, high LXPage
+        ld (hl), c
+        dec l
+        ld (hl), c
+        inc l
+        exx
+.acc:   ; ---- next line up: dx += curvature, total += dx
         ld a, b
 .cl:    add a, 0
         ld b, a
@@ -157,99 +211,60 @@ RoadPass1:
         add a, b
         ld c, a
         adc hl, de
-        ld a, ixh
-        or a
         exx
-        jr nz, .slow            ; cx outside 0..255
-        ; ---- fast path: 8-bit maths
-        ld a, ixl
-        ld b, a                 ; B' = cx
-        ld h, high X1Page
-        sub (hl)                ; cx - X1
-        jr c, .slow
-        ld h, high DEPage
-        ld (hl), a              ; D
-        ld a, b
-        dec a
-        ld h, high X1Page
-        add a, (hl)             ; cx + X1 - 1
-        jr c, .slow
-        set 7, l
-        ld h, high DEPage
-        ld (hl), a              ; E
-        res 7, l
-        ld a, b
-        ld h, high LWPage
-        sub (hl)                ; centre line x = cx - LW (LW = 255: none)
-        jr nc, .lane
-        ld a, $FF
-.lane:  ld h, high LXPage
-        ld (hl), a
-.next:  dec l
+        dec l
         exx
         jp p, .cx
         ret
 
-.slow:  ; IX = cx (16-bit), L' = i
+.slow:  ; IX = cx (16-bit), C' = X1, L' = line
+        ld h, high LWPage
+        ld b, (hl)              ; B' = LW (255: none)
+        push hl
         push ix
-        pop de                  ; DE' = cx
-        ld h, high X1Page
-        ld c, (hl)
+        pop hl                  ; HL' = cx
+        ld a, h
+        or a
+        ld a, $FF
+        jr nz, .sl1
+        ld a, l
+        sub b
+        jr nc, .sl1
+        ld a, $FF
+.sl1:   push af                 ; centre line x
         ld b, 0                 ; BC' = X1
         push hl
-        ld h, d
-        ld l, e
         or a
         sbc hl, bc              ; first road pixel
         bit 7, h
         jr nz, .f0
         ld a, h
         or a
-        jr nz, .noRoad          ; >= 256: road entirely right of the screen
+        jr nz, .noRoad2         ; >= 256: road entirely right of the screen
         ld a, l
         jr .f1
 .f0:    xor a
-.f1:    ex af, af'              ; A' = D
-        ld h, d
-        ld l, e
+.f1:    ld d, a
+        pop hl
         add hl, bc
         dec hl                  ; last road pixel
         bit 7, h
-        jr nz, .noRoad          ; < 0: road entirely left of the screen
+        jr nz, .noRoad1         ; < 0: road entirely left of the screen
         ld a, h
         or a
         ld a, l
         jr z, .f2
         ld a, 255
-.f2:    ld c, a                 ; E
-        ex af, af'
-        ld b, a                 ; D
+.f2:    ld e, a
+        jr .sdone
+.noRoad2:
         pop hl
-        ld h, high DEPage
-        ld (hl), b
-        set 7, l
-        ld (hl), c
-        res 7, l
-        jr .slane
-.noRoad:
+.noRoad1:
+        ld de, $FF00
+.sdone: pop af
+        ld c, a
         pop hl
-        ld h, high DEPage
-        ld (hl), $FF
-        set 7, l
-        ld (hl), 0
-        res 7, l
-.slane: ld a, ixh
-        or a
-        ld a, $FF
-        jr nz, .slw
-        ld a, ixl
-        ld h, high LWPage
-        sub (hl)
-        jr nc, .slw
-        ld a, $FF
-.slw:   ld h, high LXPage
-        ld (hl), a
-        jr .next
+        jr .store
 
 ; Light/dark band per line: bit STRIPE_BIT of (z + position)
 RoadBands:
@@ -423,7 +438,8 @@ DrawRoadRow:
         djnz .cmp
         jr .rangesSame
 .rangesChanged:
-        call StalePieces        ; old kerb cells to clear on each line
+        call StalePieces        ; old kerb cells no longer in the ranges
+        call ZeroStaleRow       ; clear them on all 8 lines of the row
         ld a, 1
         ld (RowForced), a
         ld a, (CurRow)
@@ -472,6 +488,7 @@ DrawRoadRow:
         sub (hl)                ; left kerb width
         call LdiEntry
         ld (DrawRoadLine.lcall + 1), hl
+        ld (DrawRoadLine.lcall2 + 1), hl
         ld a, (RowC)
         ld (DrawRoadLine.kc + 1), a
         add a, low StripR + STRIP_PAD
@@ -481,6 +498,7 @@ DrawRoadRow:
         sub (hl)                ; right kerb width
         call LdiEntry
         ld (DrawRoadLine.rcall + 1), hl
+        ld (DrawRoadLine.rcall2 + 1), hl
         ; centre line cells must satisfy b <= col and col + 1 < c
         ld a, (RowB)
         ld (DrawRoadLine.lb + 1), a
@@ -508,18 +526,23 @@ DrawRoadRow:
         or $40
 .bufOr: or 0
         ld ixh, a
+        ; ---- lines in pairs: every write goes to both lines of a pair
         ld a, (CurI)
         ld c, a
-        ld b, 8
+        ld b, 4
 .line:  push bc
         call DrawRoadLine
         pop bc
         inc ixh
+        inc ixh
+        inc c
         inc c
         djnz .line
         ld a, c
         ld (CurI), a
         ret
+
+
 
 ; A = width in bytes (clamped to STRIP_PAD) -> HL = LDI chain entry
 LdiEntry:
@@ -619,7 +642,7 @@ StalePieces:
 .p1:    ld b, a
         ld a, (OldA)
         call .piece
-        ld (ZeroStale.p1 + 1), hl
+        ld (ZeroStaleRow.p1 + 1), hl
         ; piece 2: [max(oA, b), oB)
         ld a, (OldB)
         ld b, a
@@ -630,7 +653,7 @@ StalePieces:
         jr nc, .p2
         ld a, c
 .p2:    call .piece
-        ld (ZeroStale.p2 + 1), hl
+        ld (ZeroStaleRow.p2 + 1), hl
         ; piece 3: [oC, min(oD, c))
         ld a, (OldD)
         ld b, a
@@ -641,7 +664,7 @@ StalePieces:
 .p3:    ld b, a
         ld a, (OldC)
         call .piece
-        ld (ZeroStale.p3 + 1), hl
+        ld (ZeroStaleRow.p3 + 1), hl
         ; piece 4: [max(oC, d), oD)
         ld a, (OldD)
         ld b, a
@@ -652,7 +675,7 @@ StalePieces:
         jr nc, .p4
         ld a, c
 .p4:    call .piece
-        ld (ZeroStale.p4 + 1), hl
+        ld (ZeroStaleRow.p4 + 1), hl
         ret
 ; A = start, B = end -> L = start, H = count (0 if end <= start)
 .piece: ld l, a
@@ -663,13 +686,22 @@ StalePieces:
 .pc:    ld h, a
         ret
 
-; Clear the stale kerb cells (patched pieces) on the line at IX. Preserves DE.
-ZeroStale:
-        push de
-        ld a, ixh
-        ld h, a
-        ld a, ixl
-        ld e, a
+; Clear the stale kerb cells (pieces patched by StalePieces) on all 8 lines
+; of the current row, a column strip at a time.
+ZeroStaleRow:
+        ld a, (CurRow)
+        ld b, a
+        and 7
+        rrca
+        rrca
+        rrca
+        ld e, a                 ; row's low address byte
+        ld a, b
+        and $18
+        or $40
+        ld hl, BufHiOr
+        or (hl)
+        ld d, a                 ; row's first line high byte
 .p1:    ld bc, 0                ; C = start, B = count (patched)
         call .zero
 .p2:    ld bc, 0
@@ -677,19 +709,23 @@ ZeroStale:
 .p3:    ld bc, 0
         call .zero
 .p4:    ld bc, 0
-        call .zero
-        pop de
-        ret
 .zero:  inc b
         dec b
         ret z
         ld a, e
         add a, c
         ld l, a
+        ld h, d
         xor a
-.zl:    ld (hl), a
+.col:   push hl
+        ld c, 8
+.ln:    ld (hl), a
+        inc h
+        dec c
+        jr nz, .ln
+        pop hl
         inc l
-        djnz .zl
+        djnz .col
         ret
 
 ; --------------------------------------------------------------------------
@@ -719,10 +755,8 @@ DrawRoadLine:
         jr .kerbs
 
 .clearRow:
-        ; the row's kerb cells changed: clear stale cells and the centre line
-        push bc
-        call ZeroStale
-        pop bc
+        ; the row's kerb cells changed (stale cells already cleared by the
+        ; row): clear the old centre line on both lines of the pair
         ld l, c
 .s2b:   ld h, 0
         ld a, (hl)
@@ -740,6 +774,10 @@ DrawRoadLine:
         xor a
         ld (hl), a
         inc l
+        ld (hl), a
+        inc h
+        ld (hl), a
+        dec l
         ld (hl), a
 
 .kerbs: ld l, c
@@ -814,14 +852,28 @@ DrawRoadLine:
         ld a, ixh
         ld d, a                 ; DE = left kerb cells
 .lsrc:  ld hl, StripL
+        push hl
+        push de
 .lcall: call LdiEnd
+        pop de
+        pop hl
+        inc d                   ; and the second line of the pair
+.lcall2:
+        call LdiEnd
         ld a, ixl
 .kc:    add a, 0
         ld e, a
         ld a, ixh
         ld d, a                 ; DE = right kerb cells
 .rsrc:  ld hl, StripR
+        push hl
+        push de
 .rcall: call LdiEnd
+        pop de
+        pop hl
+        inc d
+.rcall2:
+        call LdiEnd
         pop bc
         jr .lane
 
@@ -861,6 +913,9 @@ DrawRoadLine:
         jr .gw
 .g0:    xor a
 .gw:    ld (hl), a
+        inc h
+        ld (hl), a
+        dec h
         inc l
         inc c
         djnz .gl
@@ -898,7 +953,7 @@ DrawRoadLine:
         ld (hl), b
         cp $FF
         jr z, .noOld
-        ; erase the old centre line bytes
+        ; erase the old centre line bytes (both lines of the pair)
         rrca
         rrca
         rrca
@@ -910,6 +965,10 @@ DrawRoadLine:
         xor a
         ld (hl), a
         inc l
+        ld (hl), a
+        inc h
+        ld (hl), a
+        dec l
         ld (hl), a
 .noOld: ld a, b
         cp $FF
@@ -940,10 +999,14 @@ DrawRoadLine:
         ld h, a
         ld a, (de)
         ld (hl), a
+        inc h
+        ld (hl), a
         inc l
         ld a, e
         add a, low LaneM2 - low LaneM1
         ld e, a
         ld a, (de)
+        ld (hl), a
+        dec h
         ld (hl), a
         ret

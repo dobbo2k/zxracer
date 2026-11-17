@@ -157,11 +157,57 @@ NextCurve:
         pop hl
         ret
 
-; A = curvature -> patch RoadPass1's dx increment (sign-extended)
+; Curvature is weighted by how much depth a screen line spans: near lines
+; (bottom) get 1/4, and the weight doubles at each zone line going up, to 16
+; near the horizon. So bends build up in the distance and the near road
+; straightens gradually instead of snapping when a segment boundary passes
+; under the car.
+ZoneLines:
+        db 64, 48, 34, 24, 17, 12, $FF
+
+; A = segment curvature -> patch RoadPass1's dx increment for the current zone
 SetCurve:
-        ld (RoadPass1.cl + 1), a
+        ld (CurC), a
+; increment = (curvature << zone) >> 2, sign-extended into RoadPass1
+ApplyCurve:
+        push hl
+        push bc
+        ld a, (CurC)
+        ld l, a
         rlca
         sbc a, a
+        ld h, a
+        ld a, (CurK)
+        or a
+        jr z, .shifted
+        ld b, a
+.sh:    add hl, hl
+        djnz .sh
+.shifted:
+        sra h
+        rr l
+        sra h
+        rr l
+        ld a, l
+        ld (RoadPass1.cl + 1), a
+        ld a, h
         ld (RoadPass1.ch + 1), a
+        rlca
+        sbc a, a
         ld (RoadPass1.ch2 + 1), a
+        pop bc
+        pop hl
         ret
+
+; Called by RoadPass1 at a zone line: double the curvature weight.
+NextZone:
+        push hl
+        ld hl, CurK
+        inc (hl)
+        ld hl, (ZonePtr)
+        inc hl
+        ld (ZonePtr), hl
+        ld a, (hl)
+        ld (RoadPass1.nz + 1), a
+        pop hl
+        jr ApplyCurve

@@ -38,6 +38,9 @@ LastStraight:   db 0
 RoadStraight:   db 0
 CurveOr:        db 0
 CurvePtr:       dw 0
+CurC:           db 0            ; curvature of the current pass-1 chunk
+CurK:           db 0            ; curvature zone (weight 2^k / 4)
+ZonePtr:        dw 0
 CurveList:      ds 1 + 2 * MAX_BOUNDS + 1
 
 ; track

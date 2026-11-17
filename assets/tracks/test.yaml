@@ -22,6 +22,6 @@ segments:
 # x is the lateral offset in bottom-line pixels from the road centre (the road's
 # outer edge is at +-150 there).
 scenery:
-  - {type: palm, from: 300, to: 65000, every: 1100, x: -210}
-  - {type: palm, from: 850, to: 65000, every: 1100, x: 210}
+  - {type: palm, from: 300, to: 65000, every: 1100, x: -260}
+  - {type: palm, from: 850, to: 65000, every: 1100, x: 260}
   - {type: palm, from: 9000, to: 14000, every: 550, x: -330}
