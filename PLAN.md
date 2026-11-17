@@ -160,29 +160,37 @@ Main loop @25 Hz:
 | HUD | 3,000 |
 | **Total** | **~141,800** |
 
-**Measured in M1** (zxsim, cycle-counted with 128K contention, road only, no sprites):
+**Measured** (zxsim, cycle-counted with 128K contention, T-states per game frame):
 
-| Situation | Road T-states / game frame | Frame rate |
-|---|---|---|
-| Standing still | 75,800 | 25 fps |
-| Straight at full speed | 105,500 | 24 fps |
-| Steering hard (every line moves) | 158,000 | 17.7 fps |
+| Version | Situation | Road | Frame rate |
+|---|---|---|---|
+| M1 first version | steering | 274,000 | 11 fps |
+| M1 | standing / straight / steering hard | 75,800 / 105,500 / 158,000 | 25 / 24 / 17.7 fps |
+| M1b (v7) | standing / straight / steering hard | ~55,000 / 75,300 / 137,000 | 25 / 25 / 19 fps |
+| M2+M3 | attract-mode lap of the curvy test track, road + car | 147,000 + 5,800 | 18.6 fps |
 
-The first straightforward renderer cost 274,000 T. Four profile-driven rewrites brought
-it to the figures above. The 30k budget was unrealistic for 96 scanlines on a 3.5 MHz
-Z80. **Decision:** keep 25 fps as the target for straights and 16.7 fps as the guaranteed
-minimum. The road is now budgeted at **≤ 60k** worst case through the M1b optimisations
-below, which leaves room for sprites.
+The 30k road budget was unrealistic for 96 scanlines on a 3.5 MHz Z80. **Decision:**
+the guaranteed minimum is 16.7 fps (212,700 T per game frame) with scenery and
+traffic. 25 fps is reached on straights and stays the goal for the M11 optimisation
+pass. Remaining budget at 16.7 fps on curves is about 55k for scenery and traffic sprites.
 
-M1b road optimisation backlog (by expected gain):
-1. Fixed per-frame overhead (75k when nothing moves): pass 1 only when the
-   road shape changes, per-row constant tables instead of ~30 patches per row,
-   cheaper band and centre-line checks.
-2. Centre line: about 220 T per line today. Precompute its mask pointer per line in
-   pass 1 and only touch lines whose band flipped.
-3. Contended writes: draw buffer A while the beam is in the border.
-4. Fewer road lines: a dashboard on the bottom 2 character rows (common on 8-bit
-   conversions) removes 16 of the 96 lines.
+What the v7 renderer does (§3.2 still applies):
+- Pass 1 (only when the road shape changes) computes each line's first and last
+  road pixel and the centre-line x, clamped to the screen. A line is redrawn only
+  when those change.
+- The 8 pixel lines of a character row are 256 bytes apart, so the line address is
+  `inc ixh`.
+- Curves: one 16.8 accumulator per frame, from the bottom line up:
+  `dx += curvature; x += dx`. The player's lateral offset is folded into the start
+  value. Curvature changes are found once per frame by a binary search over the
+  depth table, not per line.
+
+Optimisation backlog for M11 (by expected gain):
+1. Pass 1 on curves (~33k): compute every second line and interpolate the rest.
+2. Row overhead (~25k): fewer patched constants per row, inline the line loop.
+3. Centre line (~17k when steering): only touch lines whose band flipped or whose
+   byte position changed.
+4. A dashboard on the bottom 2 character rows would remove 16 of the 96 road lines.
 
 Border-colour timing bars (`PROFILE=1`) show each phase on screen; `make profile`
 and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
@@ -251,10 +259,10 @@ docs/       Technical notes, profiling results
 | # | Milestone | Deliverable / exit criterion | Status |
 |---|---|---|---|
 | **M0** | Toolchain & skeleton | `make` produces a bootable 128K `.sna`; CI builds it | ✅ done |
-| **M1** | Road prototype | Straight striped road, Z table, double-buffered flip, measured ≥25 fps with timing bars | 🟡 works; 24 fps straight, 17.7 fps hard steering |
-| **M1b** | Road optimisation | Road ≤ 60k T worst case (backlog in §3.6) | next |
-| **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | |
-| **M3** | Player car | Masked car with steering frames, colour patch, basic steering/speed physics | |
+| **M1** | Road prototype | Straight striped road, Z table, double-buffered flip, measured with timing bars | ✅ done; 25 fps straight (see §3.6) |
+| **M1b** | Road optimisation | Cut the road's per-line cost | ✅ v7 renderer; more in M11 |
+| **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | 🟡 curves, YAML track compiler and test loop done; hills to do |
+| **M3** | Player car | Car with steering frames, no colour clash, basic steering/speed physics | ✅ car owns a fixed 8×4-cell block; centrifugal force; attract-mode driver |
 | **M4** | Scenery | Pre-scaler pipeline, scaled masked sprites, depth sort, hill clipping; palms/signs/rocks | |
 | **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
@@ -286,7 +294,7 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 
 ## 9. Immediate next steps
 
-1. M1b: work through the road optimisation backlog in §3.6 until hard steering
-   holds 25 fps with room left for sprites.
-2. M2: track segments (curves/hills), `tools/track.py` compiler, moving horizon.
-3. M3: player car sprite and the masked sprite blitter (shared with M4).
+1. M4: scenery: pre-scaled roadside objects (palms, signs, rocks), masked blitter,
+   per-buffer erase that keeps the zero-background road design intact.
+2. M5: horizon panorama with parallax that scrolls with the curves.
+3. M2b: hills (moving horizon), once the scenery pipeline exists.

@@ -1,0 +1,19 @@
+# Test loop for M2. Lengths are in depth units (the bottom screen line is
+# 128 units away, the horizon 12288); 1000 units is about one second at top
+# speed. Curve is the change in curve rate per screen line, in 1/256 pixel
+# (positive bends right); about +-16 is a sharp bend.
+name: Test Loop
+segments:
+  - {length: 4000, curve: 0}
+  - {length: 3000, curve: 6}
+  - {length: 2500, curve: 0}
+  - {length: 4000, curve: -10}
+  - {length: 2000, curve: 0}
+  - {length: 2500, curve: 14}
+  - {length: 2500, curve: -14}
+  - {length: 3000, curve: 0}
+  - {length: 5000, curve: 4}
+  - {length: 3000, curve: -16}
+  - {length: 3000, curve: 0}
+  - {length: 3500, curve: 9}
+  - {length: 2000, curve: -6}

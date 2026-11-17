@@ -9,8 +9,10 @@ import subprocess, sys
 from PIL import Image
 
 zxsim, sna, outdir = sys.argv[1:4]
-shots = {59: "straight", 129: "steer_right", 199: "steer_left"}
-cmd = [zxsim, sna, "-n", "200", "-k", "0:Q", "-k", "60:Q+P", "-k", "130:Q+O"]
+shots = {59: "straight", 129: "steer_right", 199: "steer_left",
+         749: "attract_1", 899: "attract_2"}
+# frames 0-199 under keyboard control; idle afterwards, so attract mode resumes
+cmd = [zxsim, sna, "-n", "900", "-k", "0:Q", "-k", "60:Q+P", "-k", "130:Q+O", "-k", "200:none"]
 for f, name in shots.items():
     cmd += ["-s", f"{f}:{outdir}/{name}.ppm"]
 res = subprocess.run(cmd, capture_output=True, text=True)
@@ -25,7 +27,8 @@ if fps < 12:
     ok = False
 
 EXPECT = {"sky": (0, 255, 255), "grass": (0, 255, 0), "road": (0, 0, 0),
-          "kerb red": (255, 0, 0), "kerb white": (255, 255, 255)}
+          "kerb / car red": (255, 0, 0), "kerb white": (255, 255, 255),
+          "car lamps": (255, 255, 0)}
 for f, name in shots.items():
     im = Image.open(f"{outdir}/{name}.ppm").convert("RGB")
     im.save(f"{outdir}/{name}.png")

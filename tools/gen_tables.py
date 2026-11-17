@@ -57,20 +57,24 @@ def main(path):
     for k in range(0, 192, 16):
         lines.append("        db " + ", ".join(f"${v:02X}" for v in hi[k:k + 16]))
     road = [road_line(i) for i in range(ROAD_LINES)]
-    lines += page("RoadPage", ("RoadW", [r[0] for r in road]),
-                                  ("RoadX1", [r[1] for r in road]))
+    # Per-line road constants and pass-1 outputs, all indexed by road line i.
+    lines += page("X1Page", ("RoadX1", [r[1] for r in road]),           # road half-width (no kerb)
+                  ("RoadRW", [r[0] - r[1] for r in road]))              # kerb (rumble) width
+    lines += page("LWPage", ("LaneWp", [r[2] if r[2] else 255 for r in road]),  # 255: no line
+                  ("Band", [0] * ROAD_LINES))
     lines += page("ZPage", ("ZLo", [r[3] & 0xFF for r in road]),
-                               ("ZHi", [r[3] >> 8 for r in road]))
-    lines += page("LanePage", ("LaneW", [r[2] for r in road]),
-                                  ("Band", [0] * ROAD_LINES))
-    lines += page("CXPage", ("CXLo", [0] * ROAD_LINES),
-                                ("CXHi", [0] * ROAD_LINES))
+                  ("LaneW", [r[2] for r in road]))
+    lines += page("ZHiPage", ("ZHi", [r[3] >> 8 for r in road]))
+    lines += page("DEPage", ("RoadD", [0xFF] * ROAD_LINES),             # first road pixel
+                  ("RoadE", [0] * ROAD_LINES))                          # last road pixel
+    lines += page("LXPage", ("LaneX", [0xFF] * ROAD_LINES))             # centre line x
+
     # Per-buffer state (three consecutive pages per buffer):
-    #   St1: road centre cx low / high per line (kerb bytes drawn for that cx)
+    #   St1: first / last road pixel per line (kerb bytes drawn for those)
     #   St2: centre-line x per line ($FF = none)
     #   RowSt: kerb cell ranges a, b, c, d per row (4 bytes each) / band per row at +$80
     for buf in "AB":
-        lines += page(f"State{buf}1", (f"St{buf}CxL", [0] * ROAD_LINES), (f"St{buf}CxH", [0] * ROAD_LINES))
+        lines += page(f"State{buf}1", (f"St{buf}D", [0] * ROAD_LINES), (f"St{buf}E", [0] * ROAD_LINES))
         lines += page(f"State{buf}2", (f"St{buf}Lane", [0xFF] * ROAD_LINES))
         lines += page(f"State{buf}3", (f"Row{buf}Ranges", [0] * 48), (f"Row{buf}Band", [0xFF] * 12))
 

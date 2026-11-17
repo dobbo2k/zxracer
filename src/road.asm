@@ -12,11 +12,15 @@
 ;   - the centre line (white ink on road cells, light bands only)
 ; Grass and road cells are otherwise zero.
 ;
-; Pass 1: per road line i (0 = horizon .. 95 = bottom) the road centre cx
-;         (16-bit), the centre-line x and the light/dark band.
-; Pass 2: per character row: kerb cell ranges, attributes (only rewritten
-;         when they change), then per line: kerb bytes (only if cx moved
-;         or the row's ranges changed) and the centre line (only if it moved).
+; Pass 1 (only when the road shape changes): per road line i (0 = horizon ..
+;   95 = bottom) the first and last road pixel D, E (clamped to the screen;
+;   D > E means no road on screen) and the centre-line x.
+; Bands (every frame): light/dark band per line.
+; Pass 2, per character row: kerb cell ranges from the row's top and bottom
+;   lines, attributes (only rewritten when they change), then per line the
+;   kerb bytes (only if D/E changed or the row's ranges changed) and the
+;   centre line (only if it changed). The 8 pixel lines of a row are 256
+;   bytes apart, so the line address is just INC IXH.
 ;
 ; Per-buffer state remembers what each buffer shows, since a buffer is
 ; redrawn every second frame.
@@ -34,10 +38,30 @@ DrawRoad:
         inc a
         ld (DrawRoadRow.rs1 + 1), a
         ld (DrawRoadRow.rs2 + 1), a
+        ld (StalePieces.rs + 1), a
         ld a, (BufHiOr)
-        ld (LineAddrIY.bufOr + 1), a
+        ld (DrawRoadRow.bufOr + 1), a
 
+        ; pass 1 only when the road shape changed: the player moved sideways
+        ; or a curve is in view (this frame or the last)
+        call BuildCurveList
+        ld a, (RoadStraight)
+        ld hl, LastStraight
+        ld b, (hl)
+        ld (hl), a
+        and b
+        jr z, .shapeChanged
+        ld hl, (PlayerX)
+        ld de, (Pass1PX)
+        or a
+        sbc hl, de
+        jr z, .shapeSame
+.shapeChanged:
+        ld hl, (PlayerX)
+        ld (Pass1PX), hl
         call RoadPass1
+.shapeSame:
+        call RoadBands
 
         xor a
         ld (CurI), a
@@ -53,8 +77,14 @@ DrawRoad:
         ret
 
 ; --------------------------------------------------------------------------
+; Road edges and centre line per line, from the bottom line up.
+; The road centre is a single accumulator: total (HL.C, 16.8) starts at
+; 128 - PlayerX on the bottom line and each line up adds dx (DE.B, 16.8),
+; which starts at PlayerX / 96 (the player's lateral offset in perspective)
+; and gains the segment curvature every line (screen-space curves).
+; Alternate registers: L' = line index, H' = table page.
 RoadPass1:
-        ; step per line (8.8 signed) = PlayerX / 96 * 256 ~= PlayerX * 2.664
+        ; dx = PlayerX / 96 ~= PlayerX * 2.664 / 256
         ld de, (PlayerX)
         ld h, d
         ld l, e
@@ -77,31 +107,152 @@ RoadPass1:
         sra d
         rr e
         add hl, de              ; + x/128
-        ld a, l
-        ld ixl, a               ; step fraction
+        ld b, l                 ; dx fraction
         ld a, h
         ld e, a
         rlca
         sbc a, a
-        ld d, a                 ; DE = step integer part (sign-extended)
-        ld hl, 0                ; HL.C = accumulated offset (16.8)
-        ld c, l
-        ld iy, CXHi             ; (iy-128) = CXLo[i], (iy+0) = CXHi[i]
-        ld b, ROAD_LINES
-.cx:    ld a, c
-        add a, ixl
+        ld d, a                 ; DE = dx integer part (sign-extended)
+        ; total = 128 - PlayerX
+        push de
+        ld de, (PlayerX)
+        ld hl, 128
+        or a
+        sbc hl, de
+        pop de
+        ld c, 0
+        ; curvature at the bottom line and the first boundary
+        push hl
+        ld a, (CurveList)
+        call SetCurve
+        ld hl, CurveList + 1
+        ld (CurvePtr), hl
+        ld a, (hl)
+        ld (.nb + 1), a
+        pop hl
+        exx
+        ld l, ROAD_LINES - 1
+        exx
+.cx:    exx
+        ld a, l
+        exx
+.nb:    cp $FF
+        call z, NextCurve
+        ; IX = cx = total
+        ld a, l
+        ld ixl, a
+        ld a, h
+        ld ixh, a
+        ; advance to the next line up: dx += curvature, total += dx
+        ld a, b
+.cl:    add a, 0
+        ld b, a
+        ld a, e
+.ch:    adc a, 0
+        ld e, a
+        ld a, d
+.ch2:   adc a, 0
+        ld d, a
+        ld a, c
+        add a, b
         ld c, a
         adc hl, de
-        ld a, $80               ; cx = 128 - offset
-        sub l
-        ld (iy - 128), a
-        ld a, 0
-        sbc a, h
-        ld (iy + 0), a
-        inc iy
-        djnz .cx
+        ld a, ixh
+        or a
+        exx
+        jr nz, .slow            ; cx outside 0..255
+        ; ---- fast path: 8-bit maths
+        ld a, ixl
+        ld b, a                 ; B' = cx
+        ld h, high X1Page
+        sub (hl)                ; cx - X1
+        jr c, .slow
+        ld h, high DEPage
+        ld (hl), a              ; D
+        ld a, b
+        dec a
+        ld h, high X1Page
+        add a, (hl)             ; cx + X1 - 1
+        jr c, .slow
+        set 7, l
+        ld h, high DEPage
+        ld (hl), a              ; E
+        res 7, l
+        ld a, b
+        ld h, high LWPage
+        sub (hl)                ; centre line x = cx - LW (LW = 255: none)
+        jr nc, .lane
+        ld a, $FF
+.lane:  ld h, high LXPage
+        ld (hl), a
+.next:  dec l
+        exx
+        jp p, .cx
+        ret
 
-        ; bands: bit STRIPE_BIT of (z + position)
+.slow:  ; IX = cx (16-bit), L' = i
+        push ix
+        pop de                  ; DE' = cx
+        ld h, high X1Page
+        ld c, (hl)
+        ld b, 0                 ; BC' = X1
+        push hl
+        ld h, d
+        ld l, e
+        or a
+        sbc hl, bc              ; first road pixel
+        bit 7, h
+        jr nz, .f0
+        ld a, h
+        or a
+        jr nz, .noRoad          ; >= 256: road entirely right of the screen
+        ld a, l
+        jr .f1
+.f0:    xor a
+.f1:    ex af, af'              ; A' = D
+        ld h, d
+        ld l, e
+        add hl, bc
+        dec hl                  ; last road pixel
+        bit 7, h
+        jr nz, .noRoad          ; < 0: road entirely left of the screen
+        ld a, h
+        or a
+        ld a, l
+        jr z, .f2
+        ld a, 255
+.f2:    ld c, a                 ; E
+        ex af, af'
+        ld b, a                 ; D
+        pop hl
+        ld h, high DEPage
+        ld (hl), b
+        set 7, l
+        ld (hl), c
+        res 7, l
+        jr .slane
+.noRoad:
+        pop hl
+        ld h, high DEPage
+        ld (hl), $FF
+        set 7, l
+        ld (hl), 0
+        res 7, l
+.slane: ld a, ixh
+        or a
+        ld a, $FF
+        jr nz, .slw
+        ld a, ixl
+        ld h, high LWPage
+        sub (hl)
+        jr nc, .slw
+        ld a, $FF
+.slw:   ld h, high LXPage
+        ld (hl), a
+        jr .next
+
+; Light/dark band per line: bit STRIPE_BIT of (z + position)
+RoadBands:
         ld a, (Pos)
         ld c, a
         ld hl, ZLo
@@ -117,174 +268,134 @@ RoadPass1:
         ret
 
 ; --------------------------------------------------------------------------
-; HL = signed pixel x -> A = column + 1, saturated to 0 (x < 0) .. 33 (x > 255)
-ColSat: ld a, h
-        or a
-        jr nz, .out
-        ld a, l
-        rrca
-        rrca
-        rrca
-        and 31
-        inc a
-        ret
-.out:   ld a, 0
-        ret m
-        ld a, 33
-        ret
-
-; A = line index -> B, C, D, E = biased columns (see ColSat) of the left
-; outer edge, first road pixel, last road pixel and right outer edge.
-LineCols:
-        ld l, a
-        ld h, high CXLo
-        ld e, (hl)
-        set 7, l
-        ld d, (hl)              ; DE = cx
-        ld h, high RoadX1
-        ld c, (hl)              ; C = X1
-        res 7, l
-        ld h, high RoadW
-        ld b, (hl)              ; B = W
-        ld a, d
-        or a
-        jr nz, .slow
-        ; fast path: all four edges on screen -> 8-bit maths
-        ld a, e
-        sub b
-        jr c, .slow
-        rrca
-        rrca
-        rrca
-        and 31
-        inc a
-        ld h, a                 ; outer left
-        ld a, e
-        dec a
-        add a, b
-        jr c, .slow
-        rrca
-        rrca
-        rrca
-        and 31
-        inc a
-        ld l, a                 ; outer right
-        ld a, e
-        sub c
-        rrca
-        rrca
-        rrca
-        and 31
-        inc a
-        ld d, a                 ; first road pixel
-        ld a, e
-        dec a
-        add a, c
-        rrca
-        rrca
-        rrca
-        and 31
-        inc a
-        ld c, d
-        ld d, a
-        ld b, h
-        ld e, l
-        ret
-.slow:  push bc
-        ld h, d
-        ld l, e
-        ld c, b
-        ld b, 0
-        or a
-        sbc hl, bc              ; cx - W
-        call ColSat
-        ld (LcOL), a
-        ld h, d
-        ld l, e
-        add hl, bc
-        dec hl                  ; cx + W - 1
-        call ColSat
-        ld (LcOR), a
-        pop bc
-        ld b, 0
-        ld h, d
-        ld l, e
-        or a
-        sbc hl, bc              ; cx - X1
-        call ColSat
-        ld (LcRL), a
-        ld h, d
-        ld l, e
-        add hl, bc
-        dec hl                  ; cx + X1 - 1
-        call ColSat
-        ld e, a
-        ld a, (LcOL)
-        ld b, a
-        ld a, (LcRL)
-        ld c, a
-        ld a, (LcOR)
-        ld d, e
-        ld e, a
-        ret
-
-; --------------------------------------------------------------------------
 DrawRoadRow:
-        ; ---- kerb cell ranges from the row's top and bottom lines
+        ; ---- edges of the row's top (0) and bottom (1) lines
         ld a, (CurI)
+        ld l, a
+        ld h, high DEPage
+        ld b, (hl)              ; D0
+        set 7, l
+        ld c, (hl)              ; E0
+        ld h, high X1Page
+        ld a, (hl)
+        ld (RowRW0), a
+        ld a, l
         add a, 7
-        call LineCols
-        ld (RowCols), bc
-        ld (RowCols + 2), de
-        ld a, (CurI)
-        call LineCols
-        ; lo = min(B), lr = max(C), rr = min(D), ro = max(E)   (biased)
-        ld a, (RowCols + 1)
+        ld l, a
+        ld a, (hl)
+        ld (RowRW1), a
+        ld h, high DEPage
+        ld e, (hl)              ; E1
+        res 7, l
+        ld d, (hl)              ; D1
+        ; a line without road (D > E) borrows the other line's edges
+        ld a, c
         cp b
-        jr nc, .m1
-        ld b, a
-.m1:    ld a, (RowCols)
-        cp c
-        jr c, .m2
-        ld c, a
-.m2:    ld a, (RowCols + 3)
+        jr nc, .t0
+        ld b, d
+        ld c, e
+        ld a, (RowRW1)
+        ld (RowRW0), a
+.t0:    ld a, e
         cp d
-        jr nc, .m3
-        ld d, a
-.m3:    ld a, (RowCols + 2)
-        cp e
-        jr c, .m4
-        ld e, a
-.m4:    ; narrow road: some line's first road cell >= another's last
-        ld a, c
-        cp d
-        ld a, 0
-        jr c, .m5
-        inc a
-.m5:    ld (RowMerged), a
-        ; a = max(lo, 1) - 1 ; b = clamp(lr, a, 32) ; c = clamp(rr - 1, b, 32) ; d = clamp(ro, c, 32)
-        ld a, b
-        or a
-        jr nz, .k1
-        inc a
-.k1:    dec a
+        jr nc, .t1
+        ld d, b
+        ld e, c
+        ld a, (RowRW0)
+        ld (RowRW1), a
+.t1:    ld a, c
+        cp b
+        jr nc, .haveRoad
+        xor a                   ; no road on this row: all grass
         ld (RowA), a
-        ld h, a
-        ld a, c
-        call Clamp32
         ld (RowB), a
+        ld (RowC), a
+        ld (RowD), a
+        ld (RowMerged), a
+        jr .ranges
+.haveRoad:
+        ; a = min(D - RW) >> 3   (clamped at 0)
+        ld a, (RowRW0)
+        ld h, a
+        ld a, b
+        sub h
+        jr nc, .a0
+        xor a
+.a0:    ld l, a
+        ld a, (RowRW1)
         ld h, a
         ld a, d
-        or a
-        jr z, .k2
-        dec a
-.k2:    call Clamp32
-        ld (RowC), a
-        ld h, a
+        sub h
+        jr nc, .a1
+        xor a
+.a1:    cp l
+        jr c, .a2
+        ld a, l
+.a2:    rrca
+        rrca
+        rrca
+        and 31
+        ld (RowA), a
+        ; b = max(D) >> 3 + 1
+        ld a, b
+        cp d
+        jr nc, .b0
+        ld a, d
+.b0:    rrca
+        rrca
+        rrca
+        and 31
+        ld l, a                 ; max column of the first road pixel
+        inc a
+        ld (RowB), a
+        ; c = min(E) >> 3, at least b
+        ld a, c
+        cp e
+        jr c, .c0
         ld a, e
-        call Clamp32
-        ld (RowD), a
+.c0:    rrca
+        rrca
+        rrca
+        and 31
+        cp l                    ; narrow road: an edge cell holds both edges
+        ld h, 1
+        jr c, .c1
+        jr z, .c1
+        ld h, 0
+.c1:    ld l, a
+        ld a, h
+        ld (RowMerged), a
+        ld a, (RowB)
+        cp l
+        jr nc, .c2
+        ld a, l
+.c2:    ld (RowC), a
+        ; d = max(E + RW) >> 3 + 1   (clamped at 255)
+        ld a, (RowRW0)
+        add a, c
+        jr nc, .d0
+        ld a, 255
+.d0:    ld l, a
+        ld a, (RowRW1)
+        add a, e
+        jr nc, .d1
+        ld a, 255
+.d1:    cp l
+        jr nc, .d2
+        ld a, l
+.d2:    rrca
+        rrca
+        rrca
+        and 31
+        inc a
+        ld l, a
+        ld a, (RowC)
+        cp l
+        jr nc, .d3
+        ld a, l
+.d3:    ld (RowD), a
 
+.ranges:
         ; ---- band of the row's middle line
         ld a, (CurI)
         add a, low Band + 4
@@ -384,26 +495,30 @@ DrawRoadRow:
         ld a, $FF               ; road too narrow for a centre line
         ld (DrawRoadLine.lb + 1), a
 .laneOk:
+        ; ---- bitmap address of the row's first pixel line -> IX
+        ld a, (CurRow)
+        ld b, a
+        and 7
+        rrca
+        rrca
+        rrca
+        ld ixl, a               ; (row & 7) << 5
+        ld a, b
+        and $18
+        or $40
+.bufOr: or 0
+        ld ixh, a
         ld a, (CurI)
         ld c, a
         ld b, 8
 .line:  push bc
         call DrawRoadLine
         pop bc
+        inc ixh
         inc c
         djnz .line
         ld a, c
         ld (CurI), a
-        ret
-
-; H = lower bound, A = value -> A = clamp(A, H, 32)
-Clamp32:
-        cp h
-        jr nc, .lo
-        ld a, h
-.lo:    cp 33
-        ret c
-        ld a, 32
         ret
 
 ; A = width in bytes (clamped to STRIP_PAD) -> HL = LDI chain entry
@@ -482,8 +597,7 @@ StalePieces:
         add a, a
         add a, a
         ld l, a
-        ld a, (DrawRoadRow.rs1 + 1)
-        ld h, a
+.rs:    ld h, 0
         ld a, (hl)
         ld (OldA), a
         inc l
@@ -549,13 +663,13 @@ StalePieces:
 .pc:    ld h, a
         ret
 
-; Clear the stale kerb cells (patched pieces) of line C on the back buffer.
-; IY = line address. Preserves DE.
+; Clear the stale kerb cells (patched pieces) on the line at IX. Preserves DE.
 ZeroStale:
         push de
-        push iy
-        pop hl
-        ld e, l
+        ld a, ixh
+        ld h, a
+        ld a, ixl
+        ld e, a
 .p1:    ld bc, 0                ; C = start, B = count (patched)
         call .zero
 .p2:    ld bc, 0
@@ -578,133 +692,65 @@ ZeroStale:
         djnz .zl
         ret
 
-; C = road line index -> IY = screen address of column 0 in the back buffer.
-; Preserves BC, DE.
-LineAddrIY:
-        ld a, c
-        add a, ROAD_Y0
-        ld l, a
-        ld h, high ScrLo
-        ld a, (hl)
-        inc h
-        ld h, (hl)
-        ld l, a
-        ld a, h
-.bufOr: or 0
-        ld h, a
-        push hl
-        pop iy
-        ret
-
 ; --------------------------------------------------------------------------
-; Draw road line C (preserved).
+; Draw road line C (preserved) at bitmap address IX (preserved).
 ; Row constants (patched by DrawRoadRow): forced, merged, ka/ga/gc = a,
 ; kl = a + STRIP_PAD, kc = c, kr = low StripR + STRIP_PAD + c, gn = d - a,
 ; lb = b, lc = c - 1, lcall / rcall = LDI chain entries for the kerb widths.
-; Frame constants: s1a / s1b (cx state), s2a (centre line state).
+; Frame constants: s1a / s1b (D/E state), s2a / s2b (centre line state).
 DrawRoadLine:
-        ; ---- DE = cx
         ld l, c
-        set 7, l
-        ld h, high CXHi
+        ld h, high DEPage
         ld d, (hl)
-        res 7, l
-        ld e, (hl)
+        set 7, l
+        ld e, (hl)              ; D, E = first / last road pixel
 .forced:
         ld a, 0
         or a
-        jr z, .check
-        ; row's kerb cells changed: clear stale cells, forget the centre line
-        call LineAddrIY
+        jr nz, .clearRow
+.s1a:   ld h, 0
+        ld a, (hl)
+        cp e
+        jr nz, .kerbs
+        res 7, l
+        ld a, (hl)
+        cp d
+        jp z, .lane             ; edges unchanged on this buffer
+        jr .kerbs
+
+.clearRow:
+        ; the row's kerb cells changed: clear stale cells and the centre line
         push bc
         call ZeroStale
         pop bc
         ld l, c
 .s2b:   ld h, 0
         ld a, (hl)
-        ld (hl), $FF
-        inc a
+        ld (hl), $FF            ; centre line forgotten
+        cp $FF
         jr z, .kerbs
-        dec a
         rrca
         rrca
         rrca
         and 31
-        ld b, a
-        ld a, iyl
-        add a, b
+        add a, ixl
         ld l, a
-        ld a, iyh
+        ld a, ixh
         ld h, a
         xor a
         ld (hl), a
         inc l
         ld (hl), a
-        jr .kerbs2
-.check: ld l, c
-.s1a:   ld h, 0
-        ld a, (hl)
-        cp e
-        jr nz, .kerbs
-        set 7, l
-        ld a, (hl)
-        cp d
-        jp z, .lane             ; road position unchanged on this buffer
-.kerbs: call LineAddrIY
-.kerbs2:
-        ld l, c
+
+.kerbs: ld l, c
 .s1b:   ld h, 0
-        ld (hl), e
-        set 7, l
         ld (hl), d
-
-        ; ---- first / last road pixel -> D, E
-        ld h, high RoadX1
-        ld b, (hl)              ; B = X1  (L = i | $80)
-        ld a, d
-        or a
-        jr nz, .slow
+        set 7, l
+        ld (hl), e
         ld a, e
-        sub b
-        jr c, .slow
-        ld d, a
-        ld a, e
-        dec a
-        add a, b
-        jr c, .slow
-        ld e, a
-        jr .masks
-.slow:  ex de, hl               ; HL = cx
-        ld e, b
-        ld d, 0
-        push hl
-        or a
-        sbc hl, de              ; first road pixel
-        ld a, h
-        or a
-        jr z, .s1
-        jp m, .s0
-        pop hl                  ; >= 256: road entirely right of the screen
-        jr .none
-.s0:    xor a
-        jr .s2
-.s1:    ld a, l
-.s2:    pop hl
-        push af
-        add hl, de
-        dec hl                  ; last road pixel
-        ld a, h
-        or a
-        jr z, .s3
-        jp m, .nonePop          ; < 0: road entirely left of the screen
-        ld a, 255
-        jr .s4
-.s3:    ld a, l
-.s4:    ld e, a
-        pop af
-        ld d, a
-
-.masks: ; road pixel masks for the edge bytes, then D = colB, E = colQ
+        cp d
+        jr c, .none
+        ; road pixel masks for the edge bytes, then D = colB, E = colQ
         ld h, high MaskPage
         ld a, d
         and 7
@@ -731,8 +777,6 @@ DrawRoadLine:
         and 31
         ld e, a
         jr .copy
-.nonePop:
-        pop af
 .none:  xor a
         ld (StripL + STRIP_PAD), a
         ld (StripR + STRIP_PAD), a
@@ -764,17 +808,17 @@ DrawRoadLine:
         ld a, low StripR + STRIP_PAD
 .r2:    ld (.rsrc + 1), a
 
-        ld a, iyl
+        ld a, ixl
 .ka:    add a, 0
         ld e, a
-        ld a, iyh
+        ld a, ixh
         ld d, a                 ; DE = left kerb cells
 .lsrc:  ld hl, StripL
 .lcall: call LdiEnd
-        ld a, iyl
+        ld a, ixl
 .kc:    add a, 0
         ld e, a
-        ld a, iyh
+        ld a, ixh
         ld d, a                 ; DE = right kerb cells
 .rsrc:  ld hl, StripR
 .rcall: call LdiEnd
@@ -783,9 +827,9 @@ DrawRoadLine:
 
 .generic:
         ; narrow road: compose every kerb byte in [a, d) from both edges
-        push iy
-        pop hl
-        ld a, l
+        ld a, ixh
+        ld h, a
+        ld a, ixl
 .ga:    add a, 0
         ld l, a
 .gn:    ld b, 0
@@ -799,19 +843,21 @@ DrawRoadLine:
         ld a, e
         cp c
         jr c, .g0
-        ld ixh, $FF
         ld a, c
         cp d
+        ld a, $FF
         jr nz, .g1
         ld a, (StripL + STRIP_PAD)
-        ld ixh, a
-.g1:    ld a, c
+.g1:    ex af, af'
+        ld a, c
         cp e
         jr nz, .g2
         ld a, (StripR + STRIP_PAD)
-        and ixh
-        ld ixh, a
-.g2:    ld a, ixh
+        ld (.gm + 1), a
+        ex af, af'
+.gm:    and $FF
+        jr .gw
+.g2:    ex af, af'
         jr .gw
 .g0:    xor a
 .gw:    ld (hl), a
@@ -820,7 +866,7 @@ DrawRoadLine:
         djnz .gl
 .gDone: pop bc
 
-.lane:  ; ---- centre line x = cx - LW: light band only, both bytes on road cells
+.lane:  ; ---- centre line: light band only, both bytes on road cells
         ld b, $FF
         ld l, c
         set 7, l
@@ -828,20 +874,11 @@ DrawRoadLine:
         ld a, (hl)
         or a
         jr nz, .laneNew
-        ld h, high CXHi
-        ld a, (hl)
-        or a
-        jr nz, .laneNew         ; centre off screen
         res 7, l
-        ld e, (hl)              ; cx low
-        ld h, high LaneW
+        ld h, high LaneX
         ld a, (hl)
-        or a
+        cp $FF
         jr z, .laneNew
-        ld d, a
-        ld a, e
-        sub d
-        jr c, .laneNew
         ld e, a
         rrca
         rrca
@@ -859,38 +896,27 @@ DrawRoadLine:
         cp b
         ret z                   ; centre line unchanged on this buffer
         ld (hl), b
-        push af
-        call LineAddrIY
-        pop af
-        push iy
-        pop hl
         cp $FF
         jr z, .noOld
         ; erase the old centre line bytes
-        push hl
         rrca
         rrca
         rrca
         and 31
-        add a, l
+        add a, ixl
         ld l, a
+        ld a, ixh
+        ld h, a
         xor a
         ld (hl), a
         inc l
         ld (hl), a
-        pop hl
 .noOld: ld a, b
         cp $FF
         ret z
         ; draw: mask index = LW*8 + (x & 7)
-        rrca
-        rrca
-        rrca
-        and 31
-        add a, l
-        ld l, a
-        push hl
         ld l, c
+        set 7, l
         ld h, high LaneW
         ld a, (hl)
         add a, a
@@ -903,7 +929,15 @@ DrawRoadLine:
         add a, low LaneM1
         ld e, a
         ld d, high LaneM1
-        pop hl
+        ld a, b
+        rrca
+        rrca
+        rrca
+        and 31
+        add a, ixl
+        ld l, a
+        ld a, ixh
+        ld h, a
         ld a, (de)
         ld (hl), a
         inc l

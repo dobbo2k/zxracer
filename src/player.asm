@@ -8,6 +8,7 @@ ACCEL           EQU 1
 DECEL           EQU 1
 
 UpdatePlayer:
+        call DemoDriver
         ; frames elapsed since the last update (1..4)
         ld a, (FrameCount)
         ld hl, LastLogic
@@ -21,7 +22,42 @@ UpdatePlayer:
         ld a, 4
 .el:    ld (Elapsed), a
 
+        ; centrifugal force: PlayerX.PXFrac -= curve * speed * elapsed / 128
+        ld a, (Speed)
+        or a
+        jr z, .noCF
+        ld b, a
+        ld a, (SegCurve)
+        ld e, a
+        rlca
+        sbc a, a
+        ld d, a
+        ld hl, 0
+.cfm:   add hl, de
+        djnz .cfm
+        add hl, hl              ; delta per 50 Hz frame in 1/256 pixel
+        ex de, hl
+        ld a, d
+        rlca
+        sbc a, a
+        ld c, a                 ; sign of the delta
+        ld a, (Elapsed)
+        ld b, a
+.cfe:   ld a, (PXFrac)
+        sub e
+        ld (PXFrac), a
+        ld hl, (PlayerX)
+        ld a, l
+        sbc a, d
+        ld l, a
+        ld a, h
+        sbc a, c
+        ld h, a
+        ld (PlayerX), hl
+        djnz .cfe
+.noCF:
         ; steering
+        ld a, (Elapsed)
         ld b, a
         ld a, (Input)
         ld c, a
@@ -76,4 +112,53 @@ UpdatePlayer:
 .adv:   add hl, de
         djnz .adv
         ld (Pos), hl
+        jp UpdateTrack
+
+; Demo / attract mode: until a steering key is pressed, drive automatically
+; (accelerate, steer back towards the middle of the road).
+DEMO_DEADBAND   EQU 6
+
+DEMO_IDLE       EQU 100             ; game frames without input before attract mode
+
+DemoDriver:
+        ld a, (Input)
+        or a
+        ld hl, IdleCount
+        jr z, .idle
+        ld (hl), 0
+        jr .mode
+.idle:  ld a, (hl)
+        cp DEMO_IDLE
+        jr nc, .resume
+        inc (hl)
+        jr .mode
+.resume:
+        ld a, 1
+        ld (DemoMode), a
+.mode:  ld a, (DemoMode)
+        or a
+        ret z
+        ld a, (Input)
+        and (1 << IN_LEFT) | (1 << IN_RIGHT)
+        jr z, .auto
+        xor a
+        ld (DemoMode), a
+        ret
+.auto:  ld a, (Input)
+        set IN_UP, a
+        ld c, a
+        ld hl, (PlayerX)
+        ld de, DEMO_DEADBAND
+        add hl, de
+        bit 7, h
+        jr nz, .right           ; PlayerX < -deadband: steer right
+        ld de, -2 * DEMO_DEADBAND
+        add hl, de
+        bit 7, h
+        jr nz, .set             ; within the deadband
+        set IN_LEFT, c
+        jr .set
+.right: set IN_RIGHT, c
+.set:   ld a, c
+        ld (Input), a
         ret

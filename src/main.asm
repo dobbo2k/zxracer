@@ -24,6 +24,8 @@ MainLoop:
         call SelectBackBuffer
         BORDER 2                ; red: road
         call DrawRoad
+        BORDER 3                ; magenta: sprites
+        call DrawCar
         BORDER 0                ; black: waiting for flip
         call FlipBuffers
         jr MainLoop
@@ -33,7 +35,11 @@ MainLoop:
         INCLUDE "input.asm"
         INCLUDE "player.asm"
         INCLUDE "road.asm"
+        INCLUDE "track.asm"
+        INCLUDE "car_data.asm"
+        INCLUDE "car.asm"
         INCLUDE "vars.asm"
+        INCLUDE "track_data.asm"
 CodeEnd:
         ASSERT CodeEnd <= TABLES
 

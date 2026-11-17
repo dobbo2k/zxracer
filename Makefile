@@ -16,7 +16,13 @@ build:
 build/tables.asm: tools/gen_tables.py | build
 	$(PYTHON) tools/gen_tables.py $@
 
-build/zxracer.sna: $(SRC) build/tables.asm | build
+build/track_data.asm: tools/track.py assets/tracks/test.yaml | build
+	$(PYTHON) tools/track.py assets/tracks/test.yaml $@
+
+build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
+	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32
+
+build/zxracer.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm | build
 	$(ASM) $(ASMFLAGS) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build
