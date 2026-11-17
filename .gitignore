@@ -1,0 +1,9 @@
+build/
+*.sna
+*.tap
+*.tzx
+*.z80
+*.lst
+*.sym
+__pycache__/
+.venv/
