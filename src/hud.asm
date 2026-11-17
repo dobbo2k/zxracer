@@ -51,6 +51,7 @@ DrawHud:
         ld (ix + 3), a
         ld bc, $0101
         call CellAddr
+        ld a, (Score + 3)
         call PrintLowNib
 .s3:    ld a, (Score + 2)
         cp (ix + 2)
@@ -58,6 +59,7 @@ DrawHud:
         ld (ix + 2), a
         ld bc, $0102
         call CellAddr
+        ld a, (Score + 2)
         call PrintBcd
 .s2:    ld a, (Score + 1)
         cp (ix + 1)
@@ -65,6 +67,7 @@ DrawHud:
         ld (ix + 1), a
         ld bc, $0104
         call CellAddr
+        ld a, (Score + 1)
         call PrintBcd
 .s1:    ld a, (Score)
         cp (ix + 0)
@@ -72,6 +75,7 @@ DrawHud:
         ld (ix + 0), a
         ld bc, $0106
         call CellAddr
+        ld a, (Score)
         call PrintBcd
 .s0:    ; ---- time: two big digits
         ld a, (Time)

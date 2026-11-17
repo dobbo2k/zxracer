@@ -18,6 +18,8 @@ InitInterrupts:
 Isr:
         push af
         push hl
+        push bc
+        push de
         ld hl, FrameCount
         inc (hl)
         ld a, (FlipPending)
@@ -32,13 +34,13 @@ Isr:
         ld (hl), a
         ld a, (FlipValue)
         ld (Port7FFD), a
-        push bc
         ld bc, PORT_7FFD
         out (c), a
-        pop bc
         xor a
         ld (FlipPending), a
-.done:
+.done:  call SoundTick              ; after the flip, which must beat the beam
+        pop de
+        pop bc
         pop hl
         pop af
         ei

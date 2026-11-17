@@ -15,6 +15,7 @@ Input:          db 0
 DemoMode:       db 1            ; attract mode until a steering key is pressed
 PlayerX:        dw 0
 Speed:          db 0
+OffRoad:        db 0
 Pos:            dw 0
 LastLogic:      db 0
 Elapsed:        db 0

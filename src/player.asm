@@ -134,12 +134,17 @@ UpdatePlayer:
         or a
         sbc hl, de
         pop af
+        ld b, 0
         jr c, .onRoad
+        inc b
         cp OFFROAD_SPEED + 1
         jr c, .onRoad
         sub 2
         ld (Speed), a
 .onRoad:
+        ld a, b
+        ld (OffRoad), a
+        ld a, (Speed)
 
         ; position += speed * elapsed
         ld e, a

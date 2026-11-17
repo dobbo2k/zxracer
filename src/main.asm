@@ -53,6 +53,7 @@ MainLoop:
         INCLUDE "horizon.asm"
         INCLUDE "hud.asm"
         INCLUDE "game.asm"
+        INCLUDE "sound.asm"
         INCLUDE "horizon_data.asm"
         INCLUDE "vars.asm"
         INCLUDE "track_data.asm"

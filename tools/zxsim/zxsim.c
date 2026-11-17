@@ -18,6 +18,7 @@
  *   -d ADDR:LEN     at exit, hex-dump LEN bytes at ADDR (current paging)
  *   -w ADDR[:N]     print registers when PC reaches ADDR (first N hits, default 20)
  *   -p F:file       from frame F, accumulate T-states per PC; write "addr T" lines to file
+ *   -a              print the AY registers at exit
  *   -q              quiet summary
  */
 #include <stdio.h>
@@ -103,6 +104,7 @@ static uint8_t port_in(uint16_t port) {
     return 0xff;
 }
 
+static uint8_t ay_reg[16], ay_sel;     /* AY-3-8912: registers only, no audio */
 static int log_border_from = -1;
 static long flips;
 static void port_out(uint16_t port, uint8_t v) {
@@ -111,6 +113,8 @@ static void port_out(uint16_t port, uint8_t v) {
         if (log_border_from >= 0 && frame >= log_border_from)
             printf("border frame=%ld T=%ld colour=%d\n", frame, T, border);
     }
+    if ((port & 0xC002) == 0xC000) ay_sel = v & 15;              /* $FFFD */
+    else if ((port & 0xC002) == 0x8000) ay_reg[ay_sel] = v;      /* $BFFD */
     if (!(port & 0x8002)) {    /* $7FFD decoding: A15=0, A1=0 */
         if ((p7ffd ^ v) & 8) flips++;
         p7ffd = v; update_paging();
@@ -595,7 +599,7 @@ int main(int argc, char **argv) {
     const char *sna = NULL;
     long nframes = 50;
     event shots[64], keys[64], joys[64];
-    int nshots = 0, nkeys = 0, njoys = 0, quiet = 0;
+    int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
     long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1;
     const char *prof_file = NULL;
     static unsigned long long prof[65536];
@@ -610,6 +614,7 @@ int main(int argc, char **argv) {
             strncpy(e->arg, colon + 1, 255); e->arg[255] = 0;
         } else if (!strcmp(a, "-b") && i + 1 < argc) log_border_from = atoi(argv[++i]);
         else if (!strcmp(a, "-q")) quiet = 1;
+        else if (!strcmp(a, "-a")) show_ay = 1;
         else if (!strcmp(a, "-p") && i + 1 < argc) {
             char *v = argv[++i];
             prof_from = strtol(v, &v, 0);
@@ -665,6 +670,11 @@ int main(int argc, char **argv) {
             for (int a = 0; a < 65536; a++) if (prof[a]) fprintf(pf, "%04X %llu\n", a, prof[a]);
             fclose(pf);
         }
+    }
+    if (show_ay) {
+        printf("ay");
+        for (int r = 0; r < 14; r++) printf(" %02X", ay_reg[r]);
+        printf("\n");
     }
     if (dump_addr >= 0) {
         for (long i = 0; i < dump_len; i++)
