@@ -11,6 +11,8 @@ import sys
 import yaml
 
 LAP = 65536
+SIGN_CURVE = 10          # bends at least this sharp get warning signs
+SIGN_X = 240             # signs stand on the grass, clear of the kerb
 
 
 def main(src, dst):
@@ -34,8 +36,18 @@ def main(src, dst):
 
     # Scenery: expand the rules into one z-sorted list of 4-byte objects:
     # dw z ; db x / 4 (signed) ; db type. A type of $FF ends the list.
-    types = {"palm": 0, "traffic": 1}       # must match tools/make_scenery.py
+    types = {"palm": 0, "traffic": 1, "sign_r": 2, "sign_l": 3}   # see tools/make_scenery.py
     objs = []
+    # curve warning signs: three on the outside of every sharp bend, before it
+    z = 0
+    for length, curve in segs:
+        if abs(curve) >= SIGN_CURVE:
+            kind = "sign_r" if curve > 0 else "sign_l"
+            x = -SIGN_X if curve > 0 else SIGN_X
+            for back in (1500, 1000, 500):
+                if z - back >= 0:
+                    objs.append((z - back, x // 4, types[kind]))
+        z += length
     for rule in track.get("scenery", []):
         z = int(rule.get("from", 0))
         while z <= int(rule.get("to", LAP - 1)) and z < LAP:

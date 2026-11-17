@@ -198,31 +198,44 @@ DemoDriver:
         ret
 
 ; The demo driver keeps to the middle unless a car ahead (within 1200
-; units) is in its path; then it aims for the lane on the other side.
+; units) is in its path; then it aims for the lane away from the nearest one.
 DemoTarget:
+        ld hl, 1200
+        ld (DemoNear), hl
+        ld hl, 0
+        ld (DemoAim), hl
         ld ix, Traffic
         ld b, N_TRAFFIC
 .car:   ld l, (ix + 0)
         ld h, (ix + 1)
         ld de, (Pos)
         or a
+        sbc hl, de              ; z_rel
+        bit 7, h
+        jr nz, .next            ; behind
+        ld de, (DemoNear)
+        push hl
+        or a
         sbc hl, de
-        ld a, h
-        cp high 1200
-        jr nc, .next            ; behind (wrapped) or far ahead
+        pop hl
+        jr nc, .next            ; not nearer than the best so far
+        push hl
         push bc
-        call LaneOverlap        ; carry: in the player's path
+        ld bc, HIT_HALFWIDTH + 32   ; give way well before contact
+        call LaneOverlapBC      ; carry: in the player's path
         pop bc
+        pop hl
         jr nc, .next
+        ld (DemoNear), hl
         ld hl, -64              ; car right of centre: go left
         bit 7, (ix + 2)
-        ret z
+        jr z, .aim
         ld hl, 64
-        ret
+.aim:   ld (DemoAim), hl
 .next:  ld de, CAR_SIZE
         add ix, de
         djnz .car
-        ld hl, 0
+        ld hl, (DemoAim)
         ret
 
 ; After a crash: no control, the car is stopped and pulled back towards the

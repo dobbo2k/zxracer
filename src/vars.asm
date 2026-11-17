@@ -107,3 +107,5 @@ CarAttrDirty:   db 1
 CarShown:       dw CarShownA
 CarShownA:      db $FF          ; car frame each buffer shows
 CarShownB:      db $FF
+DemoNear:       dw 0
+DemoAim:        dw 0

@@ -9,7 +9,7 @@ N_TRAFFIC       EQU 3
 CAR_SIZE        EQU 4
 Z_CONTACT       EQU 132         ; a car this close is level with the player's car
 HIT_HALFWIDTH   EQU 56          ; |lane - PlayerX| below this: the cars touch
-; (LaneOverlap preserves IX and B)
+; (LaneOverlap preserves IX)
 LANE_X          EQU 14          ; lanes at +-56 bottom-line pixels (x / 4)
 
 InitTraffic:
@@ -109,6 +109,9 @@ UpdateTraffic:
 
 ; Carry set if the object at lane (ix+2) overlaps the player's car.
 LaneOverlap:
+        ld bc, HIT_HALFWIDTH
+; BC = half-width to test against
+LaneOverlapBC:
         ld a, (ix + 2)
         ld l, a
         rlca
@@ -125,9 +128,8 @@ LaneOverlap:
         ld hl, 0
         or a
         sbc hl, de
-.pos:   ld de, HIT_HALFWIDTH
-        or a
-        sbc hl, de
+.pos:   or a
+        sbc hl, bc
         ret
 
 DrawTraffic:

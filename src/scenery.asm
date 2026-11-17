@@ -81,8 +81,8 @@ UpdateObjects:
 ; that has just reached it (only possible well off the road).
 ObjHit: ld e, a
         ld a, c
-        cp TYPE_PALM
-        ret nz
+        cp TYPE_TRAFFIC         ; palms and signs are solid; traffic is handled apart
+        ret z
         ld a, (CrashTimer)
         or a
         ret nz
