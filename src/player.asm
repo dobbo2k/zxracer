@@ -35,6 +35,15 @@ UpdatePlayer:
         ld hl, 0
 .cfm:   add hl, de
         djnz .cfm
+        push hl                 ; horizon scrolls by curve * speed / 256 per frame
+        ld a, (Elapsed)
+        ld b, a
+        ex de, hl
+        ld hl, (HorizonX)
+.hz:    add hl, de
+        djnz .hz
+        ld (HorizonX), hl
+        pop hl
         add hl, hl              ; delta per 50 Hz frame in 1/256 pixel
         ex de, hl
         ld a, d

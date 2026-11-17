@@ -7,7 +7,7 @@ border-change log into average T-states per phase per game frame.
 import subprocess, sys
 from collections import defaultdict
 
-PHASES = {1: "logic", 2: "road", 3: "car/sprites", 4: "hud", 0: "wait/flip"}
+PHASES = {1: "logic", 2: "road", 3: "car/sprites", 4: "horizon", 0: "wait/flip"}
 FRAME_T = 70908
 
 

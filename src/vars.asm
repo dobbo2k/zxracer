@@ -68,3 +68,9 @@ CmdListA:       db 0
                 ds MAX_SPR * CMD_SIZE
 CmdListB:       db 0
                 ds MAX_SPR * CMD_SIZE
+
+; horizon
+HorizonX:       dw 0            ; scroll, 8.8 pixels
+PanoLast:       dw PanoLastA
+PanoLastA:      db $FF          ; scroll each buffer shows ($FF: none yet)
+PanoLastB:      db $FF

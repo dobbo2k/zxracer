@@ -24,6 +24,8 @@ MainLoop:
         call SelectBackBuffer
         BORDER 3                ; magenta: sprites
         call EraseSprites
+        BORDER 4                ; green: horizon
+        call DrawHorizon
         BORDER 2                ; red: road
         call DrawRoad
         BORDER 3                ; magenta: sprites
@@ -42,6 +44,8 @@ MainLoop:
         INCLUDE "car_data.asm"
         INCLUDE "car.asm"
         INCLUDE "scenery.asm"
+        INCLUDE "horizon.asm"
+        INCLUDE "horizon_data.asm"
         INCLUDE "vars.asm"
         INCLUDE "track_data.asm"
 CodeEnd:
@@ -50,7 +54,16 @@ CodeEnd:
         ORG TABLES
         INCLUDE "tables.asm"
 TablesEnd:
-        ASSERT TablesEnd <= XOR_END - 5 * 8
+        ASSERT TablesEnd <= PANO_LDI_END - 64
+
+; Unrolled LDI chain for the panorama: entered at PanoLdiEnd - 2*n
+        ORG PANO_LDI_END - 64
+        DUP 32
+        ldi
+        EDUP
+PanoLdiEnd:
+        ret
+        ASSERT $ <= XOR_END - 5 * 8
 
 ; Unrolled XOR chain for sprites: entered at XorEnd - 5*n for n bytes
         ORG XOR_END - 5 * 8

@@ -21,7 +21,13 @@ ClearScreen:
         ld l, e
         inc de
         ld (hl), ATTR_SKY
-        ld bc, 32 * ROAD_ROW0 - 1
+        ld bc, 32 * PANO_ROW0 - 1
+        ldir
+        ld h, d
+        ld l, e
+        inc de
+        ld (hl), ATTR_PANO
+        ld bc, 32 * (ROAD_ROW0 - PANO_ROW0) - 1
         ldir
         ld h, d
         ld l, e
@@ -53,11 +59,16 @@ SelectBackBuffer:
         ld a, e
         ld (BufHiOr), a
         ld (RunCommand.bufOr + 1), a
+        push bc
         ld hl, CmdListA
+        ld bc, PanoLastA
         or a
         jr z, .cmdA
         ld hl, CmdListB
+        ld bc, PanoLastB
 .cmdA:  ld (CmdList), hl
+        ld (PanoLast), bc
+        pop bc
         ld a, e
         ld a, d
         ld (StatePage), a

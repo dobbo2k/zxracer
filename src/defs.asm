@@ -9,6 +9,7 @@ PROFILE         EQU 1           ; 1 = border colour timing bars
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
 TABLES          EQU $A600       ; page-aligned lookup tables (build/tables.asm)
+PANO_LDI_END    EQU $BA00       ; unrolled 32-LDI chain for the panorama
 XOR_END         EQU $BB00       ; unrolled XOR chain ends here (with JP (IY))
 LDI_END         EQU $BC00       ; unrolled LDI chain ends here (with RET)
 SCN_DATA        EQU $5B00       ; scenery sprites: spare RAM in bank 5 (always paged)
@@ -30,6 +31,8 @@ ROAD_ROW0       EQU 12          ; first character row of the road
 
 ; Attributes: bit 6 bright, bits 5-3 paper, bits 2-0 ink
 ATTR_SKY        EQU %01101000   ; bright cyan paper, black ink (silhouettes)
+ATTR_PANO       EQU %01101001   ; bright cyan paper, blue ink (distant mountains)
+PANO_ROW0       EQU 9           ; panorama rows 9-11
 ATTR_GRASS_L    EQU %01100000   ; bright green paper, black ink
 ATTR_GRASS_D    EQU %00100000   ; green paper, black ink
 ATTR_ROAD       EQU %01000111   ; black paper, bright white ink
