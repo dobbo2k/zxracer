@@ -93,3 +93,12 @@ HudOr:          db 0
 HudCache:       dw HudCacheA
 HudCacheA:      db $FF, $FF, $FF, $FF, $FF, $FF     ; score, time, speed shown
 HudCacheB:      db $FF, $FF, $FF, $FF, $FF, $FF
+
+; traffic and collisions
+Traffic:        ds N_TRAFFIC * CAR_SIZE
+ObjType:        db 0
+CrashTimer:     db 0
+SfxTimer:       db 0
+SfxType:        db 0
+RandSeed:       dw $A5C3
+EnginePeriod:   dw ENGINE_IDLE

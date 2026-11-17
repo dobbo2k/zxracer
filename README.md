@@ -43,7 +43,10 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   and a mountain panorama that scrolls with the bends.
 - **Game:** HUD with score, big countdown timer and speed; extra time each lap,
   game over, attract mode.
+- **Traffic:** cars in two lanes. Running into one from behind slows you right
+  down; driving into a palm off the road is a crash that stops you and spins the
+  car. The attract-mode driver changes lane to avoid traffic.
 - **Sound:** AY engine note that follows the speed, gravel noise off-road, tyre squeal.
-- **Speed:** about 18-19 fps on average on a curvy lap with scenery, 25 fps on
-  straights (PLAN.md §3.6).
-- **Next:** traffic and collisions (M7). See PLAN.md §7 for all milestones.
+- **Speed:** about 16.5 fps on average on a curvy lap with scenery and traffic, up
+  to 25 fps on straights (PLAN.md §3.6).
+- **Next:** a performance pass, then more scenery and music. See PLAN.md §7.

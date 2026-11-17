@@ -18,6 +18,7 @@ start:
         call InitHud
         ld a, $80
         call InitHud
+        call InitTraffic
         call InitInterrupts
         ei
 
@@ -47,16 +48,15 @@ MainLoop:
         INCLUDE "player.asm"
         INCLUDE "road.asm"
         INCLUDE "track.asm"
-        INCLUDE "car_data.asm"
         INCLUDE "car.asm"
         INCLUDE "scenery.asm"
         INCLUDE "horizon.asm"
         INCLUDE "hud.asm"
         INCLUDE "game.asm"
         INCLUDE "sound.asm"
+        INCLUDE "traffic.asm"
         INCLUDE "horizon_data.asm"
         INCLUDE "vars.asm"
-        INCLUDE "track_data.asm"
 CodeEnd:
         ASSERT CodeEnd <= TABLES
 
@@ -109,6 +109,8 @@ FillBlock:
         ORG SCN_DATA
         INCLUDE "scenery_data.asm"
         INCLUDE "font_data.asm"
+        INCLUDE "car_data.asm"
+        INCLUDE "track_data.asm"
 ScnEnd:
         ASSERT ScnEnd <= $8000
 

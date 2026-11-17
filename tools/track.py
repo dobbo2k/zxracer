@@ -34,7 +34,7 @@ def main(src, dst):
 
     # Scenery: expand the rules into one z-sorted list of 4-byte objects:
     # dw z ; db x / 4 (signed) ; db type. A type of $FF ends the list.
-    types = {"palm": 0}
+    types = {"palm": 0, "traffic": 1}       # must match tools/make_scenery.py
     objs = []
     for rule in track.get("scenery", []):
         z = int(rule.get("from", 0))

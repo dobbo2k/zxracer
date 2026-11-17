@@ -2,7 +2,7 @@
 ; Player car: steering, speed and track position (M1: simple model)
 ; ---------------------------------------------------------------------------
 STEER           EQU 4           ; pixels (at the bottom line) per 50 Hz frame
-PX_MAX          EQU 200
+PX_MAX          EQU 300
 MAX_SPEED       EQU 20          ; depth units per 50 Hz frame
 ACCEL           EQU 1
 DECEL           EQU 1
@@ -10,9 +10,12 @@ BRAKE           EQU 2
 OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
 OFFROAD_SPEED   EQU 8
 
+CRASH_FRAMES    EQU 100
+
 UpdatePlayer:
         call GameUpdate
         call DemoDriver
+        call CrashUpdate
         ; frames elapsed since the last update (1..4)
         ld a, (FrameCount)
         ld hl, LastLogic
@@ -160,6 +163,8 @@ UpdatePlayer:
         ld (Pos), hl
         call AddScore
         call UpdateTrack
+        call EngineUpdate
+        call UpdateTraffic
         jp UpdateObjects
 
 ; Demo / attract mode: until a steering key is pressed, drive automatically
@@ -170,21 +175,81 @@ DemoDriver:
         ld a, (DemoMode)
         or a
         ret z
+        call DemoTarget         ; HL = PlayerX the driver aims for
+        ld de, (PlayerX)
+        or a
+        sbc hl, de              ; target - PlayerX
         ld a, (Input)
         set IN_UP, a
         ld c, a
-        ld hl, (PlayerX)
         ld de, DEMO_DEADBAND
         add hl, de
         bit 7, h
-        jr nz, .right           ; PlayerX < -deadband: steer right
+        jr nz, .left            ; target < PlayerX - deadband: steer left
         ld de, -2 * DEMO_DEADBAND
         add hl, de
         bit 7, h
         jr nz, .set             ; within the deadband
-        set IN_LEFT, c
+        set IN_RIGHT, c         ; target > PlayerX + deadband
         jr .set
-.right: set IN_RIGHT, c
+.left:  set IN_LEFT, c
 .set:   ld a, c
         ld (Input), a
+        ret
+
+; The demo driver keeps to the middle unless a car ahead (within 1200
+; units) is in its path; then it aims for the lane on the other side.
+DemoTarget:
+        ld ix, Traffic
+        ld b, N_TRAFFIC
+.car:   ld l, (ix + 0)
+        ld h, (ix + 1)
+        ld de, (Pos)
+        or a
+        sbc hl, de
+        ld a, h
+        cp high 1200
+        jr nc, .next            ; behind (wrapped) or far ahead
+        push bc
+        call LaneOverlap        ; carry: in the player's path
+        pop bc
+        jr nc, .next
+        ld hl, -64              ; car right of centre: go left
+        bit 7, (ix + 2)
+        ret z
+        ld hl, 64
+        ret
+.next:  ld de, CAR_SIZE
+        add ix, de
+        djnz .car
+        ld hl, 0
+        ret
+
+; After a crash: no control, the car is stopped and pulled back towards the
+; middle of the road; it spins (DrawCar alternates the steering frames).
+CrashUpdate:
+        ld a, (CrashTimer)
+        or a
+        ret z
+        ld hl, Elapsed
+        sub (hl)
+        jr nc, .t
+        xor a
+.t:     ld (CrashTimer), a
+        xor a
+        ld (Input), a
+        ld (Speed), a
+        ld hl, (PlayerX)
+        ld de, 6
+        bit 7, h
+        jr nz, .neg
+        or a
+        sbc hl, de
+        jr nc, .set
+        ld hl, 0
+        jr .set
+.neg:   add hl, de
+        jr nc, .set             ; still negative
+        ld hl, 0
+.set:   ld (PlayerX), hl
         ret

@@ -17,10 +17,12 @@
 ; Draw command (8 bytes): y top, column, bytes per line (n), source skip
 ; per line (width - n), source address (2), height, unused.
 ; ---------------------------------------------------------------------------
-MAX_SPR         EQU 10
+MAX_SPR         EQU 14             ; draw commands per buffer
+MAX_SCN         EQU 8              ; scenery objects considered per frame
 Z_NEARV         EQU 130             ; objects nearer than this have passed the bottom line
 Z_FARV          EQU 3000            ; and further than this are not drawn
 CMD_SIZE        EQU 8
+PALM_HALFWIDTH  EQU 48             ; car half-width + the palm's crown
 
 ; Skip objects that have passed behind the camera.
 UpdateObjects:
@@ -53,6 +55,19 @@ UpdateObjects:
         jr nc, .ahead
 .behind:
         pop hl
+        ; passing a palm: did the player drive into it?
+        push hl
+        inc hl
+        inc hl
+        ld a, (hl)              ; x / 4
+        inc hl
+        ld c, (hl)              ; type
+        pop hl
+        push hl
+        push bc
+        call ObjHit
+        pop bc
+        pop hl
         ld de, 4
         add hl, de
 .next:  djnz .lp
@@ -61,6 +76,42 @@ UpdateObjects:
 .ahead: pop hl
         ld (ObjFirst), hl
         ret
+
+; A = object x / 4, C = type: crash if the player's car overlaps a palm
+; that has just reached it (only possible well off the road).
+ObjHit: ld e, a
+        ld a, c
+        cp TYPE_PALM
+        ret nz
+        ld a, (CrashTimer)
+        or a
+        ret nz
+        ld a, e
+        ld l, a
+        rlca
+        sbc a, a
+        ld h, a
+        add hl, hl
+        add hl, hl
+        ld de, (PlayerX)
+        or a
+        sbc hl, de
+        bit 7, h
+        jr z, .p
+        ex de, hl
+        ld hl, 0
+        or a
+        sbc hl, de
+.p:     ld de, PALM_HALFWIDTH
+        or a
+        sbc hl, de
+        ret nc
+        ld a, CRASH_FRAMES
+        ld (CrashTimer), a
+        xor a
+        ld (Speed), a
+        ld a, SFX_CRASH
+        jp PlaySfx
 
 ; Replay the draw commands this buffer holds (XOR = erase).
 EraseSprites:
@@ -81,14 +132,15 @@ EraseSprites:
         ret
 
 ; Project visible objects, XOR them onto the back buffer and record the
-; commands in this buffer's list.
+; commands in this buffer's list: traffic first, then scenery.
 DrawSprites:
         ld hl, (CmdList)
         ld (hl), 0
         inc hl
         ld (CmdPtr), hl
+        call DrawTraffic
         ld hl, (ObjFirst)
-        ld b, MAX_SPR
+        ld b, MAX_SCN
 .obj:   push bc
         ; ---- read the object; the end marker wraps to the start of the list
         ld a, (hl)
@@ -107,7 +159,18 @@ DrawSprites:
         ld hl, Objects
         pop bc
         jr .obj
-.have:  push hl
+.have:  ld (ObjType), a
+        push hl
+        call DrawObject
+        pop hl
+        pop bc
+        ret c                   ; the rest of the list is further away
+        djnz .obj
+        ret
+
+; Project and draw one object (ObjZ, ObjX, ObjType).
+; Returns carry if it lies beyond the far limit.
+DrawObject:
         ; ---- depth relative to the camera
         ld hl, (ObjZ)
         ld de, (Pos)
@@ -117,7 +180,7 @@ DrawSprites:
         ld hl, Z_FARV
         or a
         sbc hl, de
-        jp c, .done             ; beyond the far limit: later objects are too
+        ret c                   ; beyond the far limit (carry set)
         call ObjLine            ; A = screen line index (or $FF)
         cp $FF
         jp z, .skip
@@ -134,7 +197,18 @@ DrawSprites:
         add a, a                ; 8 bytes per directory entry
         ld e, a
         ld d, 0
-        ld hl, Scn_palm
+        ld a, (ObjType)
+        add a, a
+        ld l, a
+        ld h, 0
+        push de
+        ld de, TypeDir
+        add hl, de
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        ex de, hl               ; HL = the type's size directory
+        pop de
         add hl, de
         ld a, (hl)
         ld (SprW), a
@@ -223,7 +297,7 @@ DrawSprites:
         or a
         jr z, .colPos
         inc a
-        jr nz, .skip            ; far off screen
+        jp nz, .skip            ; far off screen
         ld a, l                 ; negative: visible if col + width > 0
         ld b, a
         ld a, (SprW)
@@ -265,7 +339,13 @@ DrawSprites:
         ld (SprSkip), a
         ld a, c
 .colSet:
-        ; ---- build the command
+        ; ---- build the command (if the list has room)
+        ld hl, (CmdList)
+        ld b, a
+        ld a, (hl)
+        cp MAX_SPR
+        jr nc, .skip
+        ld a, b
         ld hl, (CmdPtr)
         ld c, a                 ; column
         ld a, (ObjI)
@@ -300,13 +380,7 @@ DrawSprites:
         call RunCommand
         ld hl, (CmdList)
         inc (hl)
-.skip:  pop hl
-        pop bc
-        dec b
-        jp nz, .obj
-        ret
-.done:  pop hl
-        pop bc
+.skip:  or a                    ; no carry: keep going
         ret
 
 ; DE = depth (< Z_FARV) -> A = largest line i with Z[i] >= depth ($FF: none)

@@ -273,7 +273,7 @@ docs/       Technical notes, profiling results
 | **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | 🟡 palms with XOR draw/erase; more object types and hills to do |
 | **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | 🟡 scrolling mountain band; clouds and per-stage palettes to do |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
-| **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | |
+| **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | 🟡 3 cars in lanes, respawn ahead, bumps, palm crashes with spin-out; lane changes to do |
 | **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 HUD, timer, lap bonus, score, game over, attract mode; stages and forks to do |
 | **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
 | **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | |
@@ -301,8 +301,8 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 
 ## 9. Immediate next steps
 
-1. M7: traffic cars (sprites on the road) and collisions with traffic and scenery
-   (crash and recovery), which make it a game rather than a drive.
+1. Performance pass (M11 backlog): the sprite path (projection ~9k, XOR replay
+   ~15k) and the road. With traffic the lap averages 16.6 fps and peaks too often.
 2. M4: more scenery types (signs, rocks, bushes) and per-stage variety.
-3. M11 backlog items in §3.6, to get closer to 25 fps everywhere.
-4. M9: music (PT3 player) with the engine moved to channel C.
+3. M9: music (PT3 player) with the engine moved to channel C.
+4. M2b: hills.

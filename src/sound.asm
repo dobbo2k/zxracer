@@ -20,8 +20,9 @@ AyWrite:
         ret
 
 ; Called from the IM2 handler. Preserves everything but AF, BC, DE, HL.
-SoundTick:
-        ; engine period = IDLE - speed * STEP, wobbling +-2
+; Engine tone period for the current speed, once per game frame (not in
+; the interrupt): IDLE - speed * STEP.
+EngineUpdate:
         ld a, (Speed)
         ld e, a
         ld d, 0
@@ -33,6 +34,12 @@ SoundTick:
         ld hl, ENGINE_IDLE
         or a
         sbc hl, de
+        ld (EnginePeriod), hl
+        ret
+
+SoundTick:
+        ; engine period with a small wobble every interrupt
+        ld hl, (EnginePeriod)
         ld a, (FrameCount)
         and 3
         add a, l
@@ -55,6 +62,21 @@ SoundTick:
         ld e, 7
 .vol:   ld a, 8
         call AyWrite
+        ; effects: a burst of noise on B (bump, crash) overrides the gravel
+        ld a, (SfxTimer)
+        or a
+        jr z, .noSfx
+        dec a
+        ld (SfxTimer), a
+        ld e, a                 ; volume fades with the timer
+        ld a, 9
+        call AyWrite
+        ld a, (SfxType)
+        ld e, a                 ; noise period: low = rumble
+        ld a, 6
+        call AyWrite
+        jr .squeal
+.noSfx:
         ; gravel: noise on B while off the road and moving
         ld e, 0
         ld a, (OffRoad)
@@ -69,7 +91,8 @@ SoundTick:
         ld e, 12                ; noise period
         ld a, 6
         call AyWrite
-        ; squeal: high tone on C, volume from |curve| * speed in bends
+.squeal:
+        ; squeal: high tone on C in hard bends at speed
         ld a, (SegCurve)
         bit 7, a
         jr z, .cpos
@@ -96,3 +119,13 @@ SoundTick:
         ld e, %00101010
         ld a, 7
         jp AyWrite
+
+SFX_BUMP        EQU 6               ; noise period of the effect
+SFX_CRASH       EQU 24
+
+; A = effect (noise period): start a 15-frame noise burst
+PlaySfx:
+        ld (SfxType), a
+        ld a, 15
+        ld (SfxTimer), a
+        ret

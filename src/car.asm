@@ -6,11 +6,24 @@
 ; ---------------------------------------------------------------------------
 CAR_COL         EQU 12
 CAR_ROW         EQU 20
-CAR_FRAME       EQU CarGfx_W * CarGfx_H + CarGfx_W * CarGfx_H / 8
+CAR_W           EQU 8               ; bytes (must match the car_data.asm built from car.png)
+CAR_H           EQU 32
+CAR_FRAME       EQU CAR_W * CAR_H + CAR_W * CAR_H / 8
 
 DrawCar:
         ld a, (Input)
         and (1 << IN_LEFT) | (1 << IN_RIGHT)
+        ld b, a
+        ld a, (CrashTimer)      ; spinning after a crash
+        or a
+        ld a, b
+        jr z, .frame
+        ld a, (FrameCount)
+        and 4
+        ld a, 1 << IN_LEFT
+        jr z, .frame
+        ld a, 1 << IN_RIGHT
+.frame:
         ld hl, CarGfx
         cp 1 << IN_LEFT
         jr nz, .notL
@@ -28,11 +41,11 @@ DrawCar:
         ld ixl, 4
 .row:   push de
         DUP 8
-        DUP CarGfx_W
+        DUP CAR_W
         ldi
         EDUP
         ld a, e
-        sub CarGfx_W
+        sub CAR_W
         ld e, a
         inc d
         EDUP
@@ -96,20 +109,20 @@ DrawCar:
         inc e
         inc l
         ld a, l
-        cp CAR_COL + CarGfx_W
+        cp CAR_COL + CAR_W
         jr nz, .cell
         pop hl
-        ld bc, CarGfx_W         ; skip the sprite's own top-row attributes
+        ld bc, CAR_W         ; skip the sprite's own top-row attributes
         add hl, bc
         ld a, e
-        add a, 32 - CarGfx_W
+        add a, 32 - CAR_W
         ld e, a
         ld ixl, 3
-.attr:  DUP CarGfx_W
+.attr:  DUP CAR_W
         ldi
         EDUP
         ld a, e
-        add a, 32 - CarGfx_W
+        add a, 32 - CAR_W
         ld e, a
         dec ixl
         jr nz, .attr
