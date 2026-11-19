@@ -19,6 +19,8 @@
  *   -w ADDR[:N]     print registers when PC reaches ADDR (first N hits, default 20)
  *   -p F:file       from frame F, accumulate T-states per PC; write "addr T" lines to file
  *   -a              print the AY registers at exit
+ *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture)
+ *   -y FILE         write the 14 AY registers at the end of every frame to FILE
  *   -q              quiet summary
  */
 #include <stdio.h>
@@ -149,12 +151,22 @@ static void render_upto(long t) {
         render_row(next_row++);
 }
 
-static void save_ppm(const char *fn) {
-    static const uint8_t pal[16][3] = {
+static const uint8_t pal[16][3] = {
         {0, 0, 0}, {0, 0, 0xd7}, {0xd7, 0, 0}, {0xd7, 0, 0xd7},
         {0, 0xd7, 0}, {0, 0xd7, 0xd7}, {0xd7, 0xd7, 0}, {0xd7, 0xd7, 0xd7},
         {0, 0, 0}, {0, 0, 0xff}, {0xff, 0, 0}, {0xff, 0, 0xff},
         {0, 0xff, 0}, {0, 0xff, 0xff}, {0xff, 0xff, 0}, {0xff, 0xff, 0xff}};
+
+/* raw RGB24 of the current frame (IMG_W x IMG_H) */
+static void write_rgb(FILE *f) {
+    static uint8_t row[IMG_W * 3];
+    for (int y = 0; y < IMG_H; y++) {
+        for (int x = 0; x < IMG_W; x++) memcpy(row + 3 * x, pal[img[y][x]], 3);
+        fwrite(row, 1, sizeof row, f);
+    }
+}
+
+static void save_ppm(const char *fn) {
     FILE *f = fopen(fn, "wb");
     if (!f) { perror(fn); return; }
     fprintf(f, "P6\n%d %d\n255\n", IMG_W, IMG_H);
@@ -601,6 +613,7 @@ int main(int argc, char **argv) {
     enum { MAX_EVENTS = 1024 };
     static event shots[MAX_EVENTS], keys[MAX_EVENTS], joys[MAX_EVENTS];
     int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
+    FILE *vid = NULL, *aylog = NULL;
     long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1;
     const char *prof_file = NULL;
     static unsigned long long prof[65536];
@@ -618,6 +631,11 @@ int main(int argc, char **argv) {
         } else if (!strcmp(a, "-b") && i + 1 < argc) log_border_from = atoi(argv[++i]);
         else if (!strcmp(a, "-q")) quiet = 1;
         else if (!strcmp(a, "-a")) show_ay = 1;
+        else if (!strcmp(a, "-v") && i + 1 < argc) {
+            if (!(vid = fopen(argv[++i], "wb"))) { perror(argv[i]); return 1; }
+        } else if (!strcmp(a, "-y") && i + 1 < argc) {
+            if (!(aylog = fopen(argv[++i], "wb"))) { perror(argv[i]); return 1; }
+        }
         else if (!strcmp(a, "-p") && i + 1 < argc) {
             char *v = argv[++i];
             prof_from = strtol(v, &v, 0);
@@ -666,6 +684,8 @@ int main(int argc, char **argv) {
         render_upto(FRAME_T + LINE_T * 400);
         T -= FRAME_T;
         for (int i = 0; i < nshots; i++) if (shots[i].frame == frame) save_ppm(shots[i].arg);
+        if (vid) write_rgb(vid);
+        if (aylog) fwrite(ay_reg, 1, 14, aylog);
     }
     if (prof_file) {
         FILE *pf = fopen(prof_file, "w");
@@ -674,6 +694,8 @@ int main(int argc, char **argv) {
             fclose(pf);
         }
     }
+    if (vid) fclose(vid);
+    if (aylog) fclose(aylog);
     if (show_ay) {
         printf("ay");
         for (int r = 0; r < 14; r++) printf(" %02X", ay_reg[r]);

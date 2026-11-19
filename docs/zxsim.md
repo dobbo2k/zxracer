@@ -23,6 +23,9 @@ zxsim game.sna [options]
   -p F:file       from frame F accumulate T-states per PC into file
   -w ADDR[:N]     print registers the first N times PC reaches ADDR
   -d ADDR:LEN     hex-dump memory at exit
+  -a              print the AY registers at exit
+  -v FILE         write every frame as raw RGB24 320x288 (video capture)
+  -y FILE         write the 14 AY registers at the end of every frame
   -q              no summary line
 ```
 
@@ -31,3 +34,8 @@ screen), so `fps = flips × 50 / frames`.
 
 `tools/profile.py` turns the border log into T-states per phase; `tools/hotspots.py
 profile.txt build/zxracer.sym N` groups a `-p` profile by routine and local label.
+
+`tools/make_video.py` pipes `-v` into ffmpeg and synthesises the `-y` register
+log (square-wave tones, LFSR noise, AY volume table) into the soundtrack;
+`make video` uses it on an `AUTOPLAY=1, PROFILE=0` build in which the
+attract-mode driver also plays the game.

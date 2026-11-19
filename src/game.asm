@@ -95,6 +95,11 @@ StartGame:
         ld (GameState), a
         xor a
         ld (DemoMode), a
+        IF AUTOPLAY
+        inc a                   ; video build: the autopilot keeps driving
+        ld (DemoMode), a
+        xor a
+        ENDIF
         ld (SecTick), a
         ld (LapFlag), a
         ld (StateTimer), a

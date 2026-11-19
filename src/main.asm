@@ -13,6 +13,8 @@ start:
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
+        xor a                   ; black border
+        out ($FE), a
         call InitScreens
         xor a
         call InitHud
@@ -114,4 +116,8 @@ FillBlock:
 ScnEnd:
         ASSERT ScnEnd <= $8000
 
+        IF AUTOPLAY
+        SAVESNA "build/video.sna", start
+        ELSE
         SAVESNA "build/zxracer.sna", start
+        ENDIF

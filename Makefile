@@ -7,7 +7,7 @@ ASMFLAGS ?= --nologo --msg=war --fullpath -Ibuild --lst=build/zxracer.lst --sym=
 SRC   := $(wildcard src/*.asm)
 ZXSIM := build/zxsim
 
-.PHONY: all clean run test shots profile
+.PHONY: all clean run test shots profile video
 all: build/zxracer.sna
 
 build:
@@ -49,6 +49,13 @@ test: $(ZXSIM) build/cputest.sna build/zxracer.sna
 # Border-bar profile: T-states per phase per game frame
 profile: $(ZXSIM) build/zxracer.sna
 	$(PYTHON) tools/profile.py $(ZXSIM) build/zxracer.sna
+
+# Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
+build/video.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm build/scenery_data.asm build/horizon_data.asm build/font_data.asm | build
+	$(ASM) --nologo --msg=war --fullpath -Ibuild -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
+
+video: $(ZXSIM) build/video.sna
+	$(PYTHON) tools/make_video.py $(ZXSIM) build/video.sna build/gameplay.mp4 3800
 
 run: build/zxracer.sna
 	fuse --machine 128 build/zxracer.sna

@@ -6,6 +6,9 @@
         IFNDEF PROFILE
 PROFILE         EQU 1           ; 1 = border colour timing bars
         ENDIF
+        IFNDEF AUTOPLAY
+AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the game (videos)
+        ENDIF
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
 TABLES          EQU $A600       ; page-aligned lookup tables (build/tables.asm)

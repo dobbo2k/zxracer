@@ -15,6 +15,7 @@ make          # -> build/zxracer.sna (128K snapshot)
 make test     # Z80 core self-test + headless smoke run with screenshots in build/
 make profile  # T-states per phase per game frame (border timing bars)
 make run      # launches Fuse in 128K mode
+make video    # build/gameplay.mp4: 76 s of autopilot gameplay with synthesised AY sound
 ```
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake (or a Kempston joystick).
