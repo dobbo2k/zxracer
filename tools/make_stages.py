@@ -23,6 +23,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
 import make_scenery as scn          # noqa: E402
+from gen_tables import SPLIT_LEN, fork_dx   # noqa: E402
 
 THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
@@ -33,7 +34,8 @@ BANK_SIZE = 0x4000
 PANO_W, PANO_H = 256, 16
 SHARED_TYPES = ["sign_r", "sign_l", "fork"]          # in every theme pack
 TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3}   # theme types: 4, 5
-END_STRAIGHT = 4500                 # straight run-in to the checkpoint (and fork)
+END_STRAIGHT = SPLIT_LEN            # the road forks along the final straight
+MAX_X = 127 * 4                     # object x is stored / 4 in a signed byte
 MAX_STAGE_LEN = 60000
 
 
@@ -151,15 +153,26 @@ def make_track(row, seed, theme):
     objs = []
     big, small = theme["types"]
     tid = {big: 4, small: 5}
+    fork = row < 4                                   # the last row ends at the goal
+    zs = stage_len - SPLIT_LEN                       # where the road splits
+
+    def side_obj(z, side, x, t):
+        # past the split, roadside objects move out with the branches
+        if fork:
+            x += fork_dx(z - zs)
+        if x <= MAX_X:
+            objs.append((z, side * round(x), t))
+
+    end = stage_len - 300 if fork else stage_len - 4500
     z = 2500
-    while z < stage_len - 4500:                     # big scenery, both sides
+    while z < end:                                   # big scenery, both sides
         for side in (-1, 1):
             if rnd.random() < 0.7:
-                objs.append((z + rnd.randint(0, 200), side * rnd.randint(240, 300), tid[big]))
+                side_obj(z + rnd.randint(0, 200), side, rnd.randint(240, 300), tid[big])
         z += rnd.randint(900, 1300)
     z = 2800
-    while z < stage_len - 4500:                     # small scenery
-        objs.append((z, rnd.choice([-1, 1]) * rnd.randint(200, 320), tid[small]))
+    while z < end:                                   # small scenery
+        side_obj(z, rnd.choice([-1, 1]), rnd.randint(200, 320), tid[small])
         z += rnd.randint(500, 900)
     zc = 0
     for length, curve in segs:                       # curve warning signs
@@ -170,9 +183,13 @@ def make_track(row, seed, theme):
                 if zc - back > 0:
                     objs.append((zc - back, x, kind))
         zc += length
-    if row < 4:                                      # fork markers mid-road
-        for back in (3000, 2300, 1600):
-            objs.append((stage_len - back, 0, TYPE_IDS["fork"]))
+    if fork:
+        for back in (1300, 500):                     # fork boards before the split
+            for side in (-1, 1):
+                objs.append((zs - back, side * 250, TYPE_IDS["fork"]))
+        objs.append((zs + 3600, 0, TYPE_IDS["fork"]))   # in the median once it opens
+        for d in (4200, 4700):
+            objs.append((zs + d, 0, tid[big]))
     # no scenery right on the road edge near curve signs etc.: keep sorted, unique z
     objs.sort()
     return segs, objs, stage_len
@@ -196,6 +213,9 @@ def track_pack(name, segs, objs, stage_len):
 
 def theme_pack(name, theme):
     pal = theme["palette"]
+    # DrawForkRow finds the kerb cells it drew by their attributes
+    assert {pal["kerb_l"], pal["kerb_d"]}.isdisjoint(
+        {pal["grass_l"], pal["grass_d"], pal["road"]}), name
     types = SHARED_TYPES + theme["types"]
     out = [f"        MODULE {name}",
            "        dw TypeDir, Panorama, Name",

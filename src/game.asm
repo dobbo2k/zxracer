@@ -9,7 +9,7 @@ ST_PLAYING      EQU 1
 ST_OVER         EQU 2
 START_TIME      EQU $65             ; BCD seconds
 OVER_FRAMES     EQU 200             ; 50 Hz frames on the game-over screen
-FORK_WARN       EQU 4500            ; units before the end of a stage
+FORK_WARN       EQU 6500            ; units before the end of a stage
 
 GameUpdate:
         ld a, (StageDone)       ; reached the end of a stage last frame

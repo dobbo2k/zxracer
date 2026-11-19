@@ -2,7 +2,7 @@
 ; Player car: steering, speed and track position (M1: simple model)
 ; ---------------------------------------------------------------------------
 STEER           EQU 4           ; pixels (at the bottom line) per 50 Hz frame
-PX_MAX          EQU 300
+PX_MAX          EQU 300         ; from the middle of the road (or the branch)
 MAX_SPEED       EQU 20          ; depth units per 50 Hz frame
 ACCEL           EQU 1
 DECEL           EQU 1
@@ -28,6 +28,7 @@ UpdatePlayer:
         jr c, .el
         ld a, 4
 .el:    ld (Elapsed), a
+        call ForkPlayer         ; past the split: carried along the branch
 
         ; centrifugal force: PlayerX.PXFrac -= curve * speed * elapsed / 128
         ld a, (Speed)
@@ -87,22 +88,26 @@ UpdatePlayer:
         ld de, STEER
         add hl, de
 .noR:   djnz .steer
-        ; clamp to +-PX_MAX
+        ; clamp to +-(PX_MAX + PlayerDx)
+        push hl
+        ld hl, (PlayerDx)
+        ld de, PX_MAX
+        add hl, de
+        ex de, hl
+        pop hl
         bit 7, h
         jr nz, .neg
-        ld de, PX_MAX
         or a
         sbc hl, de
         jr c, .inR
         ld hl, 0
 .inR:   add hl, de
         jr .px
-.neg:   ld de, -PX_MAX
-        or a
-        sbc hl, de
-        jr nc, .inL
+.neg:   add hl, de
+        jr c, .inL
         ld hl, 0
-.inL:   add hl, de
+.inL:   or a
+        sbc hl, de
 .px:    ld (PlayerX), hl
 
         ; speed
@@ -125,19 +130,17 @@ UpdatePlayer:
         xor a
 .spd:   ld (Speed), a
         ; off the road (past the kerb): speed limited, sheds speed quickly
-        push af
-        ld hl, (PlayerX)
-        bit 7, h
-        jr z, .absX
-        ex de, hl
-        ld hl, 0
+        ld hl, (PlayerX)        ; distance from the middle of the branch
+        call AbsHL
+        ld de, (PlayerDx)
         or a
         sbc hl, de
-.absX:  ld de, OFFROAD_X
+        call AbsHL
+        ld de, OFFROAD_X
         or a
         sbc hl, de
-        pop af
         ld b, 0
+        ld a, (Speed)
         jr c, .onRoad
         inc b
         cp OFFROAD_SPEED + 1
@@ -205,21 +208,26 @@ DemoDriver:
 ; The demo driver keeps to the middle unless a car ahead (within 1200
 ; units) is in its path; then it aims for the lane away from the nearest one.
 DemoTarget:
-        ; near the end of a stage: keep to one side of the fork marker
-        ld hl, (StageLen)
+        ; near the fork: take one of the branches (varying by stage)
+        ld a, (HasFork)
+        or a
+        jr z, .traffic
+        ld hl, (ForkZ)
         ld de, (Pos)
         or a
         sbc hl, de
-        ld de, 4000
-        or a
+        jr c, .branch
+        ld de, 1500
         sbc hl, de
         jr nc, .traffic
-        ld a, (Stage)           ; left or right, varying by stage
+.branch:
+        ld hl, (PlayerDx)
+        ld de, 40
+        add hl, de
+        ld a, (Stage)
         rra
-        ld hl, -64
-        ret nc
-        ld hl, 64
-        ret
+        ret c
+        jp NegHL
 .traffic:
         ld hl, 1200
         ld (DemoNear), hl
@@ -273,17 +281,29 @@ CrashUpdate:
         xor a
         ld (Input), a
         ld (Speed), a
+        ; (towards the middle of the branch it is on)
         ld hl, (PlayerX)
+        ld a, h
+        push af
+        call AbsHL
+        ld de, (PlayerDx)
+        or a
+        sbc hl, de              ; offset from the middle
         ld de, 6
         bit 7, h
         jr nz, .neg
         or a
         sbc hl, de
-        jr nc, .set
+        jr nc, .rel
         ld hl, 0
-        jr .set
+        jr .rel
 .neg:   add hl, de
-        jr nc, .set             ; still negative
+        jr nc, .rel             ; still negative
         ld hl, 0
-.set:   ld (PlayerX), hl
+.rel:   ld de, (PlayerDx)
+        add hl, de
+        pop af
+        bit 7, a
+        call nz, NegHL
+        ld (PlayerX), hl
         ret

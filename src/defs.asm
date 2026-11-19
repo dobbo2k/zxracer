@@ -11,7 +11,7 @@ AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the gam
         ENDIF
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
-TABLES          EQU $A600       ; page-aligned lookup tables (build/tables.asm)
+TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)
 PANO_LDI_END    EQU $BA00       ; unrolled 32-LDI chain for the panorama
 XOR_END         EQU $BB00       ; unrolled XOR chain ends here (with JP (IY))
 LDI_END         EQU $BC00       ; unrolled LDI chain ends here (with RET)

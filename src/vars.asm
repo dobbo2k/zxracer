@@ -131,6 +131,21 @@ PalKerbD:       db ATTR_KERB_D
 PalRoad:        db ATTR_ROAD
 MsgBuf:         ds MSG_LEN
                 db 0
+; fork
+HasFork:        db 0            ; this stage ends in a fork (not the last row)
+ForkZ:          dw 0            ; where the road splits
+ForkLim:        db 0            ; lines 0 .. ForkLim - 1 are past the split
+P1ForkLim:      db 0            ; (even) ForkLim the pass-1 tables were built with
+PlayerDx:       dw 0            ; how far the car's branch has moved out
+ForkFD:         dw 0            ; depth of the split (negative: passed)
+FkAcc:          ds 3            ; ForkLine's offset accumulator (16.8)
+Fk2C1:          dw 0
+FkOff:          dw 0
+FkX1:           dw 0
+ForkNK:         db 0
+ForkNC:         db 0
+ForkBL:         db 0
+ForkBH:         db 0
 LdBank:         db 0
 LdSrc:          dw 0
 LdDst:          dw 0

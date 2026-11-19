@@ -118,6 +118,29 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   rows only clear the stale cells.
 - Per-row constants are patched into the line routine (self-modifying code).
 
+### 3.2b The road fork (as built)
+
+- From `SPLIT_LEN` (5000) before the end of a stage, each branch's centre moves out
+  from the old centre line by `dx(d) = d² / 65536` world units (`d` past the split):
+  the road first widens, then a median opens (`dx` > the road's half-width, d ≈ 2900)
+  and the branches part (~380 units apart each at the checkpoint).
+- On screen line `k = i + 1` the branch offset is
+  `24/k − FD/256 + C1·k` with `FD` the split's depth and `C1 = FD²/6291456`, so pass 1
+  needs one table read and one add per line pair (`ForkFrame` works out `C1` with
+  two 16×16 multiplies per frame).
+- Lines where the branches overlap are one wide span and go through the normal
+  renderer (no centre line). Rows where both branches are on screen (`RowFork`)
+  go to `DrawForkRow`: it classifies the 32 cells from the four line pairs' spans,
+  writes the attributes, and writes the bitmap only in kerb cells and in cells
+  that were kerb before (found by their attributes: kerb colours are never grass
+  or road colours). A row leaving fork mode clears its kerb cells the same way.
+- The car is carried along the branch it is on (`PlayerX` moves out with `dx`), the
+  off-road test, steering limit and crash recovery are relative to its branch,
+  traffic follows the branch its lane is on, and the checkpoint takes the branch
+  the car is on and re-centres it on the new stage's road.
+- Cost: the split phase runs at ~12.5 fps for a couple of seconds (like a curvy
+  section); the widening phase ~15 fps.
+
 ### 3.3 Horizon / background
 
 - 512-pixel-wide panoramic skyline per stage (mountains, city, palms), stored as
@@ -282,7 +305,7 @@ docs/       Technical notes, profiling results
 | **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | ✅ 5 backdrop styles and palettes (coast, desert, alpine, valley, sunset); clouds to do |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | 🟡 3 cars in lanes, respawn ahead, bumps, palm crashes with spin-out; lane changes to do |
-| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 15 stages in 5 rows with forks, 5 themes, checkpoints with time bonus, GOAL; goal scenes to do |
+| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 15 stages in 5 rows, real road forks (the road splits in two), 5 themes, checkpoints with time bonus, GOAL; goal scenes to do |
 | **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
 | **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | |
 | **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | |

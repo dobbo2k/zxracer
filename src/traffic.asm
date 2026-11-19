@@ -112,7 +112,7 @@ LaneOverlap:
         ld bc, HIT_HALFWIDTH
 ; BC = half-width to test against
 LaneOverlapBC:
-        ld a, (ix + 2)
+        call CarX
         ld l, a
         rlca
         sbc a, a
@@ -142,7 +142,7 @@ DrawTraffic:
         ld l, (ix + 0)
         ld h, (ix + 1)
         ld (ObjZ), hl
-        ld a, (ix + 2)
+        call CarX
         ld (ObjX), a
         ; only cars ahead of the player
         ld de, (Pos)

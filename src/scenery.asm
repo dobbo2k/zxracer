@@ -415,7 +415,19 @@ ObjLine:
 ; Returns HL = cx, carry set if the line has no road on screen. Keeps DE.
 LineCentre:
         ld a, (ObjI)
+        ld hl, P1ForkLim
+        cp (hl)
+        jr nc, .edges
+        or 1                    ; past the split: pass 1 kept cx (odd lines)
         ld l, a
+        ld h, high CXLo
+        ld a, (hl)
+        set 7, l
+        ld h, (hl)
+        ld l, a
+        or a
+        ret
+.edges: ld l, a
         ld h, high RoadD
         ld b, (hl)              ; D
         set 7, l

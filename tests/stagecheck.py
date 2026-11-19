@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Stages: attract mode must drive through the forks into later rows, and
 an autopilot game (AUTOPLAY build) must reach the goal and return to attract
-mode on stage 1.
+mode on stage 1. The autopilot takes the left branch on even stages and the
+right one on odd stages, so it must arrive on stage 0 -> 1 -> 4 -> 7 -> 12.
 usage: stagecheck.py ZXSIM NORMAL.sna VIDEO.sna
 """
 import subprocess
@@ -20,15 +21,16 @@ def syms(path):
 
 
 def run(snap, symfile, frames, extra, names):
+    """One run: dump the memory spanning the named (byte) variables."""
     s = syms(symfile)
-    vals = {}
-    for n in names:
-        r = subprocess.run([zxsim, snap, "-n", str(frames), "-q", "-d", f"{s[n]}:1"] + extra,
-                           capture_output=True, text=True, check=True)
-        if "entered ROM" in r.stderr:
-            sys.exit(f"FAIL: {snap} crashed: {r.stderr.strip()}")
-        vals[n] = int(r.stdout.split()[0], 16)
-    return vals
+    lo = min(s[n] for n in names)
+    hi = max(s[n] for n in names) + 1
+    r = subprocess.run([zxsim, snap, "-n", str(frames), "-q", "-d", f"{lo}:{hi - lo}"] + extra,
+                       capture_output=True, text=True, check=True)
+    if "entered ROM" in r.stderr:
+        sys.exit(f"FAIL: {snap} crashed: {r.stderr.strip()}")
+    mem = [int(x, 16) for x in r.stdout.split()]
+    return {n: mem[s[n] - lo] for n in names}
 
 
 ok = True
@@ -38,12 +40,21 @@ if v["StageRow"] < 4:
     print("FAIL: attract mode did not get through the forks")
     ok = False
 keys = ["-k", "250:Q", "-k", "256:none"]
-v = run(video, video.replace(".sna", ".sym"), 10000, keys, ["GameState", "StageRow", "Time"])
-print(f"autopilot game after 10000 frames: state {v['GameState']} row {v['StageRow']} time {v['Time']:02X}")
-if not (v["GameState"] == 2 and v["StageRow"] == 5 and v["Time"] > 0):
-    print("FAIL: the autopilot did not reach the goal in time")
+goal = None
+for frames in range(8000, 11001, 100):     # (the goal screen lasts 200 frames)
+    v = run(video, video.replace(".sna", ".sym"), frames, keys, ["GameState", "StageRow", "Stage", "Time"])
+    if v["GameState"] == 2:
+        goal = frames, v
+        break
+if goal:
+    frames, v = goal
+    print(f"autopilot game: goal by frame {frames}, stage {v['Stage']} (row {v['StageRow']}), "
+          f"time left {v['Time']:02X}")
+if not (goal and v["StageRow"] == 5 and v["Stage"] == 12 and v["Time"] > 0):
+    print(f"FAIL: the autopilot did not reach the goal in time by the expected branches")
     ok = False
-v = run(video, video.replace(".sna", ".sym"), 11000, keys, ["GameState", "StageRow"])
+v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 11000) + 400, keys,
+        ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):
     print(f"FAIL: no return to attract mode on stage 1 after the goal ({v})")
     ok = False

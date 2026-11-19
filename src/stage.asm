@@ -13,6 +13,9 @@ TRACK_CACHE_SIZE EQU $8000 - TRACK_CACHE
         IFNDEF FIRST_STAGE
 FIRST_STAGE     EQU 0               ; (testing: start on another stage)
         ENDIF
+        IFNDEF START_POS
+START_POS       EQU 0               ; (testing: start further along it)
+        ENDIF
 STAGE_BONUS     EQU $40             ; BCD seconds added at a checkpoint
 NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 
@@ -111,6 +114,16 @@ LoadStage:
         ld (ObjFirst), hl
         ld hl, (TRACK_CACHE + 4)
         ld (StageLen), hl
+        ld de, -SPLIT_LEN
+        add hl, de
+        ld (ForkZ), hl
+        ld a, (StageRow)        ; every row but the last ends in a fork
+        cp NUM_ROWS
+        sbc a, a
+        and 1
+        ld (HasFork), a
+        ld hl, 0
+        ld (PlayerDx), hl
         ld hl, 0
         ld (SegStart), hl
         call InitTraffic
@@ -201,8 +214,8 @@ ResetDisplay:
         ldir                    ; St3: row bands
         ret
 
-; The car reached the end of the stage: take the fork (left or right half of
-; the road), or the goal on the last row.
+; The car reached the end of the stage: take the branch it is on (left or
+; right), or the goal on the last row.
 Checkpoint:
         xor a
         ld (StageDone), a
@@ -223,6 +236,15 @@ Checkpoint:
         cp $FF
         jr z, .goal
         push af
+        ld hl, (PlayerX)        ; onto the middle of the new road
+        ld de, (PlayerDx)
+        bit 7, h
+        jr nz, .rl
+        or a
+        sbc hl, de
+        jr .rb
+.rl:    add hl, de
+.rb:    ld (PlayerX), hl
         ld hl, (Pos)            ; carry the overshoot into the new stage
         ld de, (StageLen)
         or a
@@ -258,8 +280,9 @@ Checkpoint:
 
 ; Back to the first stage (new game, or attract mode).
 Restart:
-        ld hl, 0
+        ld hl, START_POS
         ld (Pos), hl
+        ld hl, 0
         ld (PlayerX), hl
         xor a
         ld (StageDone), a

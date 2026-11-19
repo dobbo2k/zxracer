@@ -85,8 +85,9 @@ DrawCar:
 .attrs: xor a
         ld (CarAttrDirty), a
         ; attributes. The top cell row is the open cockpit: its paper is
-        ; whatever lies underneath (grass, kerb or road, from the road
-        ; renderer's row state), with white ink for heads and screen frame.
+        ; whatever lies underneath (grass, kerb or road: the road renderer
+        ; keeps a copy of those attributes), with white ink for heads and
+        ; screen frame.
         push hl
         ld a, (AttrHi)
         add a, (CAR_ROW * 32) >> 8
@@ -95,48 +96,9 @@ DrawCar:
         ld a, (StatePage)
         add a, 2
         ld h, a
-        ld l, (CAR_ROW - ROAD_ROW0) * 4
-        ld a, (hl)
-        ld (.ca + 1), a
-        inc l
-        ld a, (hl)
-        ld (.cb + 1), a
-        inc l
-        ld a, (hl)
-        ld (.cc + 1), a
-        inc l
-        ld a, (hl)
-        ld (.cd + 1), a
-        ld l, $80 + CAR_ROW - ROAD_ROW0
-        ld a, (hl)
-        or a
-        ld a, (PalGrassL)
-        ld b, a
-        ld a, (PalKerbL)
-        ld c, a
-        jr z, .light
-        ld a, (PalGrassD)
-        ld b, a
-        ld a, (PalKerbD)
-        ld c, a
-.light: ld a, (PalRoad)
-        ld (.road + 1), a
-        ld l, CAR_COL           ; L = column
-.cell:  ld a, l
-.ca:    cp 0
-        ld h, b                 ; grass
-        jr c, .type
-.cb:    cp 0
-        ld h, c                 ; kerb
-        jr c, .type
-.cc:    cp 0
-.road:  ld h, 0
-        jr c, .type
-.cd:    cp 0
-        ld h, c
-        jr c, .type
-        ld h, b
-.type:  ld a, h
+        ld l, COCKPIT
+        ld b, CAR_W
+.cell:  ld a, (hl)
         and %01111000           ; keep bright + paper
         cp %01111000            ; bright white paper?
         jr z, .blackInk
@@ -145,9 +107,7 @@ DrawCar:
         ld (de), a
         inc e
         inc l
-        ld a, l
-        cp CAR_COL + CAR_W
-        jr nz, .cell
+        djnz .cell
         pop hl
         ld bc, CAR_W         ; skip the sprite's own top-row attributes
         add hl, bc

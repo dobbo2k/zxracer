@@ -53,6 +53,7 @@ MainLoop:
         INCLUDE "sound.asm"
         INCLUDE "traffic.asm"
         INCLUDE "stage.asm"
+        INCLUDE "fork.asm"
         INCLUDE "stages.asm"
         INCLUDE "vars.asm"
 CodeEnd:

@@ -14,6 +14,16 @@ RUMBLE_FRAC = 0.15       # rumble strip width as a fraction of half-width
 LANE_FRAC = 0.03         # centre-line half-width as a fraction of half-width
 Z_NEAR = 128             # depth units at the bottom line (z = Z_NEAR*96/dy)
 
+# Road fork at the end of a stage: from SPLIT_LEN before the end the road
+# splits in two; each branch's centre moves out from the old centre line by
+# fork_dx(d) world units (= bottom-line pixels), d = depth past the split.
+SPLIT_LEN = 5000
+FORK_K = 16                          # dx = d^2 / 65536 (the engine relies on it)
+
+
+def fork_dx(d):
+    return (d / 64) ** 2 / FORK_K if d > 0 else 0.0
+
 
 
 def screen_addr(y):
@@ -67,7 +77,25 @@ def main(path):
     lines += page("ZHiPage", ("ZHi", [r[3] >> 8 for r in road]))
     lines += page("DEPage", ("RoadD", [0xFF] * ROAD_LINES),             # first road pixel
                   ("RoadE", [0] * ROAD_LINES))                          # last road pixel
-    lines += page("LXPage", ("LaneX", [0xFF] * ROAD_LINES))             # centre line x
+    # Fork: a branch's offset on screen line i (k = i + 1) is
+    #   dx(Z - FD) * k / 96 = 24 / k - FD / 256 + FD^2 * k / 6291456
+    # (Z = 12288 / k, FD = depth of the split); ForkT1 = 24 / k in 8.8 on odd
+    # lines (fraction at i, integer part at i - 1).
+    t1 = [0] * ROAD_LINES
+    for i in range(1, ROAD_LINES, 2):
+        v = round(6144 / (i + 1))
+        t1[i], t1[i - 1] = v & 0xFF, v >> 8
+    lines += page("LXPage", ("LaneX", [0xFF] * ROAD_LINES), ("ForkT1", t1))  # centre line x
+    # Fork lines: road centre (16-bit, odd lines) and the second branch's
+    # edges; per-row "both branches on screen" flags and DrawForkRow scratch
+    lines += page("CXPage", ("CXLo", [0] * ROAD_LINES), ("CXHi", [0] * ROAD_LINES))
+    lines += page("DE2Page", ("RoadD2", [0xFF] * ROAD_LINES), ("RoadE2", [0] * ROAD_LINES))
+    lines += ["RowFork EQU DE2Page + $60", "ForkCls EQU DE2Page + $E0"]
+    # DxTab[d >> 6] = fork_dx / 4 (capped)
+    lines += [f"SPLIT_LEN EQU {SPLIT_LEN}", "        ALIGN 256", "DxTab:"]
+    dx = [min(255, round(fork_dx(k * 64 + 32) / 4)) for k in range(256)]
+    for k in range(0, 256, 16):
+        lines.append("        db " + ", ".join(f"${v:02X}" for v in dx[k:k + 16]))
     # Scenery: perspective scale (i+1)/96 in 1/256 and pre-scaled size per line
     sizes = [64, 48, 36, 27, 20, 15, 11, 8, 6]         # must match tools/make_scenery.py
     scale = [min(255, round((i + 1) * 256 / ROAD_LINES)) for i in range(ROAD_LINES)]

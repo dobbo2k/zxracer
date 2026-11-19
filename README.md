@@ -44,9 +44,10 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
 - **Stages:** 15 stages in a 5-row pyramid across 5 themes (Sunny Coast, Desert
   Highway, Alpine Pass, Green Valley, Sunset Boulevard), each with its own scenery,
-  mountain backdrop and colours. At the end of a stage the road forks: be on the
-  left or right half of the road at the checkpoint (mind the fork sign in the
-  middle). Checkpoints add time; the last row ends at the GOAL.
+  mountain backdrop and colours. At the end of a stage the road really forks:
+  it widens, a median opens and two branches pull apart, and the branch you
+  drive down picks the next stage (left or right in the next row). Checkpoints
+  add time; the last row ends at the GOAL.
 - **Game:** HUD with score, stage, big countdown timer and speed; game over,
   attract mode.
 - **Traffic:** cars in two lanes. Running into one from behind slows you right

@@ -39,18 +39,24 @@ DrawRoad:
         ld (DrawRoadRow.rs1 + 1), a
         ld (DrawRoadRow.rs2 + 1), a
         ld (StalePieces.rs + 1), a
+        ld (DrawRoadRow.rs3 + 1), a
         ld a, (BufHiOr)
         ld (DrawRoadRow.bufOr + 1), a
 
         ; pass 1 only when the road shape changed: the player moved sideways
         ; or a curve is in view (this frame or the last)
         call BuildCurveList
+        call ForkFrame
         ld a, (RoadStraight)
         ld hl, LastStraight
         ld b, (hl)
         ld (hl), a
         and b
         jr z, .shapeChanged
+        ld a, (ForkLim)         ; past the split the road changes every frame
+        ld hl, P1ForkLim
+        or (hl)
+        jr nz, .shapeChanged
         ld hl, (PlayerX)
         ld de, (Pass1PX)
         or a
@@ -84,6 +90,17 @@ DrawRoad:
 ; and gains the segment curvature every line (screen-space curves).
 ; Alternate registers: L' = line index, H' = table page.
 RoadPass1:
+        ; fork lines (in pairs) and their per-row flags
+        ld a, (ForkLim)
+        and $FE
+        ld (P1ForkLim), a
+        ld (.fl + 1), a
+        ld hl, RowFork
+        ld b, 24 - ROAD_ROW0
+        xor a
+.rf:    ld (hl), a
+        inc l
+        djnz .rf
         ; dx = PlayerX / 96 ~= PlayerX * 2.664 / 256
         ld de, (PlayerX)
         ld h, d
@@ -159,8 +176,12 @@ RoadPass1:
         ld ixl, a
         ld a, h
         ld ixh, a
-        or a
         exx
+        ld a, l
+.fl:    cp 0                    ; past the split? (P1ForkLim, patched)
+        jp c, ForkLine
+        ld a, ixh
+        or a
         ld h, high X1Page
         ld c, (hl)              ; C' = X1
         jr nz, .slow            ; cx outside 0..255
@@ -285,6 +306,14 @@ RoadBands:
 
 ; --------------------------------------------------------------------------
 DrawRoadRow:
+        ; both fork branches on screen in this row?
+        ld a, (CurRow)
+        add a, low RowFork - ROAD_ROW0
+        ld l, a
+        ld h, high RowFork
+        ld a, (hl)
+        or a
+        jp nz, DrawForkRow
         ; ---- edges of the row's top (0) and bottom (1) lines
         ld a, (CurI)
         ld l, a
@@ -420,6 +449,19 @@ DrawRoadRow:
         ld a, (hl)
         ld (RowBand), a
 
+        ; ---- drawn by DrawForkRow last time on this buffer? clear its kerb
+        ;      cells and redraw everything
+        ld a, (CurRow)
+        sub ROAD_ROW0 - $40
+        ld l, a
+.rs3:   ld h, 0
+        ld a, (hl)
+        or a
+        jr z, .notFork
+        ld (hl), 0
+        call ClearKerbCells
+        jr .rowStore
+.notFork:
         ; ---- compare with what this buffer shows for the row
         ld a, (CurRow)
         sub ROAD_ROW0
@@ -441,6 +483,7 @@ DrawRoadRow:
 .rangesChanged:
         call StalePieces        ; old kerb cells no longer in the ranges
         call ZeroStaleRow       ; clear them on all 8 lines of the row
+.rowStore:
         ld a, 1
         ld (RowForced), a
         ld a, (CurRow)
@@ -472,6 +515,7 @@ DrawRoadRow:
         ld a, (CurRow)
         cp CAR_ROW
         jr c, .lines
+        call z, SaveCockpit
         ld a, 1
         ld (CarAttrDirty), a
 
