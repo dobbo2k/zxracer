@@ -15,11 +15,12 @@ make          # -> build/zxracer.sna (128K snapshot)
 make test     # Z80 core self-test + headless smoke run with screenshots in build/
 make profile  # T-states per phase per game frame (border timing bars)
 make run      # launches Fuse in 128K mode
-make video    # build/gameplay.mp4: 76 s of autopilot gameplay with synthesised AY sound
+make video    # build/gameplay.mp4: 48 s of autopilot gameplay with synthesised AY sound
 ```
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake (or a Kempston joystick).
-The game starts in attract mode and hands over when you steer.
+The game opens on the title screen, then alternates it with a self-driving
+demo; any of the game keys starts a game.
 
 ## Layout
 
@@ -52,6 +53,10 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   add time; the last row ends at the GOAL.
 - **Game:** HUD with score, stage, big countdown timer and speed; game over,
   attract mode.
+- **Title and goal screens:** a title screen (logo, sunset, high score) between
+  demo runs, and five goal scenes, one for each route's last stage, that count
+  the time left into the score as a bonus (1000 points a second). All artwork is
+  drawn by `tools/make_screens.py` (previews in `assets/gfx/screen_*.png`).
 - **Traffic:** cars in two lanes. Running into one from behind slows you right
   down; driving into a palm off the road is a crash that stops you and spins the
   car. The attract-mode driver changes lane to avoid traffic.

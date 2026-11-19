@@ -30,9 +30,13 @@ GameUpdate:
         jp nz, StartGame
         ld a, 1
         ld (DemoMode), a
-        ld hl, MsgAttract
-        ld (Message), hl
-        ret
+        ld hl, (AttractTimer)   ; now and then, the title screen
+        dec hl
+        ld (AttractTimer), hl
+        ld a, h
+        or l
+        ret nz
+        jp GoTitle
 .playing:
         ; timer: one second per 50 frames
         ld a, (Elapsed)
@@ -93,11 +97,7 @@ GameUpdate:
         xor a
 .ov:    ld (StateTimer), a
         ret nz
-        ld a, ST_ATTRACT
-        ld (GameState), a
-        ld hl, MsgAttract
-        ld (Message), hl
-        jp Restart
+        jp EndGame
 
 StartGame:
         ld a, ST_PLAYING

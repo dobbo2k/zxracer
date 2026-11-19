@@ -158,6 +158,10 @@ ForkNK:         db 0
 ForkNC:         db 0
 ForkBL:         db 0
 ForkBH:         db 0
+HiScore:        db $00, $00, $02, $00   ; BCD, low byte first (20000 to beat)
+Mute:           db 0            ; title / goal screens: the game's sound is off
+GoalPending:    db 0            ; the goal was reached: show its screen
+AttractTimer:   dw 0            ; game frames of demo left before the title
 LdBank:         db 0
 LdSrc:          dw 0
 LdDst:          dw 0

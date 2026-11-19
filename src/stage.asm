@@ -276,6 +276,8 @@ Checkpoint:
         ld (StateTimer), a
         ld hl, MsgGoal
         ld (Message), hl
+        ld a, 1
+        ld (GoalPending), a
         ret
 
 ; Back to the first stage (new game, or attract mode).

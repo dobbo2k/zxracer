@@ -38,6 +38,9 @@ EngineUpdate:
         ret
 
 SoundTick:
+        ld a, (Mute)            ; (the title / goal screens make their own)
+        or a
+        ret nz
         ; engine period with a small wobble every interrupt
         ld hl, (EnginePeriod)
         ld a, (FrameCount)

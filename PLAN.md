@@ -41,10 +41,12 @@ any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displa
 
 ```
 $4000-$5AFF  Bank 5: screen buffer A
-$5B00-$67FF  Bank 5: resident graphics: traffic sprite, font, player car
-$6800-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
+$5B00-$69FF  Bank 5: resident graphics (traffic sprite, font, player car) and
+             the title / goal screen code
+$7800-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
              (also the bounce buffer while a theme is loaded)
-$8000-$BFFF  Bank 2: code, stage table, lookup tables, unrolled chains, IM2, stack
+$8000-$BFFF  Bank 2: code, stage table, lookup tables, unrolled chains (hill
+             tables in the gaps between them), IM2, stack
 $C000-$DAFF  Bank 7: screen buffer B
 $DB00-$FFFF  Bank 7: THEME CACHE: the current theme's sprites (scenery types,
              curve and fork signs), mountain backdrop, palette, name
@@ -56,7 +58,7 @@ what is displayed. So the theme cache is always reachable.
 
 | Bank | Use |
 |---|---|
-| 0, 1, 3, 4, 6 | Stage packs: 5 theme packs (~9 KB each) and 15 track packs (~1-2 KB), built by `tools/make_stages.py` and assembled to run in the caches |
+| 0, 1, 3, 4, 6 | Stage packs: 5 theme packs (~9 KB each) and 15 track packs (~0.5 KB), built by `tools/make_stages.py` and assembled to run in the caches; the compressed title and goal pictures |
 | 2 | Code, tables |
 | 5 | Screen A, resident graphics, track cache |
 | 7 | Screen B, theme cache |
@@ -140,6 +142,21 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 - The generator adds hills per theme strength (`hills:` in `stages.yaml`): over a
   hill, through a dip, or a long climb, each ending level; the stage start and the
   run-in to the fork stay flat.
+
+### 3.2c Title and goal screens (as built)
+
+- `tools/make_screens.py` draws the title and five goal scenes in RGB with the
+  Spectrum's 15 colours, converts them (two colours per 8×8 cell) and compresses
+  them with a small LZ format (`$00-$7F` literals, `$80-$FE` back-references,
+  `$FF` end): 1.8–3.8 KB each. They sit in the pack banks next to the stage packs.
+- `src/screens.asm` (bank 5, between the resident graphics and the 2 KB track
+  cache) unpacks a picture into screen A while B is on show, prints the high
+  score / results with the HUD font and runs the screen's own loop; the game's
+  sound is muted and the screens beep themselves.
+- Flow: boot → title (8 s or a key) → demo (≈25 s, continuing where it left off)
+  → title … A game ends with the car rolling to a stop, then the goal screen for
+  the last-row stage reached (time bonus counted in), then the title with the
+  updated high score.
 
 ### 3.2b The road fork (as built)
 
@@ -330,7 +347,7 @@ docs/       Technical notes, profiling results
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | 🟡 3 cars in lanes, respawn ahead, bumps, palm crashes with spin-out; lane changes to do |
 | **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 15 stages in 5 rows, real road forks (the road splits in two), 5 themes, checkpoints with time bonus, GOAL; goal scenes to do |
 | **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
-| **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | |
+| **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | 🟡 title screen with high score, title/demo cycle, 5 goal screens with time bonus; loading screen, options, key redefinition to do |
 | **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | |
 
 **Risk-first ordering:** M1 is the make-or-break milestone — if the road plus a
@@ -356,5 +373,5 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 ## 9. Immediate next steps
 
 1. Performance pass (§3.6 backlog): 15-16 fps on curvy stages with traffic.
-2. Goal scenes per route ending; title and loading screens (M10).
+2. Loading screen and a .tap with a BASIC loader; options / key redefinition.
 3. M9: music and a radio-select screen (last).

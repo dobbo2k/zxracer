@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Stages: attract mode must drive through the forks into later rows, and
 an autopilot game (AUTOPLAY build) must reach the goal and return to attract
-mode on stage 1. The autopilot takes the left branch on even stages and the
-right one on odd stages, so it must arrive on stage 0 -> 1 -> 4 -> 7 -> 12.
+mode on stage 1 (after the goal screen and the title). The autopilot takes
+the left branch on even stages and the right one on odd stages, so it must
+arrive on stage 0 -> 1 -> 4 -> 7 -> 12.
 usage: stagecheck.py ZXSIM NORMAL.sna VIDEO.sna
 """
 import subprocess
@@ -53,7 +54,7 @@ if goal:
 if not (goal and v["StageRow"] == 5 and v["Stage"] == 12 and v["Time"] > 0):
     print(f"FAIL: the autopilot did not reach the goal in time by the expected branches")
     ok = False
-v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 11000) + 400, keys,
+v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 11000) + 1300, keys,
         ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):
     print(f"FAIL: no return to attract mode on stage 1 after the goal ({v})")

@@ -18,6 +18,7 @@ start:
         call Restart            ; stage 1: packs, display, track state
         call InitInterrupts
         ei
+        call GoTitle
 
 MainLoop:
         BORDER 1                ; blue: game logic
@@ -126,6 +127,7 @@ FillBlock:
         INCLUDE "resident_data.asm"
         INCLUDE "font_data.asm"
         INCLUDE "car_data.asm"
+        INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 
