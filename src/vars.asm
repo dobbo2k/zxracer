@@ -48,6 +48,11 @@ SegPtr:         dw 0
 SegStart:       dw 0
 SegCurve:       db 0
 PXFrac:         db 0
+LatVX:          dw 0            ; sideways speed, 1/256 pixel per 50 Hz frame
+LatAcc:         dw 0            ; its change per frame this update
+LatF:           dw 0            ; curvature * speed
+Sliding:        db 0            ; past the grip limit
+SlideTick:      db 0
 OldA:           db 0
 OldB:           db 0
 OldC:           db 0

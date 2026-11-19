@@ -286,6 +286,7 @@ Restart:
         ld (Pos), hl
         ld hl, 0
         ld (PlayerX), hl
+        ld (LatVX), hl
         xor a
         ld (StageDone), a
         ld a, FIRST_STAGE

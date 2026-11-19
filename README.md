@@ -41,8 +41,12 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   light/dark grass bands, centre line, curves that build up in the distance,
   and hills: climbs, dips and crests the road (and the cars and scenery on it)
   disappears behind.
-- **Car:** original convertible sprite with steering frames, centrifugal force,
-  off-road slowdown and braking.
+- **Car:** original convertible sprite with steering frames, braking and
+  off-road slowdown. Handling has sideways momentum: bends push the car
+  outwards, steering builds up and the car carries its drift out of a bend.
+  Past the tyres' grip limit (sharp bend × high speed) it slides wide with a
+  squeal, steers half as well and scrubs speed off: brake or ease off for the
+  sharp bends of the later stages.
 - **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,
   pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
 - **Stages:** 15 stages in a 5-row pyramid across 5 themes (Sunny Coast, Desert

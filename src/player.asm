@@ -1,7 +1,9 @@
 ; ---------------------------------------------------------------------------
-; Player car: steering, speed and track position (M1: simple model)
+; Player car: steering, sideways momentum and grip, speed, track position
 ; ---------------------------------------------------------------------------
-STEER           EQU 4           ; pixels (at the bottom line) per 50 Hz frame
+STEER_ACC       EQU 64          ; sideways acceleration (1/256 px per frame per frame):
+                                ; 4 pixels a frame once it has built up
+GRIP            EQU 200         ; |curvature * speed| the tyres hold
 PX_MAX          EQU 300         ; from the middle of the road (or the branch)
 MAX_SPEED       EQU 20          ; depth units per 50 Hz frame
 ACCEL           EQU 1
@@ -30,10 +32,15 @@ UpdatePlayer:
 .el:    ld (Elapsed), a
         call ForkPlayer         ; past the split: carried along the branch
 
-        ; centrifugal force: PlayerX.PXFrac -= curve * speed * elapsed / 128
+        ; ---- sideways handling. Per 50 Hz frame the car's sideways speed
+        ; LatVX (1/256 pixel per frame) gets the bend's outward push
+        ; (curve * speed / 8) and the steering, and the tyres take 1/16 of
+        ; it away: so the car settles at 2 * curve * speed outwards and
+        ; 4 pixels a frame when steering, but builds up to it over a third
+        ; of a second and carries its drift on after a bend. Past the grip
+        ; limit (|curve * speed| > GRIP) it slides: an extra push of a
+        ; quarter of the excess, half the steering, half the grip.
         ld a, (Speed)
-        or a
-        jr z, .noCF
         ld b, a
         ld a, (SegCurve)
         ld e, a
@@ -41,8 +48,11 @@ UpdatePlayer:
         sbc a, a
         ld d, a
         ld hl, 0
+        inc b
+        dec b
+        jr z, .noCF
 .cfm:   add hl, de
-        djnz .cfm
+        djnz .cfm               ; HL = curve * speed
         push hl                 ; horizon scrolls by curve * speed / 256 per frame
         ld a, (Elapsed)
         ld b, a
@@ -52,60 +62,137 @@ UpdatePlayer:
         djnz .hz
         ld (HorizonX), hl
         pop hl
-        add hl, hl              ; delta per 50 Hz frame in 1/256 pixel
+.noCF:  ld (LatF), hl
+        ; push = -(curve * speed) / 8
+        ld d, h
+        ld e, l
+        sra d
+        rr e
+        sra d
+        rr e
+        sra d
+        rr e
+        ld hl, 0
+        or a
+        sbc hl, de
+        ld (LatAcc), hl
+        ; grip
+        ld hl, (LatF)
+        call AbsHL
+        ld de, GRIP
+        or a
+        sbc hl, de              ; HL = excess
+        ld a, 0
+        jr c, .grip
+        srl h
+        rr l
+        srl h
+        rr l                    ; a quarter of it
         ex de, hl
-        ld a, d
-        rlca
-        sbc a, a
-        ld c, a                 ; sign of the delta
-        ld a, (Elapsed)
-        ld b, a
-.cfe:   ld a, (PXFrac)
-        sub e
-        ld (PXFrac), a
-        ld hl, (PlayerX)
-        ld a, l
-        sbc a, d
-        ld l, a
-        ld a, h
-        sbc a, c
-        ld h, a
-        ld (PlayerX), hl
-        djnz .cfe
-.noCF:
+        ld hl, (LatF)           ; slide: push -= sign(F) * excess
+        bit 7, h
+        ld hl, (LatAcc)
+        jr nz, .sl
+        or a
+        sbc hl, de
+        jr .sl1
+.sl:    add hl, de
+.sl1:   ld (LatAcc), hl
+        ld a, 1
+.grip:  ld (Sliding), a
         ; steering
-        ld a, (Elapsed)
-        ld b, a
         ld a, (Input)
         ld c, a
-        ld hl, (PlayerX)
-.steer: bit IN_LEFT, c
+        ld de, 0
+        bit IN_LEFT, c
         jr z, .noL
-        ld de, -STEER
-        add hl, de
+        ld de, -STEER_ACC
 .noL:   bit IN_RIGHT, c
         jr z, .noR
-        ld de, STEER
+        ld hl, STEER_ACC
         add hl, de
-.noR:   djnz .steer
-        ; clamp to +-(PX_MAX + PlayerDx)
+        ex de, hl
+.noR:   ld a, (Sliding)
+        or a
+        jr z, .full
+        sra d                   ; sliding: half the steering
+        rr e
+.full:  ld hl, (LatAcc)
+        add hl, de
+        ld (LatAcc), hl
+        ; per 50 Hz frame: speed += push + steering, grip, position
+        ld a, (Elapsed)
+        ld b, a
+.lat:   push bc
+        ld hl, (LatVX)
+        ld de, (LatAcc)
+        add hl, de
+        ld d, h
+        ld e, l
+        sra d
+        rr e
+        sra d
+        rr e
+        sra d
+        rr e
+        sra d
+        rr e
+        ld a, (Sliding)
+        or a
+        jr z, .firm             ; sliding: 1/32 instead of 1/16
+        sra d
+        rr e
+.firm:  or a
+        sbc hl, de
+        ; no push or steering and almost still: stop (no endless creep)
+        ld a, (LatAcc)
+        ld c, a
+        ld a, (LatAcc + 1)
+        or c
+        jr nz, .vx
         push hl
+        ld de, 15
+        add hl, de
+        ld de, -31
+        add hl, de              ; carry unless -15 <= LatVX <= 15
+        pop hl
+        jr c, .vx
+        ld hl, 0
+.vx:    ld (LatVX), hl
+        ld a, h                 ; PlayerX.PXFrac += LatVX
+        rlca
+        sbc a, a
+        ld d, a
+        ld e, h
+        ld a, (PXFrac)
+        add a, l
+        ld (PXFrac), a
+        ld hl, (PlayerX)
+        adc hl, de
+        ld (PlayerX), hl
+        pop bc
+        djnz .lat
+        ld a, (Input)
+        ld c, a
+        ; clamp to +-(PX_MAX + PlayerDx), stopping the sideways motion
         ld hl, (PlayerDx)
         ld de, PX_MAX
         add hl, de
         ex de, hl
-        pop hl
+        ld hl, (PlayerX)
         bit 7, h
         jr nz, .neg
         or a
         sbc hl, de
         jr c, .inR
         ld hl, 0
+        ld (LatVX), hl
 .inR:   add hl, de
         jr .px
 .neg:   add hl, de
         jr c, .inL
         ld hl, 0
+        ld (LatVX), hl
 .inL:   or a
         sbc hl, de
 .px:    ld (PlayerX), hl
@@ -118,7 +205,17 @@ UpdatePlayer:
         jr nc, .noBrake
         xor a
 .noBrake:
-        bit IN_UP, c
+        ld b, a
+        ld a, (Sliding)         ; sliding: the tyres scrub speed off
+        or a
+        ld a, b
+        jr z, .grips
+        ld hl, SlideTick
+        inc (hl)
+        bit 0, (hl)
+        jr z, .spd
+        jr .coast
+.grips: bit IN_UP, c
         jr z, .coast
         add a, ACCEL
         cp MAX_SPEED + 1
@@ -184,12 +281,25 @@ DemoDriver:
         or a
         ret z
         call DemoTarget         ; HL = PlayerX the driver aims for
+        push hl
+        ld hl, (LatVX)          ; where the car will be in 16 frames
+        ld b, 4
+.pr:    sra h
+        rr l
+        djnz .pr
         ld de, (PlayerX)
+        add hl, de
+        ex de, hl
+        pop hl
         or a
-        sbc hl, de              ; target - PlayerX
+        sbc hl, de              ; target - that
         ld a, (Input)
-        set IN_UP, a
         ld c, a
+        ld a, (Sliding)         ; lift off while sliding
+        or a
+        jr nz, .gas
+        set IN_UP, c
+.gas:
         ld de, DEMO_DEADBAND
         add hl, de
         bit 7, h
@@ -281,6 +391,10 @@ CrashUpdate:
         xor a
         ld (Input), a
         ld (Speed), a
+        ld (Sliding), a
+        ld h, a
+        ld l, a
+        ld (LatVX), hl
         ; (towards the middle of the branch it is on)
         ld hl, (PlayerX)
         ld a, h

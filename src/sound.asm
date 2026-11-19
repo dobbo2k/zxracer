@@ -95,17 +95,11 @@ SoundTick:
         ld a, 6
         call AyWrite
 .squeal:
-        ; squeal: high tone on C in hard bends at speed
-        ld a, (SegCurve)
-        bit 7, a
-        jr z, .cpos
-        neg
-.cpos:  ld e, 0
-        cp 12
-        jr c, .sq
-        ld a, (Speed)
-        cp 16
-        jr c, .sq
+        ; squeal: high tone on C while the tyres slide
+        ld e, 0
+        ld a, (Sliding)
+        or a
+        jr z, .sq
         ld a, (FrameCount)
         and 6
         add a, 40               ; wavering high pitch

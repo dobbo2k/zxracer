@@ -53,10 +53,8 @@ MainLoop:
         INCLUDE "game.asm"
         INCLUDE "sound.asm"
         INCLUDE "traffic.asm"
-        INCLUDE "stage.asm"
         INCLUDE "fork.asm"
         INCLUDE "hills.asm"
-        INCLUDE "stages.asm"
         INCLUDE "vars.asm"
 CodeEnd:
         ASSERT CodeEnd <= TABLES
@@ -122,12 +120,15 @@ FillBlock:
         jp Isr
 
 ; Resident graphics in the spare part of bank 5 (always paged): the traffic
-; sprite, the font and the player's car. The track cache follows.
+; sprite, the font and the player's car; then code that is not time-critical
+; (bank 5 is contended). The track cache follows.
         ORG SCN_DATA
         INCLUDE "resident_data.asm"
         INCLUDE "font_data.asm"
         INCLUDE "car_data.asm"
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
+        INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
+        INCLUDE "stages.asm"
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 
