@@ -18,6 +18,9 @@ LDI_END         EQU $BC00       ; unrolled LDI chain ends here (with RET)
 SCN_DATA        EQU $5B00       ; scenery sprites: spare RAM in bank 5 (always paged)
 FILL_END        EQU $BD00       ; unrolled fill block ends here (with RET)
 ISR_JP          EQU $BDBD       ; IM2 lands here: JP Isr
+HILL_TABLES     EQU $BB00       ; hill mapping (gaps between the unrolled chains)
+ProjClip        EQU HILL_TABLES + $02   ; per depth line: screen line, pairs / clip line
+SrcLine         EQU HILL_TABLES + $80   ; per screen line: depth line shown
 IM2_TABLE       EQU $BE00       ; 257-byte vector table, all bytes = $BD
 STACK_TOP       EQU $C000       ; stack grows down from here ($BF01-$BFFF)
 

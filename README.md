@@ -37,7 +37,9 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
 `build/zxracer.sna`. Attract mode drives itself; press any key to start a game.
 
 - **Road:** pseudo-3D road with red/white attribute kerbs (no colour clash),
-  light/dark grass bands, centre line, and curves that build up in the distance.
+  light/dark grass bands, centre line, curves that build up in the distance,
+  and hills: climbs, dips and crests the road (and the cars and scenery on it)
+  disappears behind.
 - **Car:** original convertible sprite with steering frames, centrifugal force,
   off-road slowdown and braking.
 - **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,

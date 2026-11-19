@@ -301,8 +301,8 @@ DrawObject:
         ld b, a
         ld a, (SprW)
         add a, b
-        jr nc, .skip            ; (col + w wraps past 0 only if visible)
-        jr z, .skip
+        jp nc, .skip            ; (col + w wraps past 0 only if visible)
+        jp z, .skip
         ; clipped on the left: skip -col bytes
         ld a, b
         neg
@@ -322,7 +322,7 @@ DrawObject:
 .colPos:
         ld a, l
         cp 32
-        jr nc, .skip
+        jp nc, .skip
         ld c, a
         ld a, 32
         sub c                   ; bytes to the right edge
@@ -347,15 +347,47 @@ DrawObject:
         ld a, b
         ld hl, (CmdPtr)
         ld c, a                 ; column
+        ; base: the screen line its depth line lands on (hills), and the
+        ; line below which the road in front hides it
+        push hl
         ld a, (ObjI)
-        add a, ROAD_Y0 + 1
         ld b, a
+        or 1
+        add a, low ProjClip
+        ld l, a
+        ld h, high ProjClip
+        ld a, (hl)              ; screen line of the pair's odd depth line
+        dec l
+        ld e, (hl)              ; clip line ($80 + pairs: none)
+        pop hl
+        or a
+        jp z, .skip             ; at or above the top of the road area
+        bit 0, b
+        jr nz, .odd
+        dec a                   ; even depth line: one above the odd one
+.odd:   ld b, a                 ; B = base line
+        bit 7, e
+        jr z, .clip
+        ld e, 127
+.clip:
         ld a, (SprH)
-        ld e, a
+        ld d, a
         ld a, b
-        sub e                   ; y top = base line + 1 - height
+        add a, ROAD_Y0 + 1
+        sub d                   ; y top = base line + 1 - height
         ld (hl), a
-        inc hl
+        ld a, b
+        cp e
+        jr c, .whole
+        sub e
+        inc a                   ; lines hidden at the bottom
+        ld e, a
+        ld a, d
+        sub e
+        jp c, .skip
+        jp z, .skip
+        ld (SprH), a
+.whole: inc hl
         ld (hl), c
         inc hl
         ld a, (SprN)
@@ -410,57 +442,17 @@ ObjLine:
         ld a, (hl)
         ret
 
-; Road centre on line ObjI from the clamped edges: (D + E + 1) / 2 when
-; neither edge is clamped, else from the unclamped edge and X1.
-; Returns HL = cx, carry set if the line has no road on screen. Keeps DE.
+; HL = road centre on depth line ObjI (kept by pass 1). Clears carry,
+; keeps DE.
 LineCentre:
         ld a, (ObjI)
-        ld hl, P1ForkLim
-        cp (hl)
-        jr nc, .edges
-        or 1                    ; past the split: pass 1 kept cx (odd lines)
+        or 1                    ; (odd lines: pairs)
         ld l, a
         ld h, high CXLo
         ld a, (hl)
         set 7, l
         ld h, (hl)
         ld l, a
-        or a
-        ret
-.edges: ld l, a
-        ld h, high RoadD
-        ld b, (hl)              ; D
-        set 7, l
-        ld c, (hl)              ; E
-        ld a, c
-        cp b
-        ret c                   ; no road
-        ld h, high RoadX1
-        ld a, b
-        or a
-        jr z, .fromE
-        ; cx = D + X1
-        add a, (hl)
-        ld l, a
-        ld a, 0
-        adc a, 0
-        ld h, a
-        or a
-        ret
-.fromE: ; cx = E + 1 - X1
-        ld a, c
-        inc a
-        ld b, (hl)
-        ld l, a
-        ld h, 0
-        jr nz, .e1
-        inc h                   ; E = 255: E + 1 = 256
-.e1:    ld a, l
-        sub b
-        ld l, a
-        ld a, h
-        sbc a, 0
-        ld h, a
         or a
         ret
 

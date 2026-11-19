@@ -101,7 +101,7 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 3. Track = list of **segments** (curve amount, hill slope, length, roadside objects,
    traffic spawns, fork marker).
 4. Per frame, walk lines bottom→top accumulating `dx += curve(segment at z)` and
-   `x += dx` to bend the road; hills offset the per-line y mapping and move the horizon.
+   `x += dx` to bend the road; hills offset the per-line y mapping (§3.2a).
 5. Each line becomes a *span list*: grass | rumble | road | line | road | rumble | grass.
    Light/dark is chosen by `(z + trackPosition) & stripeBit`.
 
@@ -117,6 +117,29 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   centre-line x and each row's kerb ranges, so unchanged lines are skipped and moved
   rows only clear the stale cells.
 - Per-row constants are patched into the line routine (self-modifying code).
+
+### 3.2a Hills (as built)
+
+- Segments carry a hill value next to their curvature (`dw length; db curve, hill`).
+  Going up the depth lines from the car, the hill value (weighted by depth zone,
+  like curves) is added to a vertical speed and that to a vertical offset: depth
+  line `j` lands on screen line `j − offset`. Positive values lift the road ahead
+  (a climb), negative ones drop it away (a crest). The camera follows the road's
+  slope at the car, so the horizon stays put; road that would rise above it is
+  cut at the top of the road area.
+- `HillMap` (before pass 1) works out, per depth line pair, the screen line it
+  lands on and how many screen pairs it covers: a rising stretch covers several,
+  one that falls behind nearer road (beyond a crest) none, and the pairs above the
+  furthest visible road are ground without road. Pass 1 still computes the road
+  in depth order and `HillStore` copies each line's edges onto its screen pairs.
+- `SrcLine[screen line]` = the depth line shown, for kerb width, centre-line width
+  and the light/dark band. Scenery and traffic stand on their depth line's screen
+  line and are cut off below the road in front of them (crests).
+- With no hill in view all of this is the identity and costs nothing; on hills
+  the whole road moves every frame (about 4% slower than the same road flat).
+- The generator adds hills per theme strength (`hills:` in `stages.yaml`): over a
+  hill, through a dip, or a long climb, each ending level; the stage start and the
+  run-in to the fork stay flat.
 
 ### 3.2b The road fork (as built)
 
@@ -299,7 +322,7 @@ docs/       Technical notes, profiling results
 | **M0** | Toolchain & skeleton | `make` produces a bootable 128K `.sna`; CI builds it | ✅ done |
 | **M1** | Road prototype | Straight striped road, Z table, double-buffered flip, measured with timing bars | ✅ done; 25 fps straight (see §3.6) |
 | **M1b** | Road optimisation | Cut the road's per-line cost | ✅ v7 renderer; more in M11 |
-| **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | 🟡 curves, YAML track compiler and test loop done; hills to do |
+| **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | ✅ curves, hills (climbs, dips, crests with occlusion), YAML track compiler; the horizon stays put (camera follows the road's slope) |
 | **M3** | Player car | Car with steering frames, no colour clash, basic steering/speed physics | ✅ car owns a fixed 8×4-cell block; centrifugal force; attract-mode driver |
 | **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | ✅ 10 types (palm, bush, cactus, rock, pine, tree, lamp, curve and fork signs, traffic), per-theme sets via the cache |
 | **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | ✅ 5 backdrop styles and palettes (coast, desert, alpine, valley, sunset); clouds to do |
@@ -333,6 +356,5 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 ## 9. Immediate next steps
 
 1. Performance pass (§3.6 backlog): 15-16 fps on curvy stages with traffic.
-2. M2b: hills.
-3. M9: music and a radio-select screen.
-4. Goal scenes per route ending; title and loading screens (M10).
+2. Goal scenes per route ending; title and loading screens (M10).
+3. M9: music and a radio-select screen (last).

@@ -101,6 +101,31 @@ RoadPass1:
 .rf:    ld (hl), a
         inc l
         djnz .rf
+        ld hl, $00FF            ; no second span until ForkLine finds one
+        ld (FkD2), hl
+        ld a, (P1ForkLim)       ; store the second spans only with a fork in view
+        or a
+        ld a, 3
+        jr z, .nff
+        xor a
+.nff:   ld (.ff + 1), a
+        ld (HillStore.hf + 1), a
+        ; hills in view: lines are stored through the hill mapping
+        ld a, (HillOr)
+        or a
+        jr nz, .hills
+        ld a, (P1Hill)
+        or a
+        call nz, HillReset      ; back to one screen line per depth line
+        xor a
+        ld (P1Hill), a
+        ld hl, .flat
+        jr .hset
+.hills: ld a, 1
+        ld (P1Hill), a
+        call HillMap
+        ld hl, HillStore
+.hset:  ld (.store + 1), hl
         ; dx = PlayerX / 96 ~= PlayerX * 2.664 / 256
         ld de, (PlayerX)
         ld h, d
@@ -148,7 +173,7 @@ RoadPass1:
         ld (.nz + 1), a
         ld a, (CurveList)
         call SetCurve
-        ld hl, CurveList + 1
+        ld hl, CurveList + 2
         ld (CurvePtr), hl
         ld a, (hl)
         ld (.nb + 1), a
@@ -177,6 +202,12 @@ RoadPass1:
         ld a, h
         ld ixh, a
         exx
+        ld h, high CXPage       ; road centre on this line, for the scenery
+        set 7, l
+        ld (hl), a
+        res 7, l
+        ld a, ixl
+        ld (hl), a
         ld a, l
 .fl:    cp 0                    ; past the split? (P1ForkLim, patched)
         jp c, ForkLine
@@ -201,7 +232,8 @@ RoadPass1:
         jr nc, .lane
         ld a, $FF
 .lane:  ld c, a                 ; C' = centre line x
-.store: ; this line and the one above it
+.store: jp .flat                ; (HillStore when hills are in view)
+.flat:  ; this line and the one above it
         ld h, high DEPage
         ld (hl), d
         dec l
@@ -215,7 +247,10 @@ RoadPass1:
         ld (hl), c
         dec l
         ld (hl), c
-        inc l
+.ff:    jr .ffs                 ; (patched: 0 with a fork in view)
+        call ForkPair
+.ffs:   inc l
+.stored:
         exx
 .acc:   ; ---- next line up: dx += curvature, total += dx
         ld a, b
@@ -286,22 +321,27 @@ RoadPass1:
         pop hl
         jr .store
 
-; Light/dark band per line: bit STRIPE_BIT of (z + position)
+; Light/dark band per line: bit STRIPE_BIT of (z + position), z of the
+; depth line the screen line shows
 RoadBands:
         ld a, (Pos)
-        ld c, a
-        ld hl, ZLo
+        ld (.p + 1), a
+        ld bc, SrcLine
         ld de, Band
-        ld b, ROAD_LINES / 2    ; even lines only: lines are drawn in pairs
-.band:  ld a, (hl)
-        add a, c
+        ld h, high ZLo
+.band:  ld a, (bc)
+        ld l, a
+        ld a, (hl)
+.p:     add a, 0
         and STRIPE_BIT
         ld (de), a
-        inc l
-        inc l
+        inc c
+        inc c
         inc e
-        inc e
-        djnz .band
+        inc e                   ; even lines only: lines are drawn in pairs
+        ld a, e
+        cp low Band + ROAD_LINES
+        jr nz, .band
         ret
 
 ; --------------------------------------------------------------------------
@@ -321,14 +361,25 @@ DrawRoadRow:
         ld b, (hl)              ; D0
         set 7, l
         ld c, (hl)              ; E0
-        ld h, high X1Page
-        ld a, (hl)
-        ld (RowRW0), a
+        ld h, high SrcLine      ; kerb widths of the depth lines shown
+        ld e, (hl)
         ld a, l
         add a, 7
         ld l, a
+        ld d, (hl)
+        push hl
+        ld h, high RoadRW
+        ld a, e
+        or $80
+        ld l, a
+        ld a, (hl)
+        ld (RowRW0), a
+        ld a, d
+        or $80
+        ld l, a
         ld a, (hl)
         ld (RowRW1), a
+        pop hl
         ld h, high DEPage
         ld e, (hl)              ; E1
         res 7, l
@@ -1040,6 +1091,10 @@ DrawRoadLine:
         ; draw: mask index = LW*8 + (x & 7)
         ld l, c
         set 7, l
+        ld h, high SrcLine
+        ld a, (hl)
+        or $80
+        ld l, a
         ld h, high LaneW
         ld a, (hl)
         add a, a

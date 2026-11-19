@@ -176,12 +176,7 @@ DxOf:   ld a, h
 ; IX = cx (16-bit). Ends at RoadPass1.store with D, E = the first span and
 ; C = no centre line. Only the alternate set, AF and the temps are used.
 ForkLine:
-        ld h, high CXPage       ; road centre, for the scenery
-        ld a, ixl
-        ld (hl), a
         set 7, l
-        ld a, ixh
-        ld (hl), a
         ; off = ForkT1 + accumulator (rounded)
         ld h, high ForkT1
         ld a, (FkAcc)
@@ -255,17 +250,40 @@ ForkLine:
         cp d
         jr c, .left             ; right branch off screen
         ; both on screen: the right branch is the second span
+        ld a, d
+        ld (FkD2), a
+        ld a, e
+        ld (FkE2), a
+        ld d, b
+        ld e, c
+        jr .done
+.left:  ld d, b
+        ld e, c
+.one:   ld a, $FF               ; no second span
+        ld (FkD2), a
+        xor a
+        ld (FkE2), a
+.done:  ld c, $FF               ; no centre line past the split
+        jp RoadPass1.store
+
+; Pass 1 store, fork in view: the second span (FkD2, FkE2) on screen lines
+; L, L + 1 (L even), and the row's flag if it is on screen. Keeps all but H.
+ForkPair:
+        push af
+        push de
+        ld de, (FkD2)           ; E = D2, D = E2
         ld h, high DE2Page
-        ld (hl), d
-        dec l
-        ld (hl), d
-        set 7, l
         ld (hl), e
         inc l
         ld (hl), e
+        set 7, l
+        ld (hl), d
+        dec l
+        ld (hl), d
         res 7, l
-        ld d, b
-        ld e, c
+        ld a, d
+        cp e
+        jr c, .none
         ld a, l
         COL
         add a, low RowFork
@@ -273,20 +291,9 @@ ForkLine:
         ld l, a
         ld (hl), 1              ; this row needs DrawForkRow
         pop hl
-        jr .done
-.left:  ld d, b
-        ld e, c
-.one:   ld h, high DE2Page
-        ld (hl), $FF
-        dec l
-        ld (hl), $FF
-        set 7, l
-        ld (hl), 0
-        inc l
-        ld (hl), 0
-        res 7, l
-.done:  ld c, $FF               ; no centre line past the split
-        jp RoadPass1.store
+.none:  pop de
+        pop af
+        ret
 
 ; HL = centre, BC = half-width -> D, E = first / last pixel on screen
 ; (D = $FF, E = 0: none)
@@ -323,8 +330,6 @@ Span:   push hl
 ; colours are never grass or road colours) - everything else is already 0.
 DrawForkRow:
         ; ---- the spans of the row's 4 line pairs -> SpanBuf (8 bytes each)
-        ld a, (P1ForkLim)
-        ld (.lim + 1), a
         ld a, (CurI)
         ld c, a
         ld de, SpanBuf
@@ -339,25 +344,23 @@ DrawForkRow:
         ld a, (hl)
         ld (de), a              ; E1
         inc e
-        ld h, high X1Page
+        ld h, high SrcLine      ; kerb width of the depth line shown
         ld a, (hl)
-        ld (.rw + 1), a         ; RoadRW
+        or $80
+        push hl
+        ld l, a
+        ld h, high RoadRW
+        ld a, (hl)
+        ld (.rw + 1), a
+        pop hl
         ld h, high DE2Page
         res 7, l
-        ld a, l
-.lim:   cp 0
-        jr c, .two
-        ld a, $FF
-        ld (de), a
-        inc e
-        xor a
-        jr .e2
-.two:   ld a, (hl)
+        ld a, (hl)
         ld (de), a              ; D2
         inc e
         set 7, l
         ld a, (hl)              ; E2
-.e2:    ld (de), a
+        ld (de), a
         inc e
 .rw:    ld a, 0
         ld (de), a

@@ -5,7 +5,7 @@
 ; BuildCurveList turns the segments ahead into a list of the screen lines
 ; where the curvature changes, which RoadPass1 walks from the bottom line up.
 ; ---------------------------------------------------------------------------
-MAX_BOUNDS      EQU 6               ; curvature changes considered per frame
+MAX_BOUNDS      EQU 8               ; curvature / hill changes considered per frame
 Z_FAR           EQU 12288           ; depth of the horizon line (ZLo/ZHi[0])
 
 ; Advance SegPtr / SegStart so that SegStart <= Pos < SegStart + length.
@@ -39,9 +39,10 @@ UpdateTrack:
 .ok:    ld (SegPtr), hl
         jr UpdateTrack
 
-; Build CurveList: byte 0 = curvature at the bottom line, then pairs
-; (line, curvature) for each segment boundary in view, from the bottom up,
-; ended by line $FF. Sets RoadStraight = 1 if every curvature is 0.
+; Build CurveList: curvature and hill at the bottom line, then triples
+; (line, curvature, hill) for each segment boundary in view, from the bottom
+; up, ended by line $FF. HillOr <> 0 if any hill is in view; RoadStraight = 1
+; if no curve or hill is.
 BuildCurveList:
         ld hl, (SegPtr)
         ld e, (hl)
@@ -50,9 +51,12 @@ BuildCurveList:
         inc hl
         ld a, (hl)
         inc hl
-        inc hl                  ; HL = next segment
         ld (CurveList), a
         ld (CurveOr), a
+        ld a, (hl)
+        inc hl                  ; HL = next segment
+        ld (CurveList + 1), a
+        ld (HillOr), a
         push hl
         ld hl, (SegStart)
         add hl, de
@@ -61,7 +65,7 @@ BuildCurveList:
         sbc hl, de
         ex de, hl               ; DE = depth of the segment's end
         pop hl
-        ld ix, CurveList + 1
+        ld ix, CurveList + 2
         ld b, MAX_BOUNDS
 .next:  ; boundary beyond the horizon? then done
         push hl
@@ -100,13 +104,21 @@ BuildCurveList:
         or c
         ld (CurveOr), a
         inc hl
+        ld a, (hl)
+        ld (ix + 2), a
+        ld c, a
+        ld a, (HillOr)
+        or c
+        ld (HillOr), a
         inc hl
+        inc ix
         inc ix
         inc ix
         djnz .next
 .done:  ld (ix + 0), $FF
         ld a, (CurveOr)
-        or a
+        ld hl, HillOr
+        or (hl)
         ld a, 1
         jr z, .st
         xor a
@@ -146,6 +158,7 @@ NextCurve:
         ld hl, (CurvePtr)
 .again: inc hl
         ld a, (hl)              ; new curvature
+        inc hl                  ; (skip the hill: HillMap's)
         call SetCurve
         inc hl
         ld a, (hl)              ; next boundary line

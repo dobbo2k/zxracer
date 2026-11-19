@@ -41,7 +41,7 @@ CurvePtr:       dw 0
 CurC:           db 0            ; curvature of the current pass-1 chunk
 CurK:           db 0            ; curvature zone (weight 2^k / 4)
 ZonePtr:        dw 0
-CurveList:      ds 1 + 2 * MAX_BOUNDS + 1
+CurveList:      ds 2 + 3 * MAX_BOUNDS + 1
 
 ; track
 SegPtr:         dw 0
@@ -131,6 +131,18 @@ PalKerbD:       db ATTR_KERB_D
 PalRoad:        db ATTR_ROAD
 MsgBuf:         ds MSG_LEN
                 db 0
+; hills
+HillOr:         db 0            ; any hill in view
+HillC:          db 0            ; hill value of the current pass-1 chunk
+P1Hill:         db 0            ; the pass-1 tables were built with hills
+HmPtr:          dw 0            ; HillMap: next boundary, zone, weight, increment
+HmZone:         dw 0
+HmK:            db 0
+HillNf:         db 0            ; screen pairs 0 .. HillNf - 1 still free
+HillTopJ:       db 0            ; furthest depth line on screen
+FkD2:           db $FF          ; second span of the line ForkLine computed
+FkE2:           db 0
+
 ; fork
 HasFork:        db 0            ; this stage ends in a fork (not the last row)
 ForkZ:          dw 0            ; where the road splits

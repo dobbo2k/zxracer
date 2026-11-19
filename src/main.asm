@@ -54,6 +54,7 @@ MainLoop:
         INCLUDE "traffic.asm"
         INCLUDE "stage.asm"
         INCLUDE "fork.asm"
+        INCLUDE "hills.asm"
         INCLUDE "stages.asm"
         INCLUDE "vars.asm"
 CodeEnd:
@@ -83,6 +84,21 @@ PanoLdiEnd:
         inc de
         EDUP
 XorEnd: jp (iy)
+
+; Hill mapping (see hills.asm), starting as identities
+        ORG ProjClip
+        ASSERT ProjClip >= XorEnd + 2
+hv      DEFL 1
+        DUP ROAD_LINES / 2
+        db $81, hv
+hv      DEFL hv + 2
+        EDUP
+        ORG SrcLine
+hv      DEFL 0
+        DUP ROAD_LINES
+        db hv
+hv      DEFL hv + 1
+        EDUP
         ASSERT $ <= LDI_END - 2 * STRIP_PAD
 
 ; Unrolled LDI chain: entered at LdiEnd - 2*n to copy n bytes (HL) -> (DE)

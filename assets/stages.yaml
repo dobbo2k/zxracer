@@ -9,6 +9,7 @@
 themes:
   coast:
     name: SUNNY COAST
+    hills: 4                        # hill strength (0: flat)
     types: [palm, bush]
     horizon: {style: mountains, seed: 7}
     palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,
@@ -16,6 +17,7 @@ themes:
               road: 0b01000111}
   desert:
     name: DESERT HIGHWAY
+    hills: 3                        # hill strength (0: flat)
     types: [cactus, rock]
     horizon: {style: mesas, seed: 3}
     palette: {sky: 0b01101000, pano: 0b01101010, hud: 0b01101010, time: 0b01101010,
@@ -23,6 +25,7 @@ themes:
               road: 0b01000111}
   alpine:
     name: ALPINE PASS
+    hills: 6                        # hill strength (0: flat)
     types: [pine, rock]
     horizon: {style: peaks, seed: 11}
     palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,
@@ -30,6 +33,7 @@ themes:
               road: 0b01000111}
   country:
     name: GREEN VALLEY
+    hills: 6                        # hill strength (0: flat)
     types: [tree, bush]
     horizon: {style: hills, seed: 21}
     palette: {sky: 0b01101000, pano: 0b01101100, hud: 0b01101001, time: 0b01101010,
@@ -37,6 +41,7 @@ themes:
               road: 0b01000111}
   sunset:
     name: SUNSET BOULEVARD
+    hills: 4                        # hill strength (0: flat)
     types: [lamp, bush]
     horizon: {style: skyline, seed: 5}
     palette: {sky: 0b01011000, pano: 0b01011000, hud: 0b01011110, time: 0b01011111,
@@ -44,7 +49,7 @@ themes:
               road: 0b01000111}
 
 # Rows of the pyramid, left to right. Each stage: theme and a track seed.
-# Bends get sharper and more frequent row by row.
+# Bends get sharper and more frequent row by row; hills come from the theme.
 rows:
   - [{theme: coast, seed: 1}]
   - [{theme: country, seed: 2}, {theme: desert, seed: 3}]

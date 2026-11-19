@@ -123,7 +123,7 @@ def panorama_lines(im):
 
 # ---------------------------------------------------------------- tracks
 def make_track(row, seed, theme):
-    """Segments (length, curve) and objects (z, x, type id) for a stage."""
+    """Segments (length, curve, hill) and objects (z, x, type id) for a stage."""
     rnd = random.Random(seed * 7919 + row)
     maxc = 8 + 2 * row
     target = 26000 + 2000 * row
@@ -149,6 +149,7 @@ def make_track(row, seed, theme):
     segs.append((END_STRAIGHT, 0))
     stage_len = sum(length for length, _ in segs)
     assert stage_len <= MAX_STAGE_LEN, stage_len
+    hills = hill_profile(rnd, stage_len, theme.get("hills", 0))
 
     objs = []
     big, small = theme["types"]
@@ -175,7 +176,7 @@ def make_track(row, seed, theme):
         side_obj(z, rnd.choice([-1, 1]), rnd.randint(200, 320), tid[small])
         z += rnd.randint(500, 900)
     zc = 0
-    for length, curve in segs:                       # curve warning signs
+    for length, curve in segs:                       # curve warning signs (before hills are merged)
         if abs(curve) >= 10:
             kind = TYPE_IDS["sign_r" if curve > 0 else "sign_l"]
             x = -240 if curve > 0 else 240
@@ -192,16 +193,70 @@ def make_track(row, seed, theme):
             objs.append((zs + d, 0, tid[big]))
     # no scenery right on the road edge near curve signs etc.: keep sorted, unique z
     objs.sort()
-    return segs, objs, stage_len
+    return merge_hills(segs, hills), objs, stage_len
+
+
+def hill_profile(rnd, stage_len, amp):
+    """Hills as (start, end, value): a climb then a crest, a dip, or a long
+    climb. Positive values lift the road ahead, negative ones drop it away;
+    each event's values sum to zero, so the road ends up level again. The
+    start and the run-in to the checkpoint (and fork) stay flat."""
+    out = []
+    if amp <= 0:
+        return out
+    z = 4000 + rnd.randint(0, 2000)
+    end = stage_len - SPLIT_LEN - 1500
+    while True:
+        length = rnd.randint(1300, 2300)
+        h = rnd.randint(max(2, amp // 2), amp)
+        r = rnd.random()
+        if r < 0.45:
+            seq = [(length, h), (length, -h)]                 # over a hill
+        elif r < 0.8:
+            seq = [(length, -h), (length, h)]                 # through a dip
+        else:
+            seq = [(length, h), (rnd.randint(800, 1600), 0), (length, -h)]   # long climb
+        if z + sum(l for l, _ in seq) > end:
+            return out
+        for l, v in seq:
+            if v:
+                out.append((z, z + l, v))
+            z += l
+        z += rnd.randint(1500, 4500)
+
+
+def merge_hills(segs, hills):
+    """Split the curve segments where hills start and end: (length, curve, hill)."""
+    cuts, z = set(), 0
+    for length, _ in segs:
+        z += length
+        cuts.add(z)
+    for a, b, _ in hills:
+        cuts.update((a, b))
+    starts, z = [], 0
+    for length, curve in segs:
+        starts.append((z, z + length, curve))
+        z += length
+    out, prev = [], 0
+    for c in sorted(cuts):
+        mid = (prev + c) / 2
+        curve = next(cv for a, b, cv in starts if a <= mid < b)
+        hill = next((v for a, b, v in hills if a <= mid < b), 0)
+        if out and out[-1][1:] == (curve, hill):
+            out[-1] = (out[-1][0] + c - prev, curve, hill)
+        else:
+            out.append((c - prev, curve, hill))
+        prev = c
+    return out
 
 
 def track_pack(name, segs, objs, stage_len):
     out = [f"        MODULE {name}",
            "        dw Track, Objects, " + str(stage_len),
            "Track:"]
-    for length, curve in segs:
+    for length, curve, hill in segs:
         out.append(f"        dw {length}")
-        out.append(f"        db {curve & 0xFF}, 0")
+        out.append(f"        db {curve & 0xFF}, {hill & 0xFF}")
     out += ["        dw 0", "Objects:"]
     for z, x, t in objs:
         out.append(f"        dw {z}")
