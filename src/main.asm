@@ -15,12 +15,7 @@ start:
         out (c), a
         xor a                   ; black border
         out ($FE), a
-        call InitScreens
-        xor a
-        call InitHud
-        ld a, $80
-        call InitHud
-        call InitTraffic
+        call Restart            ; stage 1: packs, display, track state
         call InitInterrupts
         ei
 
@@ -57,7 +52,8 @@ MainLoop:
         INCLUDE "game.asm"
         INCLUDE "sound.asm"
         INCLUDE "traffic.asm"
-        INCLUDE "horizon_data.asm"
+        INCLUDE "stage.asm"
+        INCLUDE "stages.asm"
         INCLUDE "vars.asm"
 CodeEnd:
         ASSERT CodeEnd <= TABLES
@@ -107,14 +103,17 @@ FillBlock:
         ORG ISR_JP
         jp Isr
 
-; Scenery sprites in the spare part of bank 5 (visible whichever buffer is drawn)
+; Resident graphics in the spare part of bank 5 (always paged): the traffic
+; sprite, the font and the player's car. The track cache follows.
         ORG SCN_DATA
-        INCLUDE "scenery_data.asm"
+        INCLUDE "resident_data.asm"
         INCLUDE "font_data.asm"
         INCLUDE "car_data.asm"
-        INCLUDE "track_data.asm"
 ScnEnd:
-        ASSERT ScnEnd <= $8000
+        ASSERT ScnEnd <= TRACK_CACHE
+
+; Stage packs in banks 0, 1, 3, 4 and 6 (copied to the caches at a stage start)
+        INCLUDE "packs.asm"
 
         IF AUTOPLAY
         SAVESNA "build/video.sna", start

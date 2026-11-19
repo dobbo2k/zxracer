@@ -38,8 +38,8 @@ UpdateObjects:
         pop hl
         cp $FF
         jr nz, .obj
-        ld hl, Objects          ; end of the list: next lap
-        jr .next
+        ld (ObjFirst), hl       ; end of the list: stay on the end marker
+        ret
 .obj:   push hl
         ld hl, (Pos)
         ex de, hl
@@ -156,9 +156,8 @@ DrawSprites:
         inc hl
         cp $FF
         jr nz, .have
-        ld hl, Objects
-        pop bc
-        jr .obj
+        pop bc                  ; end of the list
+        ret
 .have:  ld (ObjType), a
         push hl
         call DrawObject
@@ -202,7 +201,7 @@ DrawObject:
         ld l, a
         ld h, 0
         push de
-        ld de, TypeDir
+        ld de, (StTypeDir)
         add hl, de
         ld e, (hl)
         inc hl

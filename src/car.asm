@@ -110,10 +110,18 @@ DrawCar:
         ld l, $80 + CAR_ROW - ROAD_ROW0
         ld a, (hl)
         or a
-        ld bc, (ATTR_GRASS_L << 8) | ATTR_KERB_L
+        ld a, (PalGrassL)
+        ld b, a
+        ld a, (PalKerbL)
+        ld c, a
         jr z, .light
-        ld bc, (ATTR_GRASS_D << 8) | ATTR_KERB_D
-.light: ld l, CAR_COL           ; L = column
+        ld a, (PalGrassD)
+        ld b, a
+        ld a, (PalKerbD)
+        ld c, a
+.light: ld a, (PalRoad)
+        ld (.road + 1), a
+        ld l, CAR_COL           ; L = column
 .cell:  ld a, l
 .ca:    cp 0
         ld h, b                 ; grass
@@ -122,7 +130,7 @@ DrawCar:
         ld h, c                 ; kerb
         jr c, .type
 .cc:    cp 0
-        ld h, ATTR_ROAD
+.road:  ld h, 0
         jr c, .type
 .cd:    cp 0
         ld h, c

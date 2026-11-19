@@ -98,15 +98,162 @@ def sign(direction):
     return draw
 
 
-# name: (draw function, height relative to a palm at the same distance)
-TYPES = {"palm": (palm, 1.0), "traffic": (car, 0.45),
-         "sign_r": (sign(1), 0.5), "sign_l": (sign(-1), 0.5)}
+def fork():
+    """Fork marker: a wide board with arrows both ways on two posts, 192 x 128."""
+    W, H = 192, 128
+    im = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(im)
+    d.rectangle([40, 70, 56, 127], fill=255)
+    d.rectangle([136, 70, 152, 127], fill=255)
+    d.rounded_rectangle([2, 2, 190, 84], radius=10, fill=255)
+    d.polygon([(14, 43), (54, 12), (54, 30), (88, 30), (88, 56), (54, 56), (54, 74)], fill=0)
+    d.polygon([(178, 43), (138, 12), (138, 30), (104, 30), (104, 56), (138, 56), (138, 74)], fill=0)
+    return im
+
+
+def bush():
+    """Low bush: a cluster of round clumps, 192 x 112."""
+    im = Image.new("L", (192, 112), 0)
+    d = ImageDraw.Draw(im)
+    for x, y, r in [(50, 70, 40), (100, 52, 48), (148, 72, 40), (96, 84, 36)]:
+        d.ellipse([x - r, y - r, x + r, min(111, y + r)], fill=255)
+    for x, y in [(70, 40), (120, 30), (40, 66), (160, 60)]:        # leafy gaps
+        d.ellipse([x - 6, y - 6, x + 6, y + 6], fill=0)
+    return im
+
+
+def cactus():
+    """Saguaro cactus with two arms, 160 x 256."""
+    im = Image.new("L", (160, 256), 0)
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([62, 10, 98, 255], radius=18, fill=255)       # trunk
+    d.rounded_rectangle([14, 96, 44, 176], radius=15, fill=255)       # left arm
+    d.rectangle([14, 150, 70, 178], fill=255)
+    d.rounded_rectangle([116, 60, 146, 150], radius=15, fill=255)     # right arm
+    d.rectangle([90, 124, 146, 152], fill=255)
+    for x in (72, 80, 88):                                             # ribs
+        d.line([(x, 30), (x, 250)], fill=0, width=2)
+    return im
+
+
+def rock():
+    """Boulder, 192 x 112."""
+    im = Image.new("L", (192, 112), 0)
+    d = ImageDraw.Draw(im)
+    d.polygon([(6, 111), (20, 50), (60, 18), (118, 8), (162, 34), (186, 80), (190, 111)], fill=255)
+    d.line([(70, 30), (96, 70), (90, 111)], fill=0, width=5)          # crack
+    d.line([(140, 40), (128, 80)], fill=0, width=4)
+    return im
+
+
+def pine():
+    """Pine tree: stacked triangles on a short trunk, 160 x 256."""
+    im = Image.new("L", (160, 256), 0)
+    d = ImageDraw.Draw(im)
+    d.rectangle([70, 200, 90, 255], fill=255)
+    for top, base, half in [(4, 80, 40), (40, 140, 58), (90, 210, 78)]:
+        d.polygon([(80, top), (80 - half, base), (80 + half, base)], fill=255)
+    for y in (82, 142):                                                # layer gaps
+        d.line([(40, y), (120, y)], fill=0, width=3)
+    return im
+
+
+def tree():
+    """Round-crowned tree, 192 x 224."""
+    im = Image.new("L", (192, 224), 0)
+    d = ImageDraw.Draw(im)
+    d.polygon([(84, 223), (88, 120), (104, 120), (108, 223)], fill=255)   # trunk
+    for x, y, r in [(96, 70, 62), (54, 96, 40), (138, 96, 40), (96, 112, 44)]:
+        d.ellipse([x - r, y - r, x + r, y + r], fill=255)
+    for x, y in [(70, 50), (124, 62), (100, 96), (60, 110)]:
+        d.ellipse([x - 7, y - 7, x + 7, y + 7], fill=0)
+    return im
+
+
+def lamp():
+    """Street lamp: a tall post with an arm and a lamp head, 128 x 256."""
+    im = Image.new("L", (128, 256), 0)
+    d = ImageDraw.Draw(im)
+    d.rectangle([56, 30, 66, 255], fill=255)
+    d.rectangle([44, 236, 78, 255], fill=255)                         # base
+    d.rectangle([56, 22, 110, 32], fill=255)                          # arm
+    d.rounded_rectangle([92, 22, 124, 44], radius=6, fill=255)        # lamp head
+    return im
+
+
+# name: (draw function, height relative to a palm at the same distance,
+#        pre-shifted copies per size)
+SHIFTS_SMALL = [2, 2, 2, 2, 4, 4, 4, 8, 8]     # for signs: less memory, coarser steps
+TYPES = {
+    "palm": (palm, 1.0, SHIFTS),
+    "traffic": (car, 0.45, SHIFTS),
+    "sign_r": (sign(1), 0.5, SHIFTS_SMALL),
+    "sign_l": (sign(-1), 0.5, SHIFTS_SMALL),
+    "fork": (fork, 0.6, SHIFTS_SMALL),
+    "bush": (bush, 0.35, SHIFTS),
+    "cactus": (cactus, 0.85, SHIFTS),
+    "rock": (rock, 0.35, SHIFTS),
+    "pine": (pine, 1.0, SHIFTS),
+    "tree": (tree, 0.95, SHIFTS),
+    "lamp": (lamp, 1.0, SHIFTS),
+}
 
 
 def scaled(master, h):
     w = max(1, round(master.width * h / master.height))
     small = master.resize((w, h), Image.BOX)
     return small.point(lambda v: 255 if v >= 80 else 0)
+
+
+def emit_type(name, label=None):
+    """Sprite directory and data for one type.
+
+    Returns (consts, directory, data) lists of assembler lines. The
+    directory is SIZES entries of 8 bytes; the never-drawn largest size
+    aliases size 1."""
+    fn, factor, shifts = TYPES[name]
+    label = label or f"Scn_{name}"
+    master = fn()
+    master.save(f"assets/gfx/{name}.png")
+    consts, dirl, data = [], [f"{label}:"], []
+    for k, (h0, nshift) in enumerate(zip(SIZES, shifts)):
+        if k == 0:
+            dirl.append(f"        db {label}_1_w, {label}_1_h, {label}_1_m, 0")
+            dirl.append(f"        dw {label}_1, {label}_1_s")
+            continue
+        h = max(2, round(h0 * factor))
+        img = scaled(master, h)
+        wb = (img.width + 7) // 8 + 1        # one byte of shift padding
+        step = 8 // nshift
+        mask = {1: 0, 2: 4, 4: 6, 8: 7}[nshift]
+        lab = f"{label}_{k}"
+        dirl.append(f"        db {wb}, {h}, {mask}, 0")
+        dirl.append(f"        dw {lab}, {wb * h}")
+        consts.append(f"{lab}_w EQU {wb}\n{lab}_h EQU {h}\n{lab}_m EQU {mask}\n{lab}_s EQU {wb * h}")
+        data.append(f"{lab}:")
+        for s_ in range(0, 8, step):
+            for y in range(h):
+                bits = 0
+                for x in range(img.width):
+                    if img.getpixel((x, y)):
+                        bits |= 1 << (wb * 8 - 1 - x - s_)
+                row = [(bits >> (8 * (wb - 1 - b))) & 0xFF for b in range(wb)]
+                data.append("        db " + ", ".join(f"${v:02X}" for v in row))
+    return consts, dirl, data
+
+
+def type_bytes(name):
+    """Bytes of sprite data emit_type produces (for memory planning)."""
+    fn, factor, shifts = TYPES[name]
+    master = fn()
+    tot = 0
+    for k, (h0, nshift) in enumerate(zip(SIZES, shifts)):
+        if k == 0:
+            continue
+        h = max(2, round(h0 * factor))
+        wb = (scaled(master, h).width + 7) // 8 + 1
+        tot += wb * h * nshift
+    return tot + 8 * len(SIZES)
 
 
 def main(out):

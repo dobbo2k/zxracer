@@ -156,11 +156,16 @@ UpdatePlayer:
         ld a, (Elapsed)
         ld b, a
 .adv:   add hl, de
-        jr nc, .noLap
-        ld a, 1
-        ld (LapFlag), a
-.noLap: djnz .adv
+        djnz .adv
         ld (Pos), hl
+        ; end of the stage? (the checkpoint is handled by GameUpdate)
+        ld de, (StageLen)
+        or a
+        sbc hl, de
+        jr c, .inStage
+        ld a, 1
+        ld (StageDone), a
+.inStage:
         call AddScore
         call UpdateTrack
         call EngineUpdate
@@ -200,6 +205,22 @@ DemoDriver:
 ; The demo driver keeps to the middle unless a car ahead (within 1200
 ; units) is in its path; then it aims for the lane away from the nearest one.
 DemoTarget:
+        ; near the end of a stage: keep to one side of the fork marker
+        ld hl, (StageLen)
+        ld de, (Pos)
+        or a
+        sbc hl, de
+        ld de, 4000
+        or a
+        sbc hl, de
+        jr nc, .traffic
+        ld a, (Stage)           ; left or right, varying by stage
+        rra
+        ld hl, -64
+        ret nc
+        ld hl, 64
+        ret
+.traffic:
         ld hl, 1200
         ld (DemoNear), hl
         ld hl, 0

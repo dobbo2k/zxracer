@@ -15,14 +15,16 @@ InitHud:
         or $58
         ld h, a
         ld l, 32 + 14
+        ld a, (PalTime)
+        ld c, a
         ld b, 2
-.ta:    ld (hl), ATTR_TIME
+.ta:    ld (hl), c
         inc l
-        ld (hl), ATTR_TIME
+        ld (hl), c
         inc l
-        ld (hl), ATTR_TIME
+        ld (hl), c
         inc l
-        ld (hl), ATTR_TIME
+        ld (hl), c
         ld a, l
         add a, 32 - 3
         ld l, a
@@ -38,7 +40,12 @@ InitHud:
         call PrintAt
         ld bc, $011D
         ld de, TxtKmh
-        jp PrintAt
+        call PrintAt
+        ld bc, $0201            ; STAGE n
+        ld de, TxtStage
+        call PrintAt
+        ld a, (StageRow)
+        jp PrintDigit
 
 DrawHud:
         ld a, (BufHiOr)
@@ -268,7 +275,10 @@ TxtScore:       db "SCORE", 0
 TxtTime:        db "TIME", 0
 TxtSpeed:       db "SPEED", 0
 TxtKmh:         db "KM", 0
+TxtStage:       db "STAGE ", 0
+MsgGoal:        db "  GOAL! WELL DONE!  ", 0
+MsgFork:        db " << CHOOSE A ROAD >>", 0
 MsgNone:        db "                    ", 0
 MsgAttract:     db "  PRESS ANY KEY !   ", 0
 MsgOver:        db "     GAME  OVER     ", 0
-MsgExtend:      db "   EXTENDED PLAY!   ", 0
+

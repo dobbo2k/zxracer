@@ -20,25 +20,29 @@ ClearScreen:
         ld h, d
         ld l, e
         inc de
-        ld (hl), ATTR_HUD
+        ld a, (PalHud)
+        ld (hl), a
         ld bc, 32 * 3 - 1
         ldir
         ld h, d
         ld l, e
         inc de
-        ld (hl), ATTR_SKY
+        ld a, (PalSky)
+        ld (hl), a
         ld bc, 32 * (PANO_ROW0 - 3) - 1
         ldir
         ld h, d
         ld l, e
         inc de
-        ld (hl), ATTR_PANO
+        ld a, (PalPano)
+        ld (hl), a
         ld bc, 32 * (ROAD_ROW0 - PANO_ROW0) - 1
         ldir
         ld h, d
         ld l, e
         inc de
-        ld (hl), ATTR_GRASS_L
+        ld a, (PalGrassL)
+        ld (hl), a
         ld bc, 32 * (24 - ROAD_ROW0) - 1
         ldir
         ret
@@ -48,7 +52,7 @@ SelectBackBuffer:
         ld a, (BackBuf)
         or a
         jr nz, .bufB
-        ld a, P7FFD_ROM48 | P7FFD_SHADOW    ; B displayed, draw into A
+        ld a, P7FFD_ROM48 | P7FFD_SHADOW | 7    ; B displayed, draw into A (bank 7 stays paged for the theme cache)
         ld e, 0
         ld d, high StateA1
         ld c, $58
@@ -102,7 +106,7 @@ FlipBuffers:
         or a
         ld a, P7FFD_ROM48 | 7                ; show A
         jr z, .set
-        ld a, P7FFD_ROM48 | P7FFD_SHADOW     ; show B
+        ld a, P7FFD_ROM48 | P7FFD_SHADOW | 7 ; show B
 .set:   ld (FlipValue), a
         ld a, 1
         ld (FlipPending), a

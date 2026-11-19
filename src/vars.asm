@@ -44,7 +44,7 @@ ZonePtr:        dw 0
 CurveList:      ds 1 + 2 * MAX_BOUNDS + 1
 
 ; track
-SegPtr:         dw Track
+SegPtr:         dw 0
 SegStart:       dw 0
 SegCurve:       db 0
 PXFrac:         db 0
@@ -54,7 +54,7 @@ OldC:           db 0
 OldD:           db 0
 
 ; scenery
-ObjFirst:       dw Objects      ; first object not yet passed
+ObjFirst:       dw 0            ; first object not yet passed
 ObjZ:           dw 0
 ObjX:           db 0
 ObjI:           db 0
@@ -82,7 +82,6 @@ PanoLastB:      db $FF
 GameState:      db ST_ATTRACT
 Time:           db START_TIME   ; BCD seconds
 SecTick:        db 0
-LapFlag:        db 0
 StateTimer:     db 0
 Score:          ds 4            ; BCD, low byte first
 Message:        dw MsgAttract
@@ -109,3 +108,30 @@ CarShownA:      db $FF          ; car frame each buffer shows
 CarShownB:      db $FF
 DemoNear:       dw 0
 DemoAim:        dw 0
+
+; stage
+Stage:          db 0            ; index into StageTable
+StageRow:       db 1            ; row of the pyramid (shown as STAGE n)
+StageLen:       dw $FFFF
+StageDone:      db 0
+StTrack:        dw 0            ; from the track pack header
+StObjects:      dw 0
+StTypeDir:      dw 0            ; from the theme pack header
+StPano:         dw 0
+StName:         dw 0
+Palette:                        ; from the theme pack header (9 bytes, this order)
+PalSky:         db ATTR_SKY
+PalPano:        db ATTR_PANO
+PalHud:         db ATTR_HUD
+PalTime:        db ATTR_TIME
+PalGrassL:      db ATTR_GRASS_L
+PalGrassD:      db ATTR_GRASS_D
+PalKerbL:       db ATTR_KERB_L
+PalKerbD:       db ATTR_KERB_D
+PalRoad:        db ATTR_ROAD
+MsgBuf:         ds MSG_LEN
+                db 0
+LdBank:         db 0
+LdSrc:          dw 0
+LdDst:          dw 0
+LdLen:          dw 0

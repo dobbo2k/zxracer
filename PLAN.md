@@ -37,31 +37,33 @@ enemy of colourful racers.
 any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displayable
 (bit 3 of `$7FFD` selects which) — this is our free double buffer.
 
-### 2.1 Memory map
+### 2.1 Memory map (as built)
 
 ```
-$0000-$3FFF  ROM (48K BASIC ROM, unused after boot; IM2 vector table lives in RAM)
-$4000-$5AFF  Bank 5 screen  (buffer A)
-$5B00-$7FFF  Bank 5 low RAM: per-stage SPRITE CACHE (~9K) + interrupt vector table
-$8000-$BFFF  Bank 2: engine code, line-address tables, road tables, stack
-$C000-$FFFF  Paged: bank 7 (screen buffer B) or asset banks 0,1,3,4,6
+$4000-$5AFF  Bank 5: screen buffer A
+$5B00-$67FF  Bank 5: resident graphics: traffic sprite, font, player car
+$6800-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
+             (also the bounce buffer while a theme is loaded)
+$8000-$BFFF  Bank 2: code, stage table, lookup tables, unrolled chains, IM2, stack
+$C000-$DAFF  Bank 7: screen buffer B
+$DB00-$FFFF  Bank 7: THEME CACHE: the current theme's sprites (scenery types,
+             curve and fork signs), mountain backdrop, palette, name
 ```
+
+Bank 7 stays paged at `$C000` all the time. While buffer A is drawn, bank 7 is
+the screen being shown, but paging it in only for memory access doesn't change
+what is displayed. So the theme cache is always reachable.
 
 | Bank | Use |
 |---|---|
-| 0 | Music: AY player + 3 tunes, SFX |
-| 1 | Track data for all 15 stages (compressed), traffic tables |
-| 3 | Scenery sprites set 1 (pre-scaled, masked, ZX0-compressed) |
-| 4 | Scenery sprites set 2 + player car frames + crash animation |
-| 6 | Front-end: title screen, loading-screen art, fonts, goal scenes |
-| 7 | Shadow screen (buffer B) — the rest of the bank holds the horizon art |
+| 0, 1, 3, 4, 6 | Stage packs: 5 theme packs (~9 KB each) and 15 track packs (~1-2 KB), built by `tools/make_stages.py` and assembled to run in the caches |
+| 2 | Code, tables |
+| 5 | Screen A, resident graphics, track cache |
+| 7 | Screen B, theme cache |
 
-**The paging problem:** when we draw into buffer B (bank 7 at `$C000`), no asset
-bank is visible. Solution: on stage start, decompress that stage's sprite set into the
-**sprite cache** in `$5B00-$7FFF` (bank 5) and spare space in bank 2/7, so every
-graphic needed during play is reachable whichever buffer is being drawn. Drawing into
-buffer A (`$4000`) is in contended memory — measured in M1 and compensated by doing
-more of the heavy road fill while the beam is in the border.
+A stage start copies its theme pack (through the track cache, because the storage
+banks share the `$C000` slot with bank 7) and its track pack, reads the pack
+headers, and resets both screen buffers and all per-buffer render state.
 
 ### 2.2 Colour strategy (clash-free by construction)
 
@@ -276,11 +278,11 @@ docs/       Technical notes, profiling results
 | **M1b** | Road optimisation | Cut the road's per-line cost | ✅ v7 renderer; more in M11 |
 | **M2** | Curves & hills | Segment-based track, curves, hills, moving horizon; track compiler + 1 test stage | 🟡 curves, YAML track compiler and test loop done; hills to do |
 | **M3** | Player car | Car with steering frames, no colour clash, basic steering/speed physics | ✅ car owns a fixed 8×4-cell block; centrifugal force; attract-mode driver |
-| **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | 🟡 palms and automatic curve-warning signs; per-stage sets need the bank cache |
-| **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | 🟡 scrolling mountain band; clouds and per-stage palettes to do |
+| **M4** | Scenery | Pre-scaler pipeline, scaled sprites, hill clipping; palms/signs/rocks | ✅ 10 types (palm, bush, cactus, rock, pine, tree, lamp, curve and fork signs, traffic), per-theme sets via the cache |
+| **M5** | Horizon & palette | Pre-shifted parallax panorama + clouds, per-stage attribute palettes | ✅ 5 backdrop styles and palettes (coast, desert, alpine, valley, sunset); clouds to do |
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | 🟡 3 cars in lanes, respawn ahead, bumps, palm crashes with spin-out; lane changes to do |
-| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 HUD, timer, lap bonus, score, game over, attract mode; stages and forks to do |
+| **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 15 stages in 5 rows with forks, 5 themes, checkpoints with time bonus, GOAL; goal scenes to do |
 | **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
 | **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | |
 | **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | |
@@ -307,8 +309,7 @@ representative sprite load can't hit 25 fps, we fall back to (a) narrower play a
 
 ## 9. Immediate next steps
 
-1. Performance pass (M11 backlog): the sprite path (projection ~9k, XOR replay
-   ~15k) and the road. With traffic the lap averages 16.6 fps and peaks too often.
-2. M4: more scenery types (signs, rocks, bushes) and per-stage variety.
-3. M9: music (PT3 player) with the engine moved to channel C.
-4. M2b: hills.
+1. Performance pass (§3.6 backlog): 15-16 fps on curvy stages with traffic.
+2. M2b: hills.
+3. M9: music and a radio-select screen.
+4. Goal scenes per route ending; title and loading screens (M10).

@@ -35,7 +35,7 @@ UpdateTrack:
         or (hl)
         dec hl
         jr nz, .ok
-        ld hl, Track            ; end of lap: loop
+        ld hl, (StTrack)        ; past the end: loop (never reached in play)
 .ok:    ld (SegPtr), hl
         jr UpdateTrack
 
@@ -82,8 +82,7 @@ BuildCurveList:
         inc hl
         or (hl)
         dec hl
-        jr nz, .seg
-        ld hl, Track
+        jr z, .done             ; end of the stage: the last straight runs on
 .seg:   ld a, (hl)
         add a, e
         ld e, a

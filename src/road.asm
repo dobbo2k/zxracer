@@ -605,12 +605,12 @@ RowAttrs:
         ld h, a
         ld a, (RowBand)
         or a
-        ld a, ATTR_GRASS_L
-        ld e, ATTR_KERB_L
+        ld bc, (PalGrassL)      ; C = light grass, B = dark grass
+        ld de, (PalKerbL)       ; E = light kerb, D = dark kerb
         jr z, .gl
-        ld a, ATTR_GRASS_D
-        ld e, ATTR_KERB_D
-.gl:    ld d, a                 ; D = grass, E = kerb
+        ld c, b
+        ld e, d
+.gl:    ld d, c                 ; D = grass, E = kerb
         ld a, (RowA)
         ld b, a
         ld a, d
@@ -627,7 +627,7 @@ RowAttrs:
         ld a, (RowC)
         sub c
         ld b, a
-        ld a, ATTR_ROAD
+        ld a, (PalRoad)
         call FillA
         ld a, (RowC)
         ld c, a

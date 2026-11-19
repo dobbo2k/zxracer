@@ -27,7 +27,7 @@ The game starts in attract mode and hands over when you steer.
 src/          Z80 assembly source (main loop, interrupts/flip, road renderer, input, player)
 tools/        gen_tables.py, profile.py, hotspots.py, zxsim/ (headless 128K emulator)
 tests/        cputest.asm (Z80 core self-test), smoke.py (headless run + screenshot checks)
-assets/       Source graphics, track descriptions, music
+assets/       stages.yaml (themes, palettes, the stage pyramid), generated artwork
 docs/         Technical notes
 ```
 
@@ -42,8 +42,13 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   off-road slowdown and braking.
 - **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,
   pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
-- **Game:** HUD with score, big countdown timer and speed; extra time each lap,
-  game over, attract mode.
+- **Stages:** 15 stages in a 5-row pyramid across 5 themes (Sunny Coast, Desert
+  Highway, Alpine Pass, Green Valley, Sunset Boulevard), each with its own scenery,
+  mountain backdrop and colours. At the end of a stage the road forks: be on the
+  left or right half of the road at the checkpoint (mind the fork sign in the
+  middle). Checkpoints add time; the last row ends at the GOAL.
+- **Game:** HUD with score, stage, big countdown timer and speed; game over,
+  attract mode.
 - **Traffic:** cars in two lanes. Running into one from behind slows you right
   down; driving into a palm off the road is a crash that stops you and spins the
   car. The attract-mode driver changes lane to avoid traffic.

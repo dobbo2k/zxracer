@@ -16,22 +16,16 @@ build:
 build/tables.asm: tools/gen_tables.py | build
 	$(PYTHON) tools/gen_tables.py $@
 
-build/track_data.asm: tools/track.py assets/tracks/test.yaml | build
-	$(PYTHON) tools/track.py assets/tracks/test.yaml $@
-
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
 	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32
 
-build/scenery_data.asm: tools/make_scenery.py | build
-	$(PYTHON) tools/make_scenery.py $@
-
-build/horizon_data.asm: tools/make_horizon.py | build
-	$(PYTHON) tools/make_horizon.py $@
+build/stages.asm: tools/make_stages.py tools/make_scenery.py assets/stages.yaml | build
+	$(PYTHON) tools/make_stages.py assets/stages.yaml build
 
 build/font_data.asm: tools/make_font.py | build
 	$(PYTHON) tools/make_font.py $@
 
-build/zxracer.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm build/scenery_data.asm build/horizon_data.asm build/font_data.asm | build
+build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm | build
 	$(ASM) $(ASMFLAGS) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build
@@ -41,21 +35,22 @@ build/cputest.sna: tests/cputest.asm | build
 	$(ASM) --nologo --msg=war tests/cputest.asm
 
 # CPU core self-test, then a smoke run of the game with screenshots
-test: $(ZXSIM) build/cputest.sna build/zxracer.sna
+test: $(ZXSIM) build/cputest.sna build/zxracer.sna build/video.sna
 	$(PYTHON) tests/run_cputest.py $(ZXSIM) build/cputest.sna
 	$(PYTHON) tests/smoke.py $(ZXSIM) build/zxracer.sna build
 	$(PYTHON) tests/carcheck.py $(ZXSIM) build/zxracer.sna build
+	$(PYTHON) tests/stagecheck.py $(ZXSIM) build/zxracer.sna build/video.sna
 
 # Border-bar profile: T-states per phase per game frame
 profile: $(ZXSIM) build/zxracer.sna
 	$(PYTHON) tools/profile.py $(ZXSIM) build/zxracer.sna
 
 # Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
-build/video.sna: $(SRC) build/tables.asm build/track_data.asm build/car_data.asm build/scenery_data.asm build/horizon_data.asm build/font_data.asm | build
-	$(ASM) --nologo --msg=war --fullpath -Ibuild -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
+build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm | build
+	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
 
 video: $(ZXSIM) build/video.sna
-	$(PYTHON) tools/make_video.py $(ZXSIM) build/video.sna build/gameplay.mp4 3800
+	$(PYTHON) tools/make_video.py $(ZXSIM) build/video.sna build/gameplay.mp4 2400
 
 run: build/zxracer.sna
 	fuse --machine 128 build/zxracer.sna

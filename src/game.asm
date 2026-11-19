@@ -1,17 +1,24 @@
 ; ---------------------------------------------------------------------------
-; Game states: attract (demo driver), playing (timer counts down, a lap
-; adds time), game over (the car rolls to a stop, then back to attract).
+; Game states: attract (demo driver), playing (timer counts down, each
+; checkpoint adds time), game over or goal (the car rolls to a stop, then
+; back to attract mode on stage 1).
 ; Runs before the player update with the raw input.
 ; ---------------------------------------------------------------------------
 ST_ATTRACT      EQU 0
 ST_PLAYING      EQU 1
 ST_OVER         EQU 2
-START_TIME      EQU $75             ; BCD seconds
-LAP_BONUS       EQU $30
+START_TIME      EQU $65             ; BCD seconds
 OVER_FRAMES     EQU 200             ; 50 Hz frames on the game-over screen
-EXTEND_FRAMES   EQU 100
+FORK_WARN       EQU 4500            ; units before the end of a stage
 
 GameUpdate:
+        ld a, (StageDone)       ; reached the end of a stage last frame
+        or a
+        jr z, .noCheck
+        ld a, (GameState)
+        cp ST_OVER
+        call nz, Checkpoint     ; (after the goal the car just rolls on)
+.noCheck:
         ld a, (GameState)
         cp ST_PLAYING
         jr z, .playing
@@ -49,23 +56,23 @@ GameUpdate:
         ld hl, MsgOver
         ld (Message), hl
         ret
-.noSec: ; a lap completed: extra time
-        ld a, (LapFlag)
+.noSec: ; approaching a fork: tell the player to choose
+        ld a, (StageRow)
+        cp NUM_ROWS
+        jr nc, .noFork          ; the last row ends at the goal
+        ld hl, (StageLen)
+        ld de, (Pos)
         or a
-        jr z, .noLap
-        xor a
-        ld (LapFlag), a
-        ld a, (Time)
-        add a, LAP_BONUS
-        daa
-        jr nc, .t
-        ld a, $99
-.t:     ld (Time), a
-        ld a, EXTEND_FRAMES
-        ld (StateTimer), a
-        ld hl, MsgExtend
+        sbc hl, de
+        ld de, FORK_WARN
+        or a
+        sbc hl, de
+        jr nc, .noFork
+        ld hl, MsgFork
         ld (Message), hl
-.noLap: ld a, (StateTimer)
+        ret
+.noFork:
+        ld a, (StateTimer)       ; message timer
         or a
         ret z
         ld hl, Elapsed
@@ -88,11 +95,14 @@ GameUpdate:
         ret nz
         ld a, ST_ATTRACT
         ld (GameState), a
-        ret
+        ld hl, MsgAttract
+        ld (Message), hl
+        jp Restart
 
 StartGame:
         ld a, ST_PLAYING
         ld (GameState), a
+        call Restart
         xor a
         ld (DemoMode), a
         IF AUTOPLAY
@@ -101,8 +111,8 @@ StartGame:
         xor a
         ENDIF
         ld (SecTick), a
-        ld (LapFlag), a
         ld (StateTimer), a
+        ld (StageDone), a
         ld hl, Score
         ld (hl), a
         inc hl
@@ -113,8 +123,9 @@ StartGame:
         ld (hl), a
         ld a, START_TIME
         ld (Time), a
-        ld hl, MsgNone
-        ld (Message), hl
+        call StageMessage       ; the first stage's name
+        ld a, NAME_FRAMES
+        ld (StateTimer), a
         ret
 
 ; Score += Speed * Elapsed / 4 (while playing)

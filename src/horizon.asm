@@ -36,7 +36,7 @@ DrawHorizon:
         ; copy = (scroll >> 1) & 3  ->  source base = Panorama + copy * 768
         rrca
         and 3
-        ld hl, Panorama
+        ld hl, (StPano)
         ld de, 32 * PANO_H
         jr z, .base
         ld b, a
