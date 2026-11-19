@@ -27,6 +27,7 @@ MainLoop:
         call SelectBackBuffer
         BORDER 3                ; magenta: sprites
         call EraseSprites
+        call DrawCrew
         BORDER 2                ; red: road
         call DrawRoad
         BORDER 4                ; green: horizon
@@ -129,6 +130,7 @@ FillBlock:
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
         INCLUDE "stages.asm"
+        INCLUDE "crew.asm"      ; the crew's crash close-ups
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 

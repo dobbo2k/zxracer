@@ -42,7 +42,10 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   and hills: climbs, dips and crests the road (and the cars and scenery on it)
   disappears behind.
 - **Car:** original convertible sprite with steering frames, braking and
-  off-road slowdown. Handling has sideways momentum: bends push the car
+  off-road slowdown. Its crew: him (mullet, shades, loud striped 80s shirt)
+  at the wheel and her (big blonde hair) beside him. After a crash, close-ups
+  of the two of them appear while the car spins: she tells him off ("< NICE
+  ONE, GENIUS!"), he answers back ("IT JUMPED OUT! >"). Handling has sideways momentum: bends push the car
   outwards, steering builds up and the car carries its drift out of a bend.
   Past the tyres' grip limit (sharp bend × high speed) it slides wide with a
   squeal, steers half as well and scrubs speed off: brake or ease off for the

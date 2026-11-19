@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Draw the initial player car sprite sheet (assets/gfx/car.png).
 
-An original rear view of a red convertible, 64x32 pixels per frame, frames
-side by side: straight, left, right. Spectrum colours only, one ink colour
-per 8x8 cell on black paper (see tools/png2zx.py). Edit the PNG freely
-afterwards; this script only bootstraps it.
+An original rear view of a red convertible with its crew (him: mullet,
+shades, loud striped shirt; her: big blonde hair), 64x32 pixels per frame,
+frames side by side: straight, left, right. Spectrum colours only, at most
+two per 8x8 cell (see tools/png2zx.py). The top cell row is the open
+cockpit: only its ink colours are used, over whatever lies under the car.
 """
 import sys
 from PIL import Image, ImageDraw
@@ -24,21 +25,30 @@ def car(lean):
     t = 3 * lean           # interior shifts most with the lean
     m = 2 * lean           # rear deck
     b = -lean              # tyres move the other way (we see the outer side)
-    # --- row 0 (y 0-7): windscreen frame behind, headrests, heads (white)
-    d.line([(9 + t, 0), (54 + t, 0)], W)               # windscreen top
-    d.line([(9 + t, 0), (6 + t, 7)], W)
-    d.line([(54 + t, 0), (57 + t, 7)], W)
-    for cx in (20 + t, 43 + t):
-        d.rounded_rectangle([cx - 7, 4, cx + 7, 7], radius=1, fill=W)   # headrest
-        d.ellipse([cx - 4, 0, cx + 4, 7], fill=K)                       # outline gap
-        d.ellipse([cx - 3, 0, cx + 3, 6], fill=W)                       # head
-        d.line([(cx - 1, 1), (cx + 1, 1)], K)                           # hair line
-    # --- row 1 (y 8-15): rear deck (red)
+    # --- row 0 (y 0-7): the open cockpit. Paper is whatever lies under the
+    # car; each cell's ink colour comes from here: white for him and the
+    # windscreen pillars, yellow for her
+    d.line([(7, 0), (4, 7)], W)                        # windscreen pillars
+    d.line([(56, 0), (59, 7)], W)
+    mx = 19 + t                                        # him: mullet, shades
+    d.ellipse([mx - 4, 0, mx + 4, 7], fill=W)          # head
+    d.rectangle([mx - 3, 4, mx + 3, 7], fill=W)        # mullet down the neck
+    d.point([(mx - 5, 3), (mx + 5, 3), (mx - 5, 4), (mx + 5, 4)], W)   # ears
+    d.point([(mx - 4, 3), (mx + 4, 3)], K)             # sunglasses' arms
+    wx = 44 + t                                        # her: big blown hair
+    d.ellipse([wx - 6, 0, wx + 5, 7], fill=Y)
+    d.polygon([(wx + 4, 1), (wx + 8, 2), (wx + 6, 3), (wx + 8, 5), (wx + 4, 6)], fill=Y)
+    d.point([(wx - 3, 2), (wx, 1), (wx + 2, 3)], K)    # strands
+    # --- row 1 (y 8-15): rear deck (red) with their shoulders above it:
+    # his loud striped shirt (cyan), her hair over her shoulders (yellow)
     d.rounded_rectangle([0 + m, 8, 63 + m, 17], radius=4, fill=R)
-    d.line([(12 + m, 10), (51 + m, 10)], K)            # boot lid shut line
-    d.line([(12 + m, 10), (9 + m, 15)], K)
-    d.line([(51 + m, 10), (54 + m, 15)], K)
     d.point([(3 + m, 9), (60 + m, 9)], K)              # rounded corners
+    d.rounded_rectangle([mx - 8, 8, mx + 8, 11], radius=1, fill=C)
+    for x in range(mx - 7, mx + 8, 3):                 # stripes
+        d.line([(x, 8), (x + 1, 11)], R)
+    d.rectangle([mx - 2, 8, mx + 2, 8], fill=C)        # collar
+    d.rounded_rectangle([wx - 7, 8, wx + 6, 10], radius=1, fill=Y)
+    d.line([(wx - 6, 11), (wx + 5, 11)], Y)
     # --- row 2 (y 16-23): lamps (yellow cells), body (red), plate (white)
     d.rectangle([0, 16, 15, 23], K)
     d.rectangle([48, 16, 63, 23], K)

@@ -12,7 +12,7 @@ BRAKE           EQU 2
 OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
 OFFROAD_SPEED   EQU 8
 
-CRASH_FRAMES    EQU 100
+CRASH_FRAMES    EQU 160         ; (time for her to tell him off, and his reply)
 
 UpdatePlayer:
         call GameUpdate
@@ -388,6 +388,7 @@ CrashUpdate:
         jr nc, .t
         xor a
 .t:     ld (CrashTimer), a
+        call CrewSay
         xor a
         ld (Input), a
         ld (Speed), a

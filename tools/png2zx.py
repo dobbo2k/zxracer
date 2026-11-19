@@ -2,8 +2,9 @@
 """Convert a Spectrum-palette PNG into bitmap + attribute data.
 
 The image is cut into frames of WxH pixels (multiples of 8) laid side by
-side. Paper is always black; each 8x8 cell may use one other colour, which
-becomes its ink (bright if the colour is a bright Spectrum colour).
+side. Each 8x8 cell may use two colours: with black in the cell, black is
+the paper and the other colour the ink; otherwise the more common colour is
+the paper. Both colours of a cell must share brightness (black fits either).
 Output per frame, rows top to bottom: bitmap bytes line by line (W/8 per
 line), then attribute bytes cell row by cell row.
 usage: png2zx.py in.png out.asm LABEL W H
@@ -27,29 +28,37 @@ def main(src, dst, label, w, h):
            f"{label}_FRAMES EQU {frames}", f"{label}:"]
     for f in range(frames):
         bitmap, attrs = [], []
+        inks = {}
         for cy in range(h // 8):
             row_attr = []
             for cx in range(w // 8):
-                ink = None
+                counts = {}
                 for y in range(8):
                     for x in range(8):
                         px = im.getpixel((f * w + cx * 8 + x, cy * 8 + y))
-                        if px == (0, 0, 0):
-                            continue
                         if px not in PAL:
                             sys.exit(f"{src}: non-Spectrum colour {px} at frame {f} cell {cx},{cy}")
-                        if ink and ink != PAL[px]:
-                            sys.exit(f"{src}: two ink colours in frame {f} cell {cx},{cy}")
-                        ink = PAL[px]
-                ink = ink or (0, 0)
-                row_attr.append(ink[0] | (0x40 if ink[1] else 0))
+                        counts[px] = counts.get(px, 0) + 1
+                if len(counts) > 2:
+                    sys.exit(f"{src}: three colours in frame {f} cell {cx},{cy}")
+                cols = sorted(counts, key=lambda p: -counts[p])
+                if (0, 0, 0) in cols or len(cols) == 1:
+                    paper = (0, 0, 0)
+                    ink = next((p for p in cols if p != (0, 0, 0)), (0, 0, 0))
+                else:
+                    paper, ink = cols
+                bright = {PAL[p][1] for p in (paper, ink) if p != (0, 0, 0)}
+                if len(bright) > 1:
+                    sys.exit(f"{src}: bright and normal colours in frame {f} cell {cx},{cy}")
+                inks[(cx, cy)] = ink
+                row_attr.append(PAL[ink][0] | (PAL[paper][0] << 3) | (0x40 if bright == {1} else 0))
             attrs.append(row_attr)
         for y in range(h):
             line = []
             for cx in range(w // 8):
                 b = 0
                 for x in range(8):
-                    if im.getpixel((f * w + cx * 8 + x, y)) != (0, 0, 0):
+                    if im.getpixel((f * w + cx * 8 + x, y)) == inks[(cx, y // 8)] != (0, 0, 0):
                         b |= 0x80 >> x
                 line.append(b)
             bitmap.append(line)

@@ -176,6 +176,9 @@ ResetDisplay:
         ld hl, 0
         ld (MsgLastA), hl
         ld (MsgLastB), hl
+        xor a
+        ld (CrewShownA), a
+        ld (CrewShownB), a
         ld a, $FF
         ld (CarShownA), a
         ld (CarShownB), a

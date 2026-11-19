@@ -108,6 +108,7 @@ ObjHit: ld e, a
         ret nc
         ld a, CRASH_FRAMES
         ld (CrashTimer), a
+        call CrewPick
         xor a
         ld (Speed), a
         ld a, SFX_CRASH

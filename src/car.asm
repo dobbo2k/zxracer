@@ -86,31 +86,40 @@ DrawCar:
         ld (CarAttrDirty), a
         ; attributes. The top cell row is the open cockpit: its paper is
         ; whatever lies underneath (grass, kerb or road: the road renderer
-        ; keeps a copy of those attributes), with white ink for heads and
-        ; screen frame.
-        push hl
+        ; keeps a copy of those attributes), its ink the sprite's (him
+        ; white, her yellow) - or black where that matches the paper.
         ld a, (AttrHi)
         add a, (CAR_ROW * 32) >> 8
         ld d, a
         ld e, low (CAR_ROW * 32) + CAR_COL
         ld a, (StatePage)
         add a, 2
-        ld h, a
-        ld l, COCKPIT
-        ld b, CAR_W
-.cell:  ld a, (hl)
-        and %01111000           ; keep bright + paper
-        cp %01111000            ; bright white paper?
-        jr z, .blackInk
-        or 7                    ; white ink
-.blackInk:
+        ld b, a
+        ld c, COCKPIT           ; BC -> the attributes under the cockpit
+        ld ixl, CAR_W
+.cell:  ld a, (hl)              ; the sprite's ink
+        and 7
+        ld (.ink + 1), a
+        rlca
+        rlca
+        rlca
+        ld (.pap + 1), a
+        ld a, (bc)
+        and %01111000           ; bright + paper underneath
+        push af
+        and %00111000
+.pap:   cp 0
+        jr nz, .inkOk
+        xor a
+        ld (.ink + 1), a        ; same colour as the paper: black ink
+.inkOk: pop af
+.ink:   or 0
         ld (de), a
+        inc hl
+        inc c
         inc e
-        inc l
-        djnz .cell
-        pop hl
-        ld bc, CAR_W         ; skip the sprite's own top-row attributes
-        add hl, bc
+        dec ixl
+        jr nz, .cell
         ld a, e
         add a, 32 - CAR_W
         ld e, a

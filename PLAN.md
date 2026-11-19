@@ -288,6 +288,11 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
   quarter of the excess, half the steering and grip, a tyre squeal, and holding
   the throttle no longer adds speed (it scrubs off until the tyres grip again).
+- **Crew** *(as built)*: the car sprite's open cockpit row shows his head
+  (white ink) and hers (yellow) over whatever lies under the car (ink turns
+  black where it matches); his striped shirt and her hair sit on the rear deck.
+  A crash (160 frames) shows their 48×48 close-ups (`tools/make_crew.py`) either
+  side of the message line: one of 8 pairs of lines, hers then his reply.
 - **Collisions:** roadside object → crash & tumble, restart from road centre;
   traffic → bump, spin or crash depending on speed and angle.
 - **Traffic:** trucks, vans, small cars, bikes in lanes with simple lane-change AI;
