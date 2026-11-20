@@ -325,10 +325,12 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   RPM, acceleration curve, braking, off-road slowdown + grass shudder, centrifugal
   drift on curves (must steer into bends), skids with tyre squeal.
   *As built:* the car has a sideways speed (1/256 px per frame). Each 50 Hz
-  frame the bend adds `−curvature × speed / 8`, steering ±64, and grip takes
-  1/16 of it away, so it settles where the old direct push did (2 × curvature ×
-  speed outwards; 4 px a frame when steering) but over about a third of a second,
-  and drift carries on after a bend. Past the grip limit (|curvature × speed| >
+  frame the bend adds `−curvature × speed / 4`, steering ±64, and grip takes
+  1/16 of it away, so it settles at 4 × curvature × speed outwards (1/256 px per
+  frame: 1.25 px a frame on a curvature-4 bend at top speed; doubled after play
+  testing, when the drift was too weak to notice) against 4 px a frame when
+  steering, building up over about a third of a second and carrying on after a
+  bend. Past the grip limit (|curvature × speed| >
   200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
   quarter of the excess, half the steering and grip, a tyre squeal, and holding
   the throttle no longer adds speed (it scrubs off until the tyres grip again).

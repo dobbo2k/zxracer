@@ -34,8 +34,8 @@ UpdatePlayer:
 
         ; ---- sideways handling. Per 50 Hz frame the car's sideways speed
         ; LatVX (1/256 pixel per frame) gets the bend's outward push
-        ; (curve * speed / 8) and the steering, and the tyres take 1/16 of
-        ; it away: so the car settles at 2 * curve * speed outwards and
+        ; (curve * speed / 4) and the steering, and the tyres take 1/16 of
+        ; it away: so the car settles at 4 * curve * speed outwards and
         ; 4 pixels a frame when steering, but builds up to it over a third
         ; of a second and carries its drift on after a bend. Past the grip
         ; limit (|curve * speed| > GRIP) it slides: an extra push of a
@@ -63,11 +63,9 @@ UpdatePlayer:
         ld (HorizonX), hl
         pop hl
 .noCF:  ld (LatF), hl
-        ; push = -(curve * speed) / 8
+        ; push = -(curve * speed) / 4
         ld d, h
         ld e, l
-        sra d
-        rr e
         sra d
         rr e
         sra d
