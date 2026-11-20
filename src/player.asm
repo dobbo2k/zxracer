@@ -3,7 +3,7 @@
 ; ---------------------------------------------------------------------------
 STEER_ACC       EQU 64          ; sideways acceleration (1/256 px per frame per frame):
                                 ; 4 pixels a frame once it has built up
-GRIP            EQU 200         ; |curvature * speed| the tyres hold
+GRIP            EQU 96          ; |P| (the bend's push) the tyres hold
 PX_MAX          EQU 300         ; from the middle of the road (or the branch)
 MAX_SPEED       EQU 20          ; depth units per 50 Hz frame (HIGH gear: 280 km/h)
 LOW_MAX         EQU 13          ; LOW gear's top speed (182 km/h)
@@ -54,12 +54,16 @@ UpdatePlayer:
 
         ; ---- sideways handling. Per 50 Hz frame the car's sideways speed
         ; LatVX (1/256 pixel per frame) gets the bend's outward push
-        ; (curve * speed / 4) and the steering, and the tyres take 1/16 of
-        ; it away: so the car settles at 4 * curve * speed outwards and
-        ; 4 pixels a frame when steering, but builds up to it over a third
-        ; of a second and carries its drift on after a bend. Past the grip
-        ; limit (|curve * speed| > GRIP) it slides: an extra push of a
-        ; quarter of the excess, half the steering, half the grip.
+        ; P = curve * speed^2 / 32 - it grows with the square of the speed,
+        ; as cornering force does - and the steering (STEER_ACC), and the
+        ; tyres take 1/16 of it away: so the car settles at 16 * P outwards
+        ; and 4 pixels a frame when steering, but builds up to it over a
+        ; third of a second and carries its drift on after a bend. Steering
+        ; into a bend holds the car only while P <= STEER_ACC: at full speed
+        ; just the gentlest bends (curve 4); curve 6 needs speed 18, 10
+        ; needs 14, 16 needs 11 - lift off or brake. Past the grip limit
+        ; (P > GRIP) it slides: an extra push of half the excess, half the
+        ; steering, half the grip.
         ld a, (Speed)
         ld b, a
         ld a, (SegCurve)
@@ -82,14 +86,20 @@ UpdatePlayer:
         djnz .hz
         ld (HorizonX), hl
         pop hl
-.noCF:  ld (LatF), hl
-        ; push = -(curve * speed) / 4
-        ld d, h
-        ld e, l
-        sra d
-        rr e
-        sra d
-        rr e
+.noCF:  ex de, hl                ; P = (curve * speed) * speed / 32
+        ld hl, 0
+        ld a, (Speed)
+        or a
+        jr z, .p0
+        ld b, a
+.pm:    add hl, de
+        djnz .pm
+        ld b, 5
+.p32:   sra h
+        rr l
+        djnz .p32
+.p0:    ld (LatF), hl
+        ex de, hl               ; push = -P
         ld hl, 0
         or a
         sbc hl, de
@@ -103,9 +113,7 @@ UpdatePlayer:
         ld a, 0
         jr c, .grip
         srl h
-        rr l
-        srl h
-        rr l                    ; a quarter of it
+        rr l                    ; half of it
         ex de, hl
         ld hl, (LatF)           ; slide: push -= sign(F) * excess
         bit 7, h
@@ -276,7 +284,7 @@ UpdatePlayer:
 ; pulls hard but tops out at LOW_MAX (above it, after changing down at
 ; speed, the engine brakes the car to it); HIGH reaches MAX_SPEED but pulls
 ; weakly from low speeds. From a standstill LOW reaches 182 km/h in about
-; 4 s, HIGH then 280 km/h in about 5 more; starting in HIGH takes 10 s to
+; 5 s, HIGH then 280 km/h in about 6 more; starting in HIGH takes 12 s to
 ; 182. Braking beats the throttle; sliding scrubs speed off.
 SpeedStep:
         ld a, (Input)
@@ -341,21 +349,23 @@ SpeedStep:
 .st:    ld (SpeedFrac), hl
         ret
 LowPull:                        ; LOW: 1/256ths of a speed unit per frame
-        db 22, 22, 22, 22, 22, 22           ; 0-5
-        db 18, 18, 18, 18                   ; 6-9
-        db 12, 12, 12                       ; 10-12
+        db 18, 18, 18, 18, 18, 18           ; 0-5
+        db 15, 15, 15, 15                   ; 6-9
+        db 10, 10, 10                       ; 10-12
 HighPull:                       ; HIGH
-        db 5, 5, 5, 5, 5, 5                 ; 0-5: it bogs down
-        db 8, 8, 8, 8                       ; 6-9
-        db 10, 10, 10, 10, 10, 10           ; 10-15
-        db 7, 7                             ; 16-17
-        db 5, 5                             ; 18-19
+        db 4, 4, 4, 4, 4, 4                 ; 0-5: it bogs down
+        db 6, 6, 6, 6                       ; 6-9
+        db 8, 8, 8, 8, 8, 8                 ; 10-15
+        db 6, 6                             ; 16-17
+        db 4, 4                             ; 18-19
 
 ; Demo / attract mode: until a steering key is pressed, drive automatically
 ; (accelerate, steer back towards the middle of the road).
 DEMO_DEADBAND   EQU 6
 DEMO_LOOK       EQU 1200            ; how far ahead it looks for traffic
 DEMO_SIDE       EQU 130             ; where it drives (lanes at +-56, the edge at 150)
+DEMO_LIFT_P     EQU 60              ; it lifts off past this bend push (|P|)
+DEMO_BRAKE_P    EQU 84              ; and brakes past this one
 DEMO_LIFT       EQU 700             ; it lifts off this close behind one in its path
 
 DemoDriver:
@@ -387,9 +397,19 @@ DemoDriver:
         sbc hl, de              ; target - that
         ld a, (Input)
         ld c, a
-        ld a, (Sliding)         ; lift off while sliding
+        push hl                 ; a bend pushing harder than steering
+        ld hl, (LatF)           ; holds: lift off; near the grip limit:
+        call AbsHL              ; brake
+        ld de, DEMO_BRAKE_P
         or a
-        jr nz, .gas
+        sbc hl, de
+        jr c, .nobr
+        set IN_DOWN, c
+.nobr:  add hl, de
+        ld de, DEMO_LIFT_P
+        sbc hl, de              ; (carry clear)
+        pop hl
+        jr nc, .gas
         push hl
         ld hl, (DemoNear)       ; or close behind a vehicle in its path
         ld de, DEMO_LIFT
@@ -423,7 +443,7 @@ DemoTarget:
         ; near the fork: take one of the branches (varying by stage)
         ld a, (HasFork)
         or a
-        jr z, .traffic
+        jp z, DemoTraffic
         ld hl, (ForkZ)
         ld de, (Pos)
         or a
@@ -431,7 +451,7 @@ DemoTarget:
         jr c, .branch
         ld de, 1500
         sbc hl, de
-        jr nc, .traffic
+        jp nc, DemoTraffic
 .branch:                        ; the outer edge of the branch (its traffic
         ld de, (PlayerDx)       ; keeps to +-56 from the middle of it)
         ld hl, DEMO_SIDE
@@ -443,62 +463,6 @@ DemoTarget:
         call NegHL
         ld de, -DEMO_SIDE
 .br:    ld (DemoAim), de        ; (and that side afterwards)
-        ret
-.traffic:
-        ld hl, DEMO_LOOK
-        ld (DemoAny), hl
-        ld ix, Traffic
-        ld a, (NTraffic)
-        ld b, a
-.car:   ld l, (ix + 0)
-        ld h, (ix + 1)
-        ld de, (Pos)
-        or a
-        sbc hl, de              ; z_rel
-        bit 7, h
-        jr nz, .next            ; behind
-        ld de, (DemoAny)
-        push hl
-        sbc hl, de              ; (carry clear)
-        pop hl
-        jr nc, .path
-        ld (DemoAny), hl        ; the nearest ahead, in any lane
-        ld a, (ix + 5)
-        ld (DemoHead), a
-.path:  ld de, (DemoNear)
-        push hl
-        sbc hl, de
-        pop hl
-        jr nc, .next
-        push hl
-        push bc
-        ld bc, HIT_WIDEST
-        call LaneOverlapBC      ; carry: in the player's path
-        pop bc
-        pop hl
-        jr nc, .next
-        ld (DemoNear), hl       ; the nearest in its path
-.next:  ld de, CAR_SIZE
-        add ix, de
-        djnz .car
-        ; the middle until a vehicle is near; then the outer edge of the
-        ; road, away from where that one is heading, and that side from then
-        ; on (the lanes are at +-56: no vehicle reaches a car out there)
-        ld hl, (DemoAim)
-        ld a, h
-        or l
-        ret nz                  ; keep to the side it chose
-        ld hl, (DemoAny)
-        ld de, DEMO_LOOK
-        sbc hl, de              ; (carry clear)
-        ld hl, 0
-        ret z
-        ld hl, -DEMO_SIDE
-        ld a, (DemoHead)
-        rlca
-        jr nc, .aim
-        ld hl, DEMO_SIDE
-.aim:   ld (DemoAim), hl
         ret
 
 ; After a crash: no control, the car is stopped and pulled back towards the
@@ -513,6 +477,8 @@ CrashUpdate:
         xor a
 .t:     ld (CrashTimer), a
         call CrewSay
+        xor a                   ; back into LOW for the restart
+        ld (Gear), a
         xor a
         ld (Input), a
         ld (Sliding), a

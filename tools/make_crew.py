@@ -19,32 +19,57 @@ S = 48
 
 
 def her():
+    """Her: a big blonde 80s perm, cyan top; angry, shouting.
+    Laid out on the 8x8 cell grid so each cell keeps to two colours: the
+    eyes and brows in their own cell row (black on white skin), the nose
+    between blushing cheeks below, the mouth in the row under that."""
     im = Image.new("RGB", (S, S), rgb(RED))
     d = ImageDraw.Draw(im)
     Y, Wt, K, C, R = rgb(YELLOW), rgb(WHITE), rgb(BLACK), rgb(CYAN), rgb(RED)
-    # big 80s perm: a mass of curls
-    for x, y, r in ((24, 16, 17), (10, 20, 10), (38, 20, 10), (8, 33, 8), (40, 33, 8),
-                    (16, 6, 8), (32, 6, 8), (24, 3, 7)):
+    # the perm: a mass of curls down to the shoulders, curl lines in red
+    for x, y, r in ((24, 9, 13), (11, 12, 9), (37, 12, 9), (5, 22, 8), (43, 22, 8),
+                    (4, 34, 8), (44, 34, 8), (6, 44, 6), (42, 44, 6), (16, 3, 7), (32, 3, 7)):
         d.ellipse([x - r, y - r, x + r, y + r], fill=Y)
-    # shoulders (cyan top), neck
-    d.rounded_rectangle([2, 41, 45, 52], radius=6, fill=C)
-    d.rectangle([20, 36, 27, 42], fill=Wt)
-    # face
-    d.ellipse([13, 10, 34, 38], fill=Wt)
-    # angry brows, eyes
-    d.polygon([(15, 18), (22, 21), (22, 23), (15, 20)], fill=K)
-    d.polygon([(33, 18), (26, 21), (26, 23), (33, 20)], fill=K)
-    d.rectangle([18, 23, 20, 24], fill=K)                 # glaring eyes
-    d.rectangle([27, 23, 29, 24], fill=K)
-    d.line([(17, 25), (21, 25)], K)
-    d.line([(26, 25), (30, 25)], K)
-    d.point([(23, 28), (25, 28)], K)                      # nose
-    # shouting mouth
-    d.ellipse([19, 30, 29, 37], fill=R)
-    d.rectangle([21, 31, 27, 31], fill=Wt)                # teeth
-    # hoop earrings
-    d.ellipse([9, 28, 14, 35], outline=C)
-    d.ellipse([33, 28, 38, 35], outline=C)
+    for x, y, r, a0, a1 in ((14, 6, 5, 200, 340), (26, 4, 5, 190, 350), (36, 7, 5, 200, 330),
+                            (6, 18, 4, 100, 300), (42, 18, 4, 240, 80), (4, 30, 4, 90, 300),
+                            (44, 30, 4, 240, 90), (5, 40, 3, 60, 300), (43, 40, 3, 240, 120)):
+        d.arc([x - r, y - r, x + r, y + r], a0, a1, fill=R)
+    # cyan top on the shoulders, the neck
+    d.rounded_rectangle([8, 41, 39, 52], radius=4, fill=C)
+    d.rectangle([18, 36, 29, 44], fill=Wt)
+    d.polygon([(18, 41), (24, 47), (29, 41)], fill=Wt)          # the neckline
+    # the face: cells 1-4 across; full width through the eyes and cheeks,
+    # then tapering to the chin
+    d.ellipse([9, 9, 38, 30], fill=Wt)
+    d.rectangle([8, 16, 39, 31], fill=Wt)
+    d.polygon([(8, 31), (39, 31), (36, 36), (30, 40), (17, 40), (11, 36)], fill=Wt)
+    d.polygon([(10, 13), (16, 9), (24, 8), (32, 9), (38, 13), (38, 15), (31, 13),
+               (24, 15), (17, 13), (10, 15)], fill=Y)                     # fringe
+    # brows: drawn down towards the nose in a frown
+    d.line([(10, 16), (15, 16), (20, 17)], K)
+    d.line([(10, 17), (15, 17)], K)
+    d.line([(37, 16), (32, 16), (27, 17)], K)
+    d.line([(37, 17), (32, 17)], K)
+    # eyes: almond, a thick upper lid with lashes at the outer corner, a dark
+    # iris with a highlight, a fine lower lid (all within cell row 2)
+    for cx, out in ((16, -1), (31, 1)):
+        d.line([(cx - 5, 20), (cx - 4, 19), (cx + 3, 19), (cx + 4, 20)], K)   # upper lid
+        d.line([(cx + (4 if out > 0 else -5), 19), (cx + (6 if out > 0 else -7), 17)], K)  # lashes
+        d.rectangle([cx - 2, 20, cx + 1, 22], fill=K)                 # iris
+        d.point((cx - 1, 20), Wt)                                     # highlight
+        d.point([(cx - 4, 22), (cx + 3, 22)], K)                      # lower lid
+        d.line([(cx - 3, 23), (cx + 2, 23)], K)
+    # nose, between blushing cheeks
+    d.line([(24, 24), (23, 28)], K)
+    d.point([(22, 29), (25, 29)], K)
+    d.line([(23, 30), (24, 30)], K)
+    for x0 in (10, 33):
+        for k in range(3):
+            d.point([(x0 + 2 * k, 27), (x0 + 1 + 2 * k, 28)], R)
+    # the shouting mouth: red lips, teeth top and bottom
+    d.ellipse([18, 32, 29, 39], fill=R)
+    d.rectangle([20, 33, 27, 33], fill=Wt)
+    d.rectangle([21, 38, 26, 38], fill=Wt)
     # anger marks
     for x, y in ((44, 2), (40, 5)):
         d.line([(x, y), (x + 3, y)], Wt)

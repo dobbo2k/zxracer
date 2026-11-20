@@ -52,7 +52,7 @@ SegCurve:       db 0
 PXFrac:         db 0
 LatVX:          dw 0            ; sideways speed, 1/256 pixel per 50 Hz frame
 LatAcc:         dw 0            ; its change per frame this update
-LatF:           dw 0            ; curvature * speed
+LatF:           dw 0            ; the bend's push P = curvature * speed^2 / 32
 Sliding:        db 0            ; past the grip limit
 Gear:           db 0            ; 0 LOW, 1 HIGH
 FireWas:        db 0            ; fire held last update (gear changes on a press)

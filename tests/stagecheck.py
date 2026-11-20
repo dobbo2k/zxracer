@@ -42,7 +42,7 @@ if v["StageRow"] < 4:
     ok = False
 keys = ["-k", "250:Q", "-k", "256:none"]
 goal = None
-for frames in range(8000, 12001, 100):     # (the goal screen lasts 200 frames)
+for frames in range(8000, 16001, 100):     # (the goal screen lasts 200 frames)
     v = run(video, video.replace(".sna", ".sym"), frames, keys, ["GameState", "StageRow", "Stage", "Time"])
     if v["GameState"] == 2:
         goal = frames, v
@@ -54,7 +54,7 @@ if goal:
 if not (goal and v["StageRow"] == 5 and v["Stage"] == 12 and v["Time"] > 0):
     print(f"FAIL: the autopilot did not reach the goal in time by the expected branches")
     ok = False
-v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 12000) + 4500, keys,   # (goal, route, initials, table, title, table)
+v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 16000) + 4500, keys,   # (goal, route, initials, table, title, table)
         ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):
     print(f"FAIL: no return to attract mode on stage 1 after the goal ({v})")

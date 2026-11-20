@@ -17,7 +17,7 @@ FIRST_STAGE     EQU 0               ; (testing: start on another stage)
         IFNDEF START_POS
 START_POS       EQU 0               ; (testing: start further along it)
         ENDIF
-STAGE_BONUS     EQU $43             ; BCD seconds added at a checkpoint
+STAGE_BONUS     EQU $48             ; BCD seconds added at a checkpoint
 NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 
 ; ---------------------------------------------------------------------------
@@ -138,6 +138,8 @@ CopyFromBank:
         pop bc
         ret
 
+ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40)
+                                    ; and the cockpit's attributes ($60)
 ; Start both buffers afresh in the new palette: bitmaps, attributes, HUD
 ; labels, and every per-buffer record of what is on screen.
 ResetDisplay:
@@ -180,27 +182,34 @@ ResetDisplay:
         ld hl, $8000
         ld (Pass1PX), hl
         ret
-.state: ld d, h
+.state: ld bc, StAD_end - StAD   ; (just the tables: the rest of each page
+        xor a                   ; holds other data - src/holes.asm)
+        call .fill              ; St1: D
+        ld l, $80
+        ld bc, StAE_end - StAE
+        call .fill              ; St1: E
+        inc h
+        ld l, 0
+        ld bc, StALane_end - StALane
+        ld a, $FF
+        call .fill              ; St2: centre line
+        inc h
+        ld l, 0
+        ld bc, ST3_USED
+        xor a
+        call .fill              ; St3: row ranges, fork rows, cockpit
+        ld l, $80
+        ld bc, RowABand_end - RowABand
+        ld a, $FF
+; HL = start, BC = length, A = value (HL is kept)
+.fill:  push hl
+        ld (hl), a
+        ld d, h
         ld e, l
         inc de
-        ld (hl), 0
-        ld bc, 255
-        ldir                    ; St1: D, E
-        inc hl
-        inc de
-        ld (hl), $FF
-        ld bc, 255
-        ldir                    ; St2: centre line
-        inc hl
-        inc de
-        ld (hl), 0
-        ld bc, 127
-        ldir                    ; St3: row ranges
-        inc hl
-        inc de
-        ld (hl), $FF
-        ld bc, 127
-        ldir                    ; St3: row bands
+        dec bc
+        ldir
+        pop hl
         ret
 
 ; The car reached the end of the stage: take the branch it is on (left or

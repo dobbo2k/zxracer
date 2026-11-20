@@ -3,7 +3,8 @@
 ; includes tables.asm). Most tables fill 96 or 192 bytes of their 256-byte
 ; page; nothing reads or writes past them - checked with zxsim -u over whole
 ; games (PLAN.md) - except one byte after ScrLo and ScrHi, kept clear, and
-; the state pages, which ResetDisplay clears whole (nothing goes there). The
+; the parts of the state pages ResetDisplay clears. Besides data, two
+; routines that are not time-critical live in the state pages' holes. The
 ; ASSERTs keep a table from growing into what follows it.
 ; ---------------------------------------------------------------------------
         ORG ScrLo + $C4         ; (ScrLo + $C0..$C3 kept clear)
@@ -153,3 +154,139 @@ DrumHat:        db 10, 1
                 dw 0
                 db 0
         ASSERT $ <= StripPage + 256
+
+; The state pages (src/stage.asm ResetDisplay clears only their tables)
+        ORG StateA2 + $60
+        ASSERT StALane_end <= StateA2 + $60
+; No music: the engine on A, gravel and hits on B, the lights' beeps on C
+EngineSounds:
+        ; engine period with a small wobble every interrupt
+        ld hl, (EnginePeriod)
+        ld a, (FrameCount)
+        and 3
+        add a, l
+        ld l, a
+        jr nc, .nw
+        inc h
+.nw:    push hl
+        ld e, l
+        xor a                   ; tone A fine
+        call AyWrite
+        pop hl
+        ld e, h
+        ld a, 1                 ; tone A coarse
+        call AyWrite
+        ; engine volume: 11 when the game is running, quieter in attract
+        ld e, 11
+        ld a, (GameState)
+        cp ST_PLAYING
+        jr z, .vol
+        ld e, 7
+.vol:   ld a, 8
+        call AyWrite
+        ; effects: a burst of noise on B (bump, crash) overrides the gravel
+        ld a, (SfxTimer)
+        or a
+        jr z, .noSfx
+        dec a
+        ld (SfxTimer), a
+        ld e, a                 ; volume fades with the timer
+        ld a, 9
+        call AyWrite
+        ld a, (SfxType)
+        ld e, a                 ; noise period: low = rumble
+        ld a, 6
+        call AyWrite
+        jr .mix
+.noSfx:
+        ; gravel: noise on B while off the road and moving
+        ld e, 0
+        ld a, (OffRoad)
+        or a
+        jr z, .gr
+        ld a, (Speed)
+        or a
+        jr z, .gr
+        ld e, 10
+.gr:    ld a, 9
+        call AyWrite
+        ld e, 12                ; noise period
+        ld a, 6
+        call AyWrite
+.mix:
+        ; mixer: tone A, noise B (0 bits enable), and tone C for a beep
+        ld a, (BeepTime)
+        or a
+        jr z, .mx
+        dec a
+        ld (BeepTime), a
+        jr nz, .bp
+        ld e, a                 ; its end: volume C off
+        ld a, 10
+        call AyWrite
+.bp:    ld e, %00101010
+        jr .mw
+.mx:    ld e, %00101110
+.mw:    ld a, 7
+        jp AyWrite
+        ASSERT $ <= StateA2 + 256
+        ORG StateB2 + $60
+        ASSERT StBLane_end <= StateB2 + $60
+; The demo driver, near no fork: the traffic decides (see DemoTarget)
+DemoTraffic:
+        ld hl, DEMO_LOOK
+        ld (DemoAny), hl
+        ld ix, Traffic
+        ld a, (NTraffic)
+        ld b, a
+.car:   ld l, (ix + 0)
+        ld h, (ix + 1)
+        ld de, (Pos)
+        or a
+        sbc hl, de              ; z_rel
+        bit 7, h
+        jr nz, .next            ; behind
+        ld de, (DemoAny)
+        push hl
+        sbc hl, de              ; (carry clear)
+        pop hl
+        jr nc, .path
+        ld (DemoAny), hl        ; the nearest ahead, in any lane
+        ld a, (ix + 5)
+        ld (DemoHead), a
+.path:  ld de, (DemoNear)
+        push hl
+        sbc hl, de
+        pop hl
+        jr nc, .next
+        push hl
+        push bc
+        ld bc, HIT_WIDEST
+        call LaneOverlapBC      ; carry: in the player's path
+        pop bc
+        pop hl
+        jr nc, .next
+        ld (DemoNear), hl       ; the nearest in its path
+.next:  ld de, CAR_SIZE
+        add ix, de
+        djnz .car
+        ; the middle until a vehicle is near; then the outer edge of the
+        ; road, away from where that one is heading, and that side from then
+        ; on (the lanes are at +-56: no vehicle reaches a car out there)
+        ld hl, (DemoAim)
+        ld a, h
+        or l
+        ret nz                  ; keep to the side it chose
+        ld hl, (DemoAny)
+        ld de, DEMO_LOOK
+        sbc hl, de              ; (carry clear)
+        ld hl, 0
+        ret z
+        ld hl, -DEMO_SIDE
+        ld a, (DemoHead)
+        rlca
+        jr nc, .aim
+        ld hl, DEMO_SIDE
+.aim:   ld (DemoAim), hl
+        ret
+        ASSERT $ <= StateB2 + 256

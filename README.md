@@ -59,15 +59,18 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   off-road slowdown. Its crew: him (mullet, shades, loud striped 80s shirt)
   at the wheel and her (big blonde hair) beside him. After a crash, close-ups
   of the two of them appear while the car spins: she tells him off ("< NICE
-  ONE, GENIUS!"), he answers back ("IT JUMPED OUT! >"). Handling has sideways momentum: bends push the car
-  outwards, steering builds up and the car carries its drift out of a bend.
-  Past the tyres' grip limit (sharp bend × high speed) it slides wide, steers
-  half as well and scrubs speed off: brake or ease off for the sharp bends of the
-  later stages. You can see it: on a fast bend the car yaws into it, and near the
-  grip limit it swings further round with light smoke from both rear tyres.
+  ONE, GENIUS!"), he answers back ("IT JUMPED OUT! >"). Handling has sideways momentum:
+  a bend pushes the car outwards with a force that grows with the square of
+  the speed, as real cornering force does. At full speed steering can only
+  hold the gentlest bends; the rest carry you wide unless you lift off or
+  brake (as in the arcade racers), and without steering the car drifts out
+  quickly. Past the tyres' grip limit it slides, steers half as well and
+  scrubs speed off. You can see it: on a fast bend the car yaws into it, and
+  past what steering can hold it swings further round with light smoke from
+  both rear tyres.
 - **Gears:** two, like an arcade shifter. LOW pulls hard but tops out at 182 km/h
-  (about 4 s from a standstill); HIGH reaches 280 km/h (about 5 s more) but bogs
-  down from a standstill (10 s to 182). Start in LOW, change up around 180; the
+  (about 5 s from a standstill); HIGH reaches 280 km/h (about 6 s more) but bogs
+  down from a standstill (12 s to 182). After a crash the car is back in LOW. Start in LOW, change up around 180; the
   engine note drops as you do, and the HUD shows the gear. Off the throttle the
   car coasts down gently; braking is firmer.
 - **Scenery:** four kinds of roadside scenery per theme (XOR-drawn,
