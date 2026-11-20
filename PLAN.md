@@ -88,6 +88,22 @@ scenery, the music player and the crash sound). Moving the checkpoint, new
 game set-up and display reset into the overlay later freed another 303 bytes
 of bank 5 and 221 of bank 2's code area (which had none left).
 
+- **The top of bank 2** *(as built)*: the tape loader loads bank 2 only up
+  to `$BDC0` (it runs at `$BE00`), and `zxsim -u` over whole games (title,
+  options, demo, a game, crashes) shows the stack never more than 46 bytes
+  deep. So `$BDC0-$BDFF` (before the IM2 table) and `$BF01-$BF7F` (below the
+  stack, which keeps 128 bytes) hold variables the game sets up itself: the
+  traffic table, the tunnel's state, the per-run state and one sprite
+  command list - 166 bytes out of the main code area, which had 9 left.
+  (The jingle pointer stays there: the interrupt reads it from the start.)
+- **Per-frame trims** *(as built)*: the engine pitch multiplies by 50 with
+  shifts (was a 50-step loop, 1100 T a frame), `ApplyCurve` skips its sums
+  on straight segments, and the timer's big digits double a nibble at a
+  time from a 16-byte table. About 3500 T less work a game frame, but the
+  frame rate does not move: frames are held to 3 TV frames when they fit,
+  and the ones that do not (hills, curves, forks and traffic together,
+  about 258k T against 213k) are over by far more than such trims save.
+
 Bank 7 stays paged at `$C000` all the time. While buffer A is drawn, bank 7 is
 the screen being shown, but paging it in only for memory access doesn't change
 what is displayed. So the theme cache is always reachable.

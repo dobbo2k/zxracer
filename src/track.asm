@@ -203,6 +203,9 @@ SetCurve:
 ; k = (curvature << zone) >> 2 (16.8, signed): RoadPass1 adds 4 k to P per
 ; line pair (patched), and its event path uses 3 k (CurK3) to correct P
 ApplyCurve:
+        ld a, (CurC)
+        or a
+        jr z, .straight         ; (no curvature: all of it 0)
         push hl
         push bc
         push de
@@ -249,6 +252,14 @@ ApplyCurve:
         pop bc
         pop hl
         ret
+.straight:
+        ld (RoadPass1.p4h + 1), a
+        ld (RoadPass1.p4l + 1), a
+        ld (RoadPass1.p4f + 1), a
+        ld (CurK3), a
+        ld (CurK3 + 1), a
+        ld (CurK3 + 2), a
+        ret
 
 ; RoadPass1's next event line: the nearer (higher) of the next curve
 ; boundary and zone line ($FF: none - both end with $FF)
@@ -284,4 +295,4 @@ NextZone:
         ld a, (hl)
         ld (NextNZ), a
         pop hl
-        jr ApplyCurve
+        jp ApplyCurve

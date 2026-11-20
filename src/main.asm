@@ -148,6 +148,29 @@ FillBlock:
         ORG ISR_JP
         jp Isr
 
+; Variables the game sets up itself before using them: the tape loader loads
+; bank 2 only up to here (src/loader.asm sits at $BE00 while it loads), and
+; the stack is never more than 46 bytes deep (zxsim -u over whole games), so
+; the rest of its page is free.
+Bss1:
+TunStart:       dw 0            ; this stage's tunnel (0: none), src/tunnel.asm
+TunEnd:         dw 0
+TunInside:      db 0            ; the car is in it (the sky is its ceiling)
+TunJ0:          db 0            ; road lines in it this frame: TunJ0 .. TunJ0 + TunJN - 1
+TunJN:          db 0
+; (cleared together at a new run)
+MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
+StageClock:     dw 0            ; 50 Hz frames on this stage
+StageTimes:     ds 5 * 2        ; per row: the stage's time (0: not finished)
+RUN_VARS        EQU 4 + 2 + 5 * 2   ; (5 rows: NUM_ROWS, defined later)
+Traffic:        ds N_TRAFFIC * CAR_SIZE
+        ASSERT $ <= IM2_TABLE
+        ORG IM2_TABLE + 257
+Bss2:
+CmdListA:       db 0            ; buffer A's sprite commands (B's: src/vars.asm)
+                ds MAX_SPR * CMD_SIZE
+        ASSERT $ <= STACK_TOP - 128  ; (the stack keeps 128 bytes)
+
         INCLUDE "holes.asm"     ; small data in the unused ends of the table pages
 
 ; Resident graphics in the spare part of bank 5 (always paged): the traffic

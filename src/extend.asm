@@ -119,18 +119,25 @@ PrintBig:
         ld a, (de)
         inc de
         push de
-        ld c, a                 ; every bit twice: C -> DE
-        ld b, 8
-.sp:    sla c
-        rl e
-        rl d
-        ld a, e
-        rra
-        rl e
-        rl d
-        djnz .sp
+        push hl
+        ld c, a                 ; each pixel twice: a nibble at a time
+        rrca
+        rrca
+        rrca
+        rrca
+        and $0F
+        add a, low DblNib
+        ld l, a
+        ld h, high DblNib
+        ld d, (hl)
+        ld a, c
+        and $0F
+        add a, low DblNib
+        ld l, a
+        ld e, (hl)
         sla e                   ; (the font's pixels are bits 6-2)
         rl d
+        pop hl
         ld (hl), d
         inc l
         ld (hl), e
@@ -152,3 +159,6 @@ PrintBig:
         pop bc
         pop de
         ret
+; a nibble's 4 pixels, each doubled
+DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
+        ASSERT high DblNib == high (DblNib + 15)

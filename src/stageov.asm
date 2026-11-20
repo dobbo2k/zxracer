@@ -226,6 +226,8 @@ RestartState:
 .rv:    ld (hl), 0
         inc hl
         djnz .rv
+        ld hl, 0                ; no jingle
+        ld (JinglePtr), hl
         ld hl, START_POS
         ld (Pos), hl
         ld hl, 0

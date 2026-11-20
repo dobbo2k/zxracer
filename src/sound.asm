@@ -9,7 +9,7 @@
 AY_SEL          EQU $FFFD
 AY_DATA         EQU $BFFD
 ENGINE_IDLE     EQU 1400            ; tone period at standstill (~80 Hz)
-ENGINE_STEP     EQU 50              ; period decrease per speed unit
+ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpdate: shifts)
 
 ; A = register, E = value
 AyWrite:
@@ -31,12 +31,19 @@ EngineUpdate:
         jr nz, .revs
         srl b
         add a, b
-.revs:  ld e, a
-        ld d, 0
-        ld hl, 0
-        ld b, ENGINE_STEP
-.m:     add hl, de
-        djnz .m
+.revs:  ld l, a                 ; revs x 50 (ENGINE_STEP) = 32 + 16 + 2
+        ld h, 0
+        add hl, hl
+        ld d, h
+        ld e, l                 ; 2
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld b, h
+        ld c, l                 ; 16
+        add hl, hl              ; 32
+        add hl, bc
+        add hl, de
         ex de, hl
         ld hl, ENGINE_IDLE
         or a

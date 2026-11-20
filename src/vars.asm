@@ -83,8 +83,6 @@ SprSrc:         dw 0
 SprStride:      dw 0
 CmdPtr:         dw 0
 CmdList:        dw CmdListA
-CmdListA:       db 0
-                ds MAX_SPR * CMD_SIZE
 CmdListB:       db 0
                 ds MAX_SPR * CMD_SIZE
 
@@ -99,17 +97,8 @@ GameState:      db ST_ATTRACT
 Time:           db START_TIME   ; BCD seconds
 SecTick:        db 0
 StateTimer:     db 0
-TunStart:       dw 0            ; this stage's tunnel (0: none), src/tunnel.asm
-TunEnd:         dw 0
-TunInside:      db 0            ; the car is in it (the sky is its ceiling)
-TunJ0:          db 0            ; road lines in it this frame: TunJ0 .. TunJ0 + TunJN - 1
-TunJN:          db 0
-; (cleared together at a new run)
-MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
-StageClock:     dw 0            ; 50 Hz frames on this stage
-StageTimes:     ds 5 * 2        ; per row: the stage's time (0: not finished)
-JinglePtr:      dw 0            ; the jingle's next note on channel C (0: none)
-RUN_VARS        EQU 4 + 2 + 5 * 2 + 2   ; (5 rows: NUM_ROWS, defined later)
+JinglePtr:      dw 0            ; the jingle's next note on channel C (0: none; the
+                                ; interrupt reads it from the start)
 Score:          ds 4            ; BCD, low byte first
 Message:        dw MsgAttract
 MsgLast:        dw MsgLastA
@@ -121,7 +110,6 @@ HudCacheA:      db $FF, $FF, $FF, $FF, $FF, $FF, $FF    ; score, time, speed, ge
 HudCacheB:      db $FF, $FF, $FF, $FF, $FF, $FF, $FF
 
 ; traffic and collisions
-Traffic:        ds N_TRAFFIC * CAR_SIZE
 NTraffic:       db 3            ; this row's traffic (InitTraffic copies TrafficRows)
 VanFrom:        db 6
 TruckFrom:      db 7
