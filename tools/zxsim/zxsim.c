@@ -30,6 +30,7 @@
  *                   following blocks into the EAR input (port $FE bit 6) with
  *                   the ROM's timings (no ROM image is needed)
  *   -x PERCENT      play the tape at PERCENT of its speed (default 100)
+ *   -48             no $7FFD paging (as a 48K Spectrum)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,6 +118,7 @@ static uint8_t port_in(uint16_t port) {
     return 0xff;
 }
 
+static int no_paging;
 static uint8_t ay_reg[16], ay_sel;     /* AY-3-8912: registers only, no audio */
 static int log_border_from = -1;
 static long flips;
@@ -128,7 +130,7 @@ static void port_out(uint16_t port, uint8_t v) {
     }
     if ((port & 0xC002) == 0xC000) ay_sel = v & 15;              /* $FFFD */
     else if ((port & 0xC002) == 0x8000) ay_reg[ay_sel] = v;      /* $BFFD */
-    if (!(port & 0x8002)) {    /* $7FFD decoding: A15=0, A1=0 */
+    if (!(port & 0x8002) && !no_paging) {    /* $7FFD decoding: A15=0, A1=0 */
         if ((p7ffd ^ v) & 8) flips++;
         p7ffd = v; update_paging();
     }
@@ -750,6 +752,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "-T") && i + 1 < argc) sna = argv[++i], tape = (uint8_t *)1;
         else if (!strcmp(a, "-R") && i + 1 < argc) rand_seed = atol(argv[++i]);
         else if (!strcmp(a, "-x") && i + 1 < argc) tape_speed = atol(argv[++i]);
+        else if (!strcmp(a, "-48")) no_paging = 1;
         else if (a[0] != '-') sna = a;
         else { fprintf(stderr, "zxsim: unknown option %s\n", a); return 2; }
     }

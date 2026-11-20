@@ -6,7 +6,10 @@ Blocks:
   1. BASIC "ZX RACER" (autostart line 10):
        10 BORDER 0: PAPER 0: INK 7: CLEAR 32767
        20 LOAD "" CODE
-       30 RANDOMIZE USR 48640: PRINT "128K ONLY"   (the loader returns on a 48K)
+       30 LET e=USR 48640
+       40 IF e=1 THEN PRINT "128K ONLY"
+       50 IF e>1 THEN PRINT "TAPE ERROR, BLOCK ";e-10
+     (the loader only returns on a 48K, or on a tape error)
   2. CODE "loader" at $BE00 (src/loader.asm)
   3. headerless standard data blocks, read by the loader's own tape routine
      (no ROM calls, interrupts off):
@@ -56,7 +59,8 @@ def symbols(path):
 
 # ---------------------------------------------------------------- BASIC
 TOKENS = {"BORDER": 0xE7, "PAPER": 0xDA, "INK": 0xD9, "CLEAR": 0xFD, "LOAD": 0xEF,
-          "CODE": 0xAF, "RANDOMIZE": 0xF9, "USR": 0xC0, "PRINT": 0xF5}
+          "CODE": 0xAF, "USR": 0xC0, "PRINT": 0xF5, "LET": 0xF1, "IF": 0xFA,
+          "THEN": 0xCB}
 
 
 def number(n):
@@ -80,7 +84,9 @@ def basic_line(num, parts):
 def basic_program():
     return (basic_line(10, ["BORDER", 0, ":", "PAPER", 0, ":", "INK", 7, ":", "CLEAR", 32767]) +
             basic_line(20, ["LOAD", '""', "CODE"]) +
-            basic_line(30, ["RANDOMIZE", "USR", LOADER_ORG, ":", "PRINT", '"128K ONLY"']))
+            basic_line(30, ["LET", "e=", "USR", LOADER_ORG]) +
+            basic_line(40, ["IF", "e=", 1, "THEN", "PRINT", '"128K ONLY"']) +
+            basic_line(50, ["IF", "e>", 1, "THEN", "PRINT", '"TAPE ERROR, BLOCK ";e-', 10]))
 
 
 # ---------------------------------------------------------------- TAP

@@ -1,8 +1,9 @@
 ; ---------------------------------------------------------------------------
 ; Tape loader for zxracer.tap (assembled on its own by tools/make_tap.py).
 ;
-; The BASIC loader loads this to $BE00 and calls it. It checks for 128K
-; paging (if there is none it returns, and BASIC says "128K ONLY"), then
+; The BASIC loader loads this to $BE00 and calls it (LET e = USR 48640).
+; It checks for 128K paging (if there is none it returns 1, and BASIC says
+; "128K ONLY"), then
 ; reads the rest of the tape itself - standard ROM-format blocks at the
 ; normal speed, but with its own loading routine, so it does not depend on
 ; which ROM is paged in (128K, +2, +2A, +3 alike) and keeps interrupts off
@@ -10,11 +11,14 @@
 ; banks (each loaded to $8000 and unpacked to $C000 in its bank), bank 2
 ; (loaded into bank 7, unpacked to $8000) and last the resident part of
 ; bank 5 (likewise, to $5B00), which overwrites BASIC itself - so it never
-; returns, but jumps into the game. A tape error resets the machine.
+; returns, but jumps into the game. A tape error returns 10 + the block's
+; number to BASIC, which reports it (nothing has been loaded over BASIC's own
+; memory before the last block, and BASIC's paging is restored from BANK_M).
 ; ---------------------------------------------------------------------------
         ORG $BE00
 Loader:
         di
+        ld (BasicSP), sp
         ; 128K? page bank 1 and bank 3 in turn and see if they differ
         ld bc, $7FFD
         ld a, $11
@@ -30,8 +34,8 @@ Loader:
         ld a, ($C000)
         cp $55
         jr z, .is128
-        ei
-        ret                     ; (BASIC prints "128K ONLY")
+        ld bc, 1                ; (BASIC prints "128K ONLY")
+        jr Back
 .is128: ld sp, $C000
         ld hl, Blocks
 .blk:   ld a, (hl)              ; $7FFD value while loading ($FF: end)
@@ -53,10 +57,13 @@ Loader:
         push bc
         push bc
         pop ix
+        ld a, (BlockNo)
+        inc a
+        ld (BlockNo), a
         call LoadBlock
         pop bc
         pop hl
-        jp nc, 0                ; tape error: start again
+        jr nc, .fail
         ld a, (hl)              ; $7FFD value while unpacking ($FF: stored)
         inc hl
         ld e, (hl)
@@ -77,6 +84,24 @@ Loader:
 .go:    xor a
         out ($FE), a            ; black border
         jp GAME_START
+.fail:  ld a, (BlockNo)         ; tape error: 10 + the block number to BASIC
+        add a, 10
+        ld c, a
+        ld b, 0
+; BC = what USR returns: back to BASIC with its stack, paging and interrupts
+Back:   ld sp, (BasicSP)
+        ld a, ($5B5C)           ; BANK_M: BASIC's last $7FFD value
+        push bc
+        ld bc, $7FFD
+        out (c), a
+        pop bc
+        xor a
+        out ($FE), a
+        ei
+        ret
+
+BasicSP:        dw 0
+BlockNo:        db 0
 
 ; IX = address, DE = length: load the next standard data block (flag $FF,
 ; then the data, then a checksum making the XOR of all of them 0). Carry

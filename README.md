@@ -25,7 +25,8 @@ loader, which reads the rest with its own tape routine (standard blocks at the
 normal speed, no ROM calls): the loading screen, then the game's memory banks,
 compressed - about 6½ minutes. Emulators' instant "flash load" only speeds up the
 first two blocks; use the emulator's fast-forward / turbo tape option for the rest.
-On a 48K Spectrum it stops with "128K ONLY". `build/release.sna` is the same game as
+On a 48K Spectrum it stops with "128K ONLY"; if a block fails to load it says
+"TAPE ERROR, BLOCK n". `build/release.sna` is the same game as
 a snapshot.
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake (or a Kempston joystick).

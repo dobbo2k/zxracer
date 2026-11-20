@@ -164,7 +164,8 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 bars) with `tools/make_tap.py`:
 
 1. BASIC `ZX RACER` (autostart 10): `BORDER 0: PAPER 0: INK 7: CLEAR 32767`,
-   `LOAD "" CODE`, `RANDOMIZE USR 48896: PRINT "128K ONLY"`.
+   `LOAD "" CODE`, `LET e=USR 48640`, `IF e=1 THEN PRINT "128K ONLY"`,
+   `IF e>1 THEN PRINT "TAPE ERROR, BLOCK ";e-10`.
 2. CODE `loader` at `$BE00` (`src/loader.asm`): checks that banks 1 and 3 differ
    (else returns to BASIC, which prints the message), then reads the rest of the
    tape with **its own loading routine** - standard ROM-format blocks at the
@@ -176,7 +177,10 @@ bars) with `tools/make_tap.py`:
    3, 4, 6 (each loaded to `$8000` and unpacked to `$C000` in its bank), bank 2
    (loaded into bank 7, unpacked to `$8000`) and the resident part of bank 5
    (likewise, to `$5B00`), and it jumps to the game. LZ compression (the screens'
-   format) saves 30%: 67 KB, about 6½ minutes. A tape error resets the machine.
+   format) saves 30%: 67 KB, about 6½ minutes. On a 48K (returns 1) or a tape error
+   (returns 10 + the block number) it goes back to BASIC - its stack, `BANK_M`
+   paging and interrupts restored; nothing has been loaded over BASIC's memory
+   before the last block - and BASIC says which.
 
 `tests/tapecheck.py` boots the tape in zxsim (`-T`: does what `LOAD "" CODE: RANDOMIZE
 USR` would, then plays the tape into the EAR input - no ROM image needed) and checks
