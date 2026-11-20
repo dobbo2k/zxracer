@@ -17,6 +17,7 @@ OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
 OFFROAD_SPEED   EQU 8
 
 CRASH_FRAMES    EQU 160         ; (time for her to tell him off, and his reply)
+SPIN_D          EQU 48          ; a spin-out's slowing (1/256ths per frame)
 
 UpdatePlayer:
         call GameUpdate
@@ -321,7 +322,22 @@ SpeedStep:
 .add:   add hl, de
         jr c, .set              ; (adding a negative: carry while >= 0)
         ld hl, 0
-.set:   ld (SpeedFrac), hl
+.set:   ; hills: a climb slows the moving car, a descent speeds it up
+        ld a, h
+        or l
+        jr z, .st
+        ld a, (CurveList + 1)   ; the hill at the car (+: climbing)
+        neg
+        add a, a                ; HILL_K = 2 (1/256ths per frame per unit)
+        ld e, a
+        rlca
+        sbc a, a
+        ld d, a
+        add hl, de
+        bit 7, h
+        jr z, .st
+        ld hl, 0
+.st:    ld (SpeedFrac), hl
         ret
 LowPull:                        ; LOW: 1/256ths of a speed unit per frame
         db 22, 22, 22, 22, 22, 22           ; 0-5
@@ -337,6 +353,9 @@ HighPull:                       ; HIGH
 ; Demo / attract mode: until a steering key is pressed, drive automatically
 ; (accelerate, steer back towards the middle of the road).
 DEMO_DEADBAND   EQU 6
+DEMO_LOOK       EQU 1200            ; how far ahead it looks for traffic
+DEMO_SIDE       EQU 130             ; where it drives (lanes at +-56, the edge at 150)
+DEMO_LIFT       EQU 700             ; it lifts off this close behind one in its path
 
 DemoDriver:
         ld a, (DemoMode)
@@ -370,6 +389,12 @@ DemoDriver:
         ld a, (Sliding)         ; lift off while sliding
         or a
         jr nz, .gas
+        push hl
+        ld hl, (DemoNear)       ; or close behind a vehicle in its path
+        ld de, DEMO_LIFT
+        sbc hl, de              ; (carry clear)
+        pop hl
+        jr c, .gas
         set IN_UP, c
 .gas:
         ld de, DEMO_DEADBAND
@@ -387,9 +412,13 @@ DemoDriver:
         ld (Input), a
         ret
 
-; The demo driver keeps to the middle unless a car ahead (within 1200
-; units) is in its path; then it aims for the lane away from the nearest one.
+; The demo driver keeps to the middle until a vehicle is near (within
+; DEMO_LOOK); then it drives on the outer edge of the road, on the side
+; away from the lane that one is heading for, and keeps to that side (at a
+; fork, to the outer edge of the branch it takes).
 DemoTarget:
+        ld hl, DEMO_LOOK
+        ld (DemoNear), hl
         ; near the fork: take one of the branches (varying by stage)
         ld a, (HasFork)
         or a
@@ -402,21 +431,24 @@ DemoTarget:
         ld de, 1500
         sbc hl, de
         jr nc, .traffic
-.branch:
-        ld hl, (PlayerDx)
-        ld de, 40
+.branch:                        ; the outer edge of the branch (its traffic
+        ld de, (PlayerDx)       ; keeps to +-56 from the middle of it)
+        ld hl, DEMO_SIDE
         add hl, de
         ld a, (Stage)
         rra
-        ret c
-        jp NegHL
+        ld de, DEMO_SIDE
+        jr c, .br
+        call NegHL
+        ld de, -DEMO_SIDE
+.br:    ld (DemoAim), de        ; (and that side afterwards)
+        ret
 .traffic:
-        ld hl, 1200
-        ld (DemoNear), hl
-        ld hl, 0
-        ld (DemoAim), hl
+        ld hl, DEMO_LOOK
+        ld (DemoAny), hl
         ld ix, Traffic
-        ld b, N_TRAFFIC
+        ld a, (NTraffic)
+        ld b, a
 .car:   ld l, (ix + 0)
         ld h, (ix + 1)
         ld de, (Pos)
@@ -424,29 +456,48 @@ DemoTarget:
         sbc hl, de              ; z_rel
         bit 7, h
         jr nz, .next            ; behind
-        ld de, (DemoNear)
+        ld de, (DemoAny)
         push hl
-        or a
+        sbc hl, de              ; (carry clear)
+        pop hl
+        jr nc, .path
+        ld (DemoAny), hl        ; the nearest ahead, in any lane
+        ld a, (ix + 5)
+        ld (DemoHead), a
+.path:  ld de, (DemoNear)
+        push hl
         sbc hl, de
         pop hl
-        jr nc, .next            ; not nearer than the best so far
+        jr nc, .next
         push hl
         push bc
-        ld bc, HIT_HALFWIDTH + 32   ; give way well before contact
+        ld bc, HIT_WIDEST
         call LaneOverlapBC      ; carry: in the player's path
         pop bc
         pop hl
         jr nc, .next
-        ld (DemoNear), hl
-        ld hl, -64              ; car right of centre: go left
-        bit 7, (ix + 2)
-        jr z, .aim
-        ld hl, 64
-.aim:   ld (DemoAim), hl
+        ld (DemoNear), hl       ; the nearest in its path
 .next:  ld de, CAR_SIZE
         add ix, de
         djnz .car
+        ; the middle until a vehicle is near; then the outer edge of the
+        ; road, away from where that one is heading, and that side from then
+        ; on (the lanes are at +-56: no vehicle reaches a car out there)
         ld hl, (DemoAim)
+        ld a, h
+        or l
+        ret nz                  ; keep to the side it chose
+        ld hl, (DemoAny)
+        ld de, DEMO_LOOK
+        sbc hl, de              ; (carry clear)
+        ld hl, 0
+        ret z
+        ld hl, -DEMO_SIDE
+        ld a, (DemoHead)
+        rlca
+        jr nc, .aim
+        ld hl, DEMO_SIDE
+.aim:   ld (DemoAim), hl
         ret
 
 ; After a crash: no control, the car is stopped and pulled back towards the
@@ -463,8 +514,23 @@ CrashUpdate:
         call CrewSay
         xor a
         ld (Input), a
-        ld (Speed), a
         ld (Sliding), a
+        ld a, (Spin)            ; a spin-out: the car slides on, slowing hard
+        or a
+        jr z, .stop
+        ld a, (Elapsed)
+        ld b, a
+        ld hl, (SpeedFrac)
+        ld de, -SPIN_D
+.sd:    add hl, de
+        jr nc, .stop            ; at a standstill
+        djnz .sd
+        ld (SpeedFrac), hl
+        jr .lat
+.stop:  xor a
+        ld (Spin), a
+        ld (Speed), a
+.lat:   xor a
         ld h, a
         ld l, a
         ld (LatVX), hl

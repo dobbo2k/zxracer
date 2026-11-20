@@ -107,6 +107,11 @@ HudCacheB:      db $FF, $FF, $FF, $FF, $FF, $FF, $FF
 
 ; traffic and collisions
 Traffic:        ds N_TRAFFIC * CAR_SIZE
+NTraffic:       db 3            ; this row's traffic (InitTraffic copies TrafficRows)
+VanFrom:        db 6
+TruckFrom:      db 7
+LaneChance:     db 2
+Spin:           db 0            ; the crash is a spin-out (the car slides on, slowing)
 ObjType:        db 0
 CrashTimer:     db 0
 SfxTimer:       db 0
@@ -120,6 +125,8 @@ CarShownA:      db $FF          ; car frame each buffer shows
 CarShownB:      db $FF
 DemoNear:       dw 0
 DemoAim:        dw 0
+DemoAny:        dw 0
+DemoHead:       db 0
 
 ; stage
 Stage:          db 0            ; index into StageTable

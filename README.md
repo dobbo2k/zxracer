@@ -82,9 +82,15 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   demo runs, and five goal scenes, one for each route's last stage, that count
   the time left into the score as a bonus (1000 points a second). All artwork is
   drawn by `tools/make_screens.py` (previews in `assets/gfx/screen_*.png`).
-- **Traffic:** cars in two lanes. Running into one from behind slows you right
-  down; driving into a palm off the road is a crash that stops you and spins the
-  car. The attract-mode driver changes lane to avoid traffic.
+- **Traffic:** cars, vans and lorries in two lanes; now and then one changes
+  lanes. Later rows bring more of them, more lorries and vans and more lane
+  changes. Running into one from behind slows you right down; hit one that is
+  much slower than you (at speed) and the car spins out, sliding on in a cloud of
+  tyre smoke until it stops, and she lets him have it. Driving into a palm off
+  the road is a crash too. The attract-mode driver keeps to the outer edge of
+  the road to pass traffic.
+- **Hills:** climbs slow the car (in HIGH it loses speed on a long one),
+  descents help it along.
 - **Sound:** AY engine note that follows the revs (speed and gear), gravel noise
   off-road, bumps and crashes.
 - **Speed:** locked at 16.7 fps; sharp bends with traffic still drop some frames to

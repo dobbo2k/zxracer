@@ -26,7 +26,22 @@ CarFrame:
         ld a, (CrashTimer)
         or a
         jr z, .drive
+        ld a, (Spin)            ; spinning out: slewing both ways, smoking
+        or a
+        jr z, .wreck
         ld a, (FrameCount)
+        and 6                   ; 0, 2, 4, 6
+        rrca
+        ld c, a                 ; 0-3
+        and 1
+        ld b, a                 ; the puff
+        ld a, c
+        and 2                   ; 0 / 2: left / right
+        add a, 3
+        add a, b
+        ld c, a                 ; 3-6
+        ret
+.wreck: ld a, (FrameCount)
         and 4
         ld c, 1
         ret z

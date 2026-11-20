@@ -317,6 +317,7 @@ RestartAt:
         ld (LatAcc), hl
         ld (Sliding), a
         ld (CrashTimer), a
+        ld (Spin), a
         ld a, 1 << IN_FIRE      ; (a fire press that started the game is no gear change)
         ld (FireWas), a
         pop af

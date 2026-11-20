@@ -41,15 +41,17 @@ any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displa
 
 ```
 $4000-$5AFF  Bank 5: screen buffer A
-$5B00-$69FF  Bank 5: resident graphics (traffic sprite, font, player car) and
-             the title / goal screen code
-$7800-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
-             (also the bounce buffer while a theme is loaded)
+$5B00-$7D7F  Bank 5: resident graphics (car, van and lorry sprites, font,
+             player car, crew close-ups), stage loading, the front end's way in
+$7D80-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
+             (640 bytes; also the bounce buffer while a theme or the front end
+             is loaded)
 $8000-$BFFF  Bank 2: code, stage table, lookup tables, unrolled chains (hill
              tables in the gaps between them), IM2, stack
 $C000-$DAFF  Bank 7: screen buffer B
 $DB00-$FFFF  Bank 7: THEME CACHE: the current theme's sprites (scenery types,
-             curve and fork signs), mountain backdrop, palette, name
+             curve and fork signs), mountain backdrop, palette, name; or, while
+             the front end runs, the front-end overlay
 ```
 
 Bank 7 stays paged at `$C000` all the time. While buffer A is drawn, bank 7 is
@@ -149,10 +151,14 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   Spectrum's 15 colours, converts them (two colours per 8×8 cell) and compresses
   them with a small LZ format (`$00-$7F` literals, `$80-$FE` back-references,
   `$FF` end): 1.8–3.8 KB each. They sit in the pack banks next to the stage packs.
-- `src/screens.asm` (bank 5, between the resident graphics and the 2 KB track
-  cache) unpacks a picture into screen A while B is on show, prints the high
-  score / results with the HUD font and runs the screen's own loop; the game's
-  sound is muted and the screens beep themselves.
+- The front end is an overlay (`src/frontend.asm`): assembled to run at the
+  theme cache and stored in a pack bank (7 KB kept for it), copied in by
+  `LoadFrontEnd` (`src/screens.asm`, resident) when a game ends or the demo
+  hands over to the title. It unpacks a picture into screen A while B is on
+  show (`ShowPic` and the unpacker stay resident: they page the pictures' banks
+  over the overlay), prints the high score / results with the HUD font and runs
+  the screen's own loop; the game's sound is muted and the screens beep
+  themselves. Afterwards the stage's packs are copied in again (`LoadPacks`).
 - Flow: boot → title (8 s or a key) → demo (≈25 s, continuing where it left off)
   → title … A game ends with the car rolling to a stop, then the goal screen for
   the last-row stage reached (time bonus counted in), then the title with the
@@ -356,10 +362,20 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   black where it matches); his striped shirt and her hair sit on the rear deck.
   A crash (160 frames) shows their 48×48 close-ups (`tools/make_crew.py`) either
   side of the message line: one of 8 pairs of lines, hers then his reply.
-- **Collisions:** roadside object → crash & tumble, restart from road centre;
-  traffic → bump, spin or crash depending on speed and angle.
-- **Traffic:** trucks, vans, small cars, bikes in lanes with simple lane-change AI;
-  density rises in later stages.
+- **Collisions** *(as built)*: roadside object → crash (the car stops and
+  swings about while the crew talk, then carries on from nearer the middle);
+  traffic → a bump (the car drops below the vehicle's speed and it is nudged
+  ahead), or, hitting one 7+ speed units slower, a spin-out: the crash, but the
+  car slides on, slowing hard (48/256 a frame) with the drift-and-smoke frames
+  slewing both ways.
+- **Traffic** *(as built)*: cars, vans and lorries (`TrafficRows` /
+  `ClassTab` in `src/traffic.asm`): per class a sprite, a contact half-width and
+  a speed range (cars 7–14, vans 6–9, lorries 5–8); per row of the pyramid the
+  number of vehicles (3, 3, 4, 4, 5), the van / lorry share and the chance of a
+  lane change (a vehicle drifts to the other lane over about 2 s). The sprites
+  are resident in bank 5 (fewer pre-shifts than the scenery to fit).
+- **Hills** *(as built)*: the hill value under the car changes the speed every
+  frame (2/256 per unit: climbs slow it, descents help).
 - **Stages:** 15 original stages (coast, desert, alpine pass, forest, city night,
   canyon, lakeside, wheat fields, etc.) arranged as a 5-row branching pyramid; choose
   left/right at each fork. 5 distinct goal scenes.

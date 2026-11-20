@@ -93,6 +93,7 @@ PanoLdiEnd:
 DualEnd:
         ret
         ASSERT high (DualEnd - 7 * STRIP_PAD) == high DualEnd
+        INCLUDE "respawn.asm"   ; (fits in the gap before the XOR chain)
         ASSERT $ <= XOR_END - 5 * 8
 
 ; Unrolled XOR chain for sprites: entered at XorEnd - 5*n for n bytes

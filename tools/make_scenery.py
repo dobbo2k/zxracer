@@ -81,6 +81,51 @@ def car():
     return im
 
 
+def truck():
+    """Master truck (rear view of a box lorry), 256 x 210: a tall box with
+    two doors, lamps, a bumper and twin tyres."""
+    W, H = 256, 210
+    im = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([4, 0, 252, 168], radius=8, fill=255)       # the box
+    d.rectangle([121, 14, 135, 168], fill=0)                        # door seam
+    d.rectangle([12, 8, 244, 16], fill=0)                           # top rail
+    d.rectangle([4, 84, 252, 100], fill=0)                          # a stripe round the box
+    for x in (40, 216):                                             # hinges
+        for y in (36, 132):
+            d.rectangle([x - 18, y, x + 18, y + 10], fill=0)
+    d.rectangle([96, 112, 108, 150], fill=0)                        # handles
+    d.rectangle([148, 112, 160, 150], fill=0)
+    d.rectangle([0, 172, 256, 190], fill=255)                       # bumper
+    d.rectangle([14, 176, 52, 186], fill=0)                         # lamps
+    d.rectangle([204, 176, 242, 186], fill=0)
+    d.rectangle([104, 174, 152, 188], fill=0)                       # plate
+    d.rectangle([10, 192, 84, 209], fill=255)                       # twin tyres
+    d.rectangle([172, 192, 246, 209], fill=255)
+    d.rectangle([46, 192, 48, 209], fill=0)
+    d.rectangle([208, 192, 210, 209], fill=0)
+    return im
+
+
+def van():
+    """Master van (rear view), 256 x 160: a high roof, two rear windows on
+    split doors, lamps down the sides."""
+    W, H = 256, 160
+    im = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([16, 0, 240, 136], radius=30, fill=255)     # body
+    d.rounded_rectangle([34, 16, 122, 60], radius=8, fill=0)        # windows
+    d.rounded_rectangle([134, 16, 222, 60], radius=8, fill=0)
+    d.rectangle([126, 16, 130, 128], fill=0)                        # door seam
+    d.rectangle([20, 70, 32, 108], fill=0)                          # lamps
+    d.rectangle([224, 70, 236, 108], fill=0)
+    d.rectangle([100, 98, 156, 114], fill=0)                        # plate
+    d.rectangle([8, 124, 248, 140], fill=255)                       # bumper
+    d.rectangle([24, 142, 72, 159], fill=255)                       # tyres
+    d.rectangle([184, 142, 232, 159], fill=255)
+    return im
+
+
 def sign(direction):
     """Master curve sign: a board on a post with an arrow cut out of it,
     160 x 160. direction +1 points right, -1 left."""
@@ -184,9 +229,13 @@ def lamp():
 # name: (draw function, height relative to a palm at the same distance,
 #        pre-shifted copies per size)
 SHIFTS_SMALL = [2, 2, 2, 2, 4, 4, 4, 8, 8]     # for signs: less memory, coarser steps
+SHIFTS_TRAFFIC = [2, 2, 2, 2, 2, 4, 4, 4, 4]   # traffic (resident): memory is short
+SHIFTS_VAN = [1, 1, 2, 2, 2, 4, 4, 4, 4]
 TYPES = {
     "palm": (palm, 1.0, SHIFTS),
-    "traffic": (car, 0.45, SHIFTS),
+    "traffic": (car, 0.45, SHIFTS_TRAFFIC),
+    "van": (van, 0.62, SHIFTS_VAN),
+    "truck": (truck, 0.8, SHIFTS_TRAFFIC),
     "sign_r": (sign(1), 0.5, SHIFTS_SMALL),
     "sign_l": (sign(-1), 0.5, SHIFTS_SMALL),
     "fork": (fork, 0.6, SHIFTS_SMALL),
