@@ -58,9 +58,11 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   of the two of them appear while the car spins: she tells him off ("< NICE
   ONE, GENIUS!"), he answers back ("IT JUMPED OUT! >"). Handling has sideways momentum: bends push the car
   outwards, steering builds up and the car carries its drift out of a bend.
-  Past the tyres' grip limit (sharp bend × high speed) it slides wide with a
-  squeal, steers half as well and scrubs speed off: brake or ease off for the
-  sharp bends of the later stages.
+  Past the tyres' grip limit (sharp bend × high speed) it slides wide, steers
+  half as well and scrubs speed off: brake or ease off for the sharp bends of the
+  later stages. You can see it: on a fast bend the car yaws into it, and near the
+  grip limit it swings further round with smoke pouring from the rear tyres and a
+  tyre squeal.
 - **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,
   pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
 - **Stages:** 15 stages in a 5-row pyramid across 5 themes (Sunny Coast, Desert

@@ -53,6 +53,7 @@ LatVX:          dw 0            ; sideways speed, 1/256 pixel per 50 Hz frame
 LatAcc:         dw 0            ; its change per frame this update
 LatF:           dw 0            ; curvature * speed
 Sliding:        db 0            ; past the grip limit
+Squeal:         db 0            ; near it: the tyres squeal
 CrewHerLine:    dw MsgNone      ; what they say after this crash
 CrewHisLine:    dw MsgNone
 CrewShownA:     db 0            ; the close-ups are on buffer A / B

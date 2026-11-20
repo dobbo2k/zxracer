@@ -12,31 +12,79 @@ CAR_ROW         EQU 20
 CAR_W           EQU 8               ; bytes (must match the car_data.asm built from car.png)
 CAR_H           EQU 32
 CAR_FRAME       EQU CAR_W * CAR_H + CAR_W * CAR_H / 8
+; Frames (assets/gfx/car.png): 0 straight, 1 left, 2 right, 3-4 drifting
+; left with tyre smoke (two puffs), 5-6 drifting right
+CarFrames:
+        DUP 7, k
+        dw CarGfx + k * CAR_FRAME
+        EDUP
 
-DrawCar:
-        ld a, (Input)
-        and (1 << IN_LEFT) | (1 << IN_RIGHT)
-        ld b, a
-        ld a, (CrashTimer)      ; spinning after a crash
+; -> C = the frame to show: spinning after a crash, else the steering; on a
+; fast bend without steering the car yaws into it, and near the grip limit
+; its rear tyres smoke (two puffs in turn)
+CarFrame:
+        ld a, (CrashTimer)
         or a
-        ld a, b
-        jr z, .frame
+        jr z, .drive
         ld a, (FrameCount)
         and 4
-        ld a, 1 << IN_LEFT
-        jr z, .frame
-        ld a, 1 << IN_RIGHT
-.frame:
-        ld hl, CarGfx
+        ld c, 1
+        ret z
+        inc c
+        ret
+.drive: ld a, (Input)
+        and (1 << IN_LEFT) | (1 << IN_RIGHT)
         ld c, 0
         cp 1 << IN_LEFT
-        jr nz, .notL
-        ld hl, CarGfx + CAR_FRAME
+        jr nz, .nl
         ld c, 1
-.notL:  cp 1 << IN_RIGHT
-        jr nz, .notR
-        ld hl, CarGfx + 2 * CAR_FRAME
+.nl:    cp 1 << IN_RIGHT
+        jr nz, .nr
         ld c, 2
+.nr:    ld hl, (LatF)           ; how hard the bend pulls
+        call AbsHL
+        ld de, DRIFT_LOOK
+        or a
+        sbc hl, de
+        ret c
+        ld a, c
+        or a
+        jr nz, .lean
+        ld a, (SegCurve)        ; no steering: into the bend
+        rlca
+        ld c, 2
+        jr nc, .lean
+        ld c, 1
+.lean:  ld de, SMOKE_AT - DRIFT_LOOK
+        or a
+        sbc hl, de
+        ret c
+        ld a, c                 ; smoke: 3-4 left, 5-6 right
+        add a, a
+        inc a
+        ld c, a
+        ld a, (FrameCount)
+        and 4
+        ret z
+        inc c
+        ret
+
+
+DRIFT_LOOK      EQU 80              ; |curvature * speed|: the car yaws into the bend
+SMOKE_AT        EQU 160             ; ... and its rear tyres smoke and squeal
+
+DrawCar:
+        call CarFrame           ; C = frame
+        ld a, c
+        add a, a
+        ld l, a
+        ld h, 0
+        ld de, CarFrames
+        add hl, de
+        ld a, (hl)
+        inc hl
+        ld h, (hl)
+        ld l, a                 ; HL = its graphics
 .notR:  ; skip the redraw if this buffer already shows this frame and nothing
         ; has written into the car's block since
         ld de, (CarShown)

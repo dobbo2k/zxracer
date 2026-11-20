@@ -95,9 +95,9 @@ SoundTick:
         ld a, 6
         call AyWrite
 .squeal:
-        ; squeal: high tone on C while the tyres slide
+        ; squeal: high tone on C while the tyres smoke (near the grip limit)
         ld e, 0
-        ld a, (Sliding)
+        ld a, (Squeal)
         or a
         jr z, .sq
         ld a, (FrameCount)

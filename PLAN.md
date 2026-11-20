@@ -334,6 +334,11 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
   quarter of the excess, half the steering and grip, a tyre squeal, and holding
   the throttle no longer adds speed (it scrubs off until the tyres grip again).
+- **Drift you can see** *(as built)*: the car sprite has 7 frames - straight,
+  left, right, and drifting left / right with tyre smoke (two puffs each, swung
+  further round). On a bend with |curvature × speed| ≥ 80 and no steering the car
+  yaws into the bend; from 160 (near the grip limit, and while sliding) it shows
+  the smoke frames, animated, and the tyres squeal.
 - **Crew** *(as built)*: the car sprite's open cockpit row shows his head
   (white ink) and hers (yellow) over whatever lies under the car (ink turns
   black where it matches); his striped shirt and her hair sit on the rear deck.

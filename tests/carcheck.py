@@ -21,7 +21,7 @@ for f in frames:
     cmd += ["-s", f"{f}:{d}/f{f}.ppm"]
 subprocess.run(cmd, check=True)
 sheet = Image.open("assets/gfx/car.png").convert("RGB")
-refs = [sheet.crop((64 * k, 8, 64 * k + 64, 32)).tobytes() for k in range(3)]
+refs = [sheet.crop((64 * k, 8, 64 * k + 64, 32)).tobytes() for k in range(sheet.width // 64)]
 bad = [f for f in frames
        if Image.open(f"{d}/f{f}.ppm").convert("RGB").crop((128, 216, 192, 240)).tobytes() not in refs]
 print(f"carcheck: {len(frames) - len(bad)}/{len(frames)} frames show an intact car")

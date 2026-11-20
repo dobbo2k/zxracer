@@ -98,6 +98,14 @@ UpdatePlayer:
 .sl1:   ld (LatAcc), hl
         ld a, 1
 .grip:  ld (Sliding), a
+        ld hl, (LatF)           ; tyres squealing: near the grip limit
+        call AbsHL
+        ld de, SMOKE_AT
+        or a
+        sbc hl, de
+        sbc a, a
+        inc a
+        ld (Squeal), a
         ; steering
         ld a, (Input)
         ld c, a

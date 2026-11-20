@@ -18,13 +18,15 @@ W = (255, 255, 255)
 C = (0, 255, 255)
 
 
-def car(lean):
-    """lean: -1 left, 0 straight, +1 right. Returns a 64x32 image."""
+def car(lean, smoke=None):
+    """lean: -1 left, 0 straight, +1 right; smoke: None, or 0 / 1 for the two
+    puffs of tyre smoke. Returns a 64x32 image."""
     im = Image.new("RGB", (64, 32), K)
     d = ImageDraw.Draw(im)
-    t = 3 * lean           # interior shifts most with the lean
-    m = 2 * lean           # rear deck
-    b = -lean              # tyres move the other way (we see the outer side)
+    swing = 5 if smoke is not None else 3              # drifting: swung further round
+    t = swing * lean       # interior shifts most with the lean
+    m = (swing - 1) * lean  # rear deck
+    b = -lean * (2 if smoke is not None else 1)        # tyres move the other way
     # --- row 0 (y 0-7): the open cockpit. Paper is whatever lies under the
     # car; each cell's ink colour comes from here: white for him and the
     # windscreen pillars, yellow for her
@@ -39,6 +41,10 @@ def car(lean):
     d.ellipse([wx - 6, 0, wx + 5, 7], fill=Y)
     d.polygon([(wx + 4, 1), (wx + 8, 2), (wx + 6, 3), (wx + 8, 5), (wx + 4, 6)], fill=Y)
     d.point([(wx - 3, 2), (wx, 1), (wx + 2, 3)], K)    # strands
+    for y in range(8):                                 # (not into the pillar's cell)
+        for x in range(56, 64):
+            if im.getpixel((x, y)) == Y:
+                im.putpixel((x, y), K)
     # --- row 1 (y 8-15): rear deck (red) with their shoulders above it:
     # his loud striped shirt (cyan), her hair over her shoulders (yellow)
     d.rounded_rectangle([0 + m, 8, 63 + m, 17], radius=4, fill=R)
@@ -73,13 +79,51 @@ def car(lean):
             d.line([(x, 27), (x + 1, 27)], R)
     for x in (22, 39):                                 # exhaust tips
         d.rectangle([x, 26, x + 2, 27], R)
+    if smoke is not None:
+        tyre_smoke(im, d, lean, smoke)
     return im
 
 
+def tyre_smoke(im, d, lean, phase):
+    """White smoke billowing from the rear tyres (drifting at the limit).
+    It takes over the tyre cells of the bottom row: their red turns white,
+    the smoke is white, the tyres stay black."""
+    rnd = [(2, 30, 3), (9, 31, 3), (14, 28, 2), (5, 26, 2), (12, 25, 1)] if phase == 0 else \
+          [(4, 31, 3), (11, 29, 3), (1, 27, 2), (15, 31, 2), (7, 25, 1)]
+    specks = [(0, 25), (6, 24), (13, 27), (3, 28)] if phase == 0 else \
+             [(2, 24), (9, 26), (15, 25), (5, 29)]
+    puffs = Image.new("L", im.size, 0)
+    pd = ImageDraw.Draw(puffs)
+    for side, x0 in ((-1, 0), (1, 48)):
+        big = (side == -lean)
+        for x, y, r in rnd:
+            if side > 0:
+                x = 15 - x
+            r = r + 1 if big else max(1, r - 1)
+            pd.ellipse([x0 + x - r, y - r, x0 + x + r, y + r], fill=255)
+        for x, y in specks:
+            pd.point((x0 + (15 - x if side > 0 else x), y), 255)
+    pd.rectangle([0, 0, 63, 23], fill=0)               # (bottom row only)
+    im.paste(Image.new("RGB", im.size, W), (0, 0), puffs)
+    for cx in (0, 1, 6, 7):                            # the smoky cells: red -> white
+        for y in range(24, 32):
+            for x in range(cx * 8, cx * 8 + 8):
+                if im.getpixel((x, y)) == R:
+                    im.putpixel((x, y), W)
+    for y in range(24, 32):                            # (smoke stays in those cells)
+        for x in range(16, 48):
+            if im.getpixel((x, y)) == W:
+                im.putpixel((x, y), K)
+
+
+FRAMES = [(0, None), (-1, None), (1, None),          # straight, left, right
+          (-1, 0), (-1, 1), (1, 0), (1, 1)]             # drifting left / right, smoke puffs
+
+
 def main(path):
-    sheet = Image.new("RGB", (64 * 3, 32), K)
-    for k, lean in enumerate((0, -1, 1)):
-        sheet.paste(car(lean), (64 * k, 0))
+    sheet = Image.new("RGB", (64 * len(FRAMES), 32), K)
+    for k, (lean, smoke) in enumerate(FRAMES):
+        sheet.paste(car(lean, smoke), (64 * k, 0))
     sheet.save(path)
 
 
