@@ -363,6 +363,23 @@ What the renderer does now (§3.2 still applies):
 The frame rate is locked at 3 TV frames (16.7 fps): an even pace looks smoother
 than a 25/16.7/12.5 mix. The remaining overruns come from sharp bends with traffic.
 
+**Where the frame goes now** (autopilot game, per game frame): road ~152k
+(pass 1 25k, row drawing 25k, line drawing 23k, hills ~20k when in view),
+sprites ~44k (projection 9k, drawing 16k, the car 7k), logic 14k, horizon 7k,
+HUD 3.5k, interrupt sound and music ~9k. A game frame holds the 3-TV-frame lock
+when all its work fits about 203k T. The lightest three quarters average 207k
+and mostly do; the heaviest quarter averages 258k (hills, forks, traffic all
+at once: road +36-46k, sprites +11-15k) and takes 4 TV frames. So shaving the
+average by a few percent hardly moves the frame rate (measured: a faster pass 1
+and sprite projection, -2.5k, changed nothing visible); what counts is the work
+that the heavy frames do and that can go. Scenery beyond depth 1200 (objects
+6 pixels high just under the horizon, 30-70 pixels in all on screen) cost a full
+projection each: drawing it from 1200 instead of 2000 cut the frames that take
+4 TV frames from 21% to 13% (15.5 to 15.9 fps on the FIXED_ELAPSED autopilot).
+A steady 16.7 fps would need the heavy frames ~25% faster - a new road renderer
+rather than more tuning (tests/rendercheck.py guards any such work: identical
+screens and tables after 300-1800 loops of a timing-independent run).
+
 Optimisation backlog for M11 (by expected gain):
 1. Road row setup (~5k patching, ~4k line loop, ~7k attributes per frame): table-driven
    row constants instead of self-modifying patches; patch the narrow-road path only when used.
@@ -383,32 +400,36 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   RPM, acceleration curve, braking, off-road slowdown + grass shudder, centrifugal
   drift on curves (must steer into bends), skids with tyre squeal.
   *As built:* the car has a sideways speed (1/256 px per frame). Each 50 Hz
-  frame the bend adds `−curvature × speed / 4`, steering ±64, and grip takes
-  1/16 of it away, so it settles at 4 × curvature × speed outwards (1/256 px per
-  frame: 1.25 px a frame on a curvature-4 bend at top speed; doubled after play
-  testing, when the drift was too weak to notice) against 4 px a frame when
-  steering, building up over about a third of a second and carrying on after a
-  bend. Past the grip limit (|curvature × speed| >
-  200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
-  quarter of the excess, half the steering and grip, tyre smoke, and holding
-  the throttle no longer adds speed (it scrubs off until the tyres grip again).
+  frame the bend adds its push P = curvature × speed² / 32 outwards (it grows
+  with the square of the speed, as cornering force does), steering ±64, and grip
+  takes 1/16 of it away, so it settles at 16 × P outwards against 4 px a frame
+  when steering, building up over about a third of a second and carrying on
+  after a bend. Steering into a bend holds the line only while P ≤ 64: at full
+  speed (20) just the gentlest bends (curvature 4); curvature 6 needs speed 18,
+  10 needs 14 (200 km/h), 16 needs 11 - so you lift off or brake, as in the
+  arcade racers. (Before play testing asked for more inertia the push was
+  curvature × speed / 4: steering held nearly everything at full speed.) Past
+  the grip limit (P > 96) the car slides: an extra outward push of half the
+  excess, half the steering and grip, tyre smoke, and holding the throttle no
+  longer adds speed (it scrubs off until the tyres grip again). The demo driver
+  lifts off above P = 60 and brakes above 84.
 - **Gears and acceleration** *(as built)*: speed is 8.8 fixed point, changed every
   50 Hz frame. LOW / HIGH, changed with SPACE or fire (on a press). LOW pulls
-  22 / 18 / 12 (1/256ths per frame) below 6 / 10 / 13 and tops out at 13 (182 km/h,
-  about 4 s from a standstill); changed down above that, the engine brakes the car
-  (32). HIGH pulls 5 below 6, 8 to 10, 10 to 16, 7 to 18, 5 to 20 (280 km/h, about
-  5 s after changing up at 182; from a standstill 10 s to 182). Off the throttle it
+  18 / 15 / 10 (1/256ths per frame) below 6 / 10 / 13 and tops out at 13 (182 km/h,
+  about 5 s from a standstill); changed down above that, the engine brakes the car
+  (32). HIGH pulls 4 below 6, 6 to 10, 8 to 16, 6 to 18, 4 to 20 (280 km/h, about
+  6 s after changing up at 182; from a standstill 12 s to 182). A crash puts it
+  back in LOW. Off the throttle it
   coasts down (16), braking 64, sliding past the grip limit 24 (the throttle does
   nothing). Engine revs: speed in HIGH, 1.5 × speed in LOW. HUD: LOW / HIGH. The
-  demo driver changes up at 13 and down below 8. (After slowing the acceleration
-  to arcade-racer pace the timer got a little more: 68 s at the start, 43 s per
-  checkpoint.)
+  demo driver changes up at 13 and down below 8. (The timer: 68 s at the start, 48 s per
+  checkpoint since the cornering got harder.)
 - **Drift you can see** *(as built)*: the car sprite has 7 frames - straight,
   left, right, and drifting left / right with tyre smoke (two puffs each, swung
-  further round). On a bend with |curvature × speed| ≥ 80 and no steering the car
-  yaws into the bend; from 160 (near the grip limit, and while sliding) it shows
-  the smoke frames (light smoke from both rear tyres), animated. (There was a
-  tyre squeal too; it was removed as annoying.)
+  further round). On a bend with P ≥ 40 and no steering the car
+  yaws into the bend; from 72 (past what steering holds, and while sliding) it
+  shows the smoke frames (light smoke from both rear tyres), animated. The tyre
+  squeal comes with the music (§5).
 - **Crew** *(as built)*: the car sprite's open cockpit row shows his head
   (white ink) and hers (yellow) over whatever lies under the car (ink turns
   black where it matches); his striped shirt and her hair sit on the rear deck.

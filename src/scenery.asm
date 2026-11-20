@@ -20,7 +20,8 @@
 MAX_SPR         EQU 14             ; draw commands per buffer
 MAX_SCN         EQU 8              ; scenery objects considered per frame
 Z_NEARV         EQU 130             ; objects nearer than this have passed the bottom line
-Z_FARV          EQU 2000            ; and further than this (specks) are not drawn
+Z_FARV          EQU 1200            ; and further than this (6-pixel specks near the horizon:
+                                    ; costly to project, near invisible) are not drawn
 CMD_SIZE        EQU 8
 PALM_HALFWIDTH  EQU 48             ; car half-width + the palm's crown
 
@@ -236,19 +237,15 @@ DrawObject:
         ld e, (hl)
         ld a, (ObjX)
         call MulS8U8            ; HL = ObjX * scale
-        sra h
-        rr l
-        sra h
-        rr l
-        sra h
-        rr l
-        sra h
-        rr l
-        sra h
-        rr l
-        sra h
-        rr l
-        ex de, hl
+        ld a, h                 ; >> 6: as A:H:L << 2, keeping A:H
+        rlca
+        sbc a, a
+        add hl, hl
+        rla
+        add hl, hl
+        rla
+        ld e, h
+        ld d, a
         call LineCentre         ; HL = cx on line ObjI
         jp c, .skip             ; no road on that line
         add hl, de              ; x
@@ -277,13 +274,24 @@ DrawObject:
         rrca
 .idx:   and 7
         jr z, .noShift
-        ld b, a
-        push hl
+        push hl                 ; SprSrc += copy * stride (by its bits)
         ld hl, (SprSrc)
         ld de, (SprStride)
-.mul:   add hl, de
-        djnz .mul
-        ld (SprSrc), hl
+        rrca
+        jr nc, .m1
+        add hl, de
+.m1:    ex de, hl
+        add hl, hl
+        ex de, hl
+        rrca
+        jr nc, .m2
+        add hl, de
+.m2:    rrca
+        jr nc, .m3
+        ex de, hl
+        add hl, hl              ; 4 * stride
+        add hl, de
+.m3:    ld (SprSrc), hl
         pop hl
 .noShift:
         ; column = left >> 3 (signed); must overlap 0..31
