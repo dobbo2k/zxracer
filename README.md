@@ -46,7 +46,10 @@ how-to-play text (`release/README.txt`) and a printable cassette inlay
 (`inlay_outside.png`, `inlay_inside.png`: 300 dpi J-card, drawn by
 `tools/make_inlay.py`: the cover art on the front, its lettering down the
 spine, screenshots and how to play inside in the game's own font).
-`make cover` draws `release/cover.png`: a hand-drawn style cover
+`make leaflet` draws `release/route_map.png`, an A5 route map leaflet
+in an 80s print style (two spot inks with halftone tints and misregistration,
+a fold; stages, themes, endings and par times from the game's data, the
+icons its scenery shapes - `tools/make_leaflet.py`). `make cover` draws `release/cover.png`: a hand-drawn style cover
 illustration of the title scene (`tools/make_cover.py`: seeded sketchy ink
 lines, hatching, washes and paper grain as SVG, the car and crew drawn
 cleanly, brush lettering from its own letter skeletons, rendered with

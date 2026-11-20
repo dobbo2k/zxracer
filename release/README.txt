@@ -11,6 +11,10 @@ FILES
   inlay_outside.png  A cassette inlay to print at 300 dpi (101.6 mm tall):
   inlay_inside.png   back flap, spine and front outside; screenshots and
                      how to play inside. Fold at the marks.
+  route_map.png      The route map leaflet: all fifteen stages, the forks
+                     and the five goals, with each stage's par time. Print
+                     it at 300 dpi on A5.
+  cover.png          The cover art.
 
 LOADING
 

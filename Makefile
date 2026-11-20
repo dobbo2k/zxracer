@@ -7,7 +7,7 @@ ASMFLAGS ?= --nologo --msg=war --fullpath -Ibuild --lst=build/zxracer.lst --sym=
 SRC   := $(wildcard src/*.asm)
 ZXSIM := build/zxsim
 
-.PHONY: all clean run test shots profile video tap release cover
+.PHONY: all clean run test shots profile video tap release cover leaflet
 all: build/zxracer.sna
 
 build:
@@ -82,6 +82,11 @@ cover: tools/make_cover.py tools/make_loading.py | build
 	$(PYTHON) tools/make_cover.py build/cover_wide.png build/cover_wide.svg wide
 	$(PYTHON) tools/make_loading.py build/cover_wide.png assets/gfx/loading.scr assets/gfx/loading_preview.png $(LOADING_STYLE)
 	$(PYTHON) tools/make_cover.py assets/gfx/spine.png build/spine.svg spine
+
+# The route map leaflet (needs Chromium too): the stage pyramid as a printed insert
+leaflet: tools/make_leaflet.py assets/stages.yaml | build
+	mkdir -p release
+	$(PYTHON) tools/make_leaflet.py release/route_map.png build/route_map.svg
 
 build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
