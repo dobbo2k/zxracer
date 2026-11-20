@@ -42,9 +42,24 @@ DrawRoad:
         ld (DrawRoadRow.rs3 + 1), a
         ld a, (BufHiOr)
         ld (DrawRoadRow.bufOr + 1), a
+        xor a
+        ld (CurI), a
+        ld a, ROAD_ROW0
+        ld (CurRow), a
+        ld b, 24 - ROAD_ROW0
+.row:   push bc
+        call DrawRoadRow
+        ld hl, CurRow
+        inc (hl)
+        pop bc
+        djnz .row
+        ret
 
-        ; pass 1 only when the road shape changed: the player moved sideways
-        ; or a curve is in view (this frame or the last)
+; The road's shape for the next frame (no screen access: it runs while the
+; last frame waits for its flip). Pass 1 only when the shape changed: the
+; player moved sideways, or curves, hills or the fork are in view (this
+; frame or the last).
+RoadPrepare:
         call BuildCurveList
         call ForkFrame
         ld a, (RoadStraight)
@@ -67,20 +82,7 @@ DrawRoad:
         ld (Pass1PX), hl
         call RoadPass1
 .shapeSame:
-        call RoadBands
-
-        xor a
-        ld (CurI), a
-        ld a, ROAD_ROW0
-        ld (CurRow), a
-        ld b, 24 - ROAD_ROW0
-.row:   push bc
-        call DrawRoadRow
-        ld hl, CurRow
-        inc (hl)
-        pop bc
-        djnz .row
-        ret
+        jp RoadBands
 
 ; --------------------------------------------------------------------------
 ; Road edges and centre line per line, from the bottom line up.
@@ -186,9 +188,6 @@ RoadPass1:
 .cx:    exx
         ld a, l
         exx
-        rra                     ; even line: no events, just accumulate
-        jr nc, .acc
-        rla
 .nb:    cp $FF
         call z, NextCurve
         exx
@@ -252,7 +251,7 @@ RoadPass1:
 .ffs:   inc l
 .stored:
         exx
-.acc:   ; ---- next line up: dx += curvature, total += dx
+.acc:   ; ---- two lines up: twice dx += curvature, total += dx
         ld a, b
 .cl:    add a, 0
         ld b, a
@@ -266,7 +265,21 @@ RoadPass1:
         add a, b
         ld c, a
         adc hl, de
+        ld a, b
+.clb:   add a, 0
+        ld b, a
+        ld a, e
+.chb:   adc a, 0
+        ld e, a
+        ld a, d
+.ch2b:  adc a, 0
+        ld d, a
+        ld a, c
+        add a, b
+        ld c, a
+        adc hl, de
         exx
+        dec l
         dec l
         exx
         jp p, .cx
@@ -319,13 +332,32 @@ RoadPass1:
 .sdone: pop af
         ld c, a
         pop hl
-        jr .store
+        jp .store
 
 ; Light/dark band per line: bit STRIPE_BIT of (z + position), z of the
 ; depth line the screen line shows
 RoadBands:
         ld a, (Pos)
         ld (.p + 1), a
+        ld (.q + 1), a
+        ld a, (P1Hill)
+        or a
+        jr nz, .hills
+        ld hl, ZLo              ; no hills: screen line = depth line
+        ld de, Band
+.flat:  ld a, (hl)
+.q:     add a, 0
+        and STRIPE_BIT
+        ld (de), a
+        inc l
+        inc l
+        inc e
+        inc e
+        ld a, e
+        cp low Band + ROAD_LINES
+        jr nz, .flat
+        ret
+.hills:
         ld bc, SrcLine
         ld de, Band
         ld h, high ZLo
@@ -511,6 +543,8 @@ DrawRoadRow:
         jr z, .notFork
         ld (hl), 0
         call ClearKerbCells
+        ld a, 1
+        ld (RowStaleCar), a     ; (anywhere, perhaps under the car)
         jr .rowStore
 .notFork:
         ; ---- compare with what this buffer shows for the row
@@ -533,6 +567,7 @@ DrawRoadRow:
         jr .rangesSame
 .rangesChanged:
         call StalePieces        ; old kerb cells no longer in the ranges
+        call StaleHitsCar
         call ZeroStaleRow       ; clear them on all 8 lines of the row
 .rowStore:
         ld a, 1
@@ -587,9 +622,8 @@ DrawRoadRow:
         ld (DrawRoadLine.gn + 1), a
         ld a, (RowB)
         sub (hl)                ; left kerb width
-        call LdiEntry
+        call DualEntry
         ld (DrawRoadLine.lcall + 1), hl
-        ld (DrawRoadLine.lcall2 + 1), hl
         ld a, (RowC)
         ld (DrawRoadLine.kc + 1), a
         add a, low StripR + STRIP_PAD
@@ -597,9 +631,8 @@ DrawRoadRow:
         ld a, (RowD)
         ld hl, RowC
         sub (hl)                ; right kerb width
-        call LdiEntry
+        call DualEntry
         ld (DrawRoadLine.rcall + 1), hl
-        ld (DrawRoadLine.rcall2 + 1), hl
         ; centre line cells must satisfy b <= col and col + 1 < c
         ld a, (RowB)
         ld (DrawRoadLine.lb + 1), a
@@ -621,10 +654,13 @@ DrawRoadRow:
         jr c, .notCar
         ld a, $FF
         ld (DrawRoadLine.lb + 1), a
-        ld a, (RowForced)
+        ld a, (RowForced)       ; stale kerb cells cleared under the car?
+        or a
+        jr z, .k1
+        ld a, (RowStaleCar)
         or a
         jr nz, .carDirty
-        ld a, (RowA)            ; left kerb cells [a, b) overlap columns 12-19?
+.k1:    ld a, (RowA)            ; left kerb cells [a, b) overlap columns 12-19?
         cp CAR_COL + CAR_W
         jr nc, .k2
         ld a, (RowB)
@@ -671,18 +707,21 @@ DrawRoadRow:
 
 
 
-; A = width in bytes (clamped to STRIP_PAD) -> HL = LDI chain entry
-LdiEntry:
+; A = width in bytes (clamped to STRIP_PAD) -> HL = entry into the
+; dual-write chain (7 bytes per byte copied, see main.asm)
+DualEntry:
         cp STRIP_PAD + 1
         jr c, .ok
         ld a, STRIP_PAD
-.ok:    ld hl, LdiEnd
-        or a
-        ret z
+.ok:    ld l, a
         add a, a
+        add a, a
+        add a, a
+        sub l                   ; 7 * width
         neg
+        add a, low DualEnd
         ld l, a
-        dec h
+        ld h, high DualEnd
         ret
 
 ; Write the row's attributes: [0,a) grass, [a,b) kerb, [b,c) road, [c,d) kerb, [d,32) grass
@@ -803,6 +842,35 @@ StalePieces:
         ld (ZeroStaleRow.p4 + 1), hl
         ret
 
+; RowStaleCar = 1 if a stale piece (car rows only) overlaps the car's columns
+StaleHitsCar:
+        xor a
+        ld (RowStaleCar), a
+        ld a, (CurRow)
+        cp CAR_ROW
+        ret c
+        ld hl, ZeroStaleRow.p1 + 1
+        call .chk
+        ld hl, ZeroStaleRow.p2 + 1
+        call .chk
+        ld hl, ZeroStaleRow.p3 + 1
+        call .chk
+        ld hl, ZeroStaleRow.p4 + 1
+.chk:   ld a, (hl)              ; start
+        inc hl
+        ld b, (hl)              ; count
+        inc b
+        dec b
+        ret z
+        cp CAR_COL + CAR_W
+        ret nc                  ; right of the car
+        add a, b
+        cp CAR_COL + 1
+        ret c                   ; left of it
+        ld a, 1
+        ld (RowStaleCar), a
+        ret
+
 ; Clear the stale kerb cells (pieces patched by StalePieces) on all 8 lines
 ; of the current row, a column strip at a time.
 ZeroStaleRow:
@@ -847,7 +915,8 @@ ZeroStaleRow:
 ; Draw road line C (preserved) at bitmap address IX (preserved).
 ; Row constants (patched by DrawRoadRow): forced, merged, ka/ga/gc = a,
 ; kl = a + STRIP_PAD, kc = c, kr = low StripR + STRIP_PAD + c, gn = d - a,
-; lb = b, lc = c - 1, lcall / rcall = LDI chain entries for the kerb widths.
+; lb = b, lc = c - 1, lcall / rcall = dual-write chain entries for the kerb
+; widths (each byte goes to both lines of the pair).
 ; Frame constants: s1a / s1b (D/E state), s2a / s2b (centre line state).
 DrawRoadLine:
         ld l, c
@@ -967,28 +1036,14 @@ DrawRoadLine:
         ld a, ixh
         ld d, a                 ; DE = left kerb cells
 .lsrc:  ld hl, StripL
-        push hl
-        push de
-.lcall: call LdiEnd
-        pop de
-        pop hl
-        inc d                   ; and the second line of the pair
-.lcall2:
-        call LdiEnd
+.lcall: call DualEnd            ; both lines of the pair
         ld a, ixl
 .kc:    add a, 0
         ld e, a
         ld a, ixh
         ld d, a                 ; DE = right kerb cells
 .rsrc:  ld hl, StripR
-        push hl
-        push de
-.rcall: call LdiEnd
-        pop de
-        pop hl
-        inc d
-.rcall2:
-        call LdiEnd
+.rcall: call DualEnd
         pop bc
         jr .lane
 

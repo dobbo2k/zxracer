@@ -20,10 +20,17 @@ start:
         ei
         call GoTitle
 
+; Each game frame: logic and the road's shape first - none of it touches
+; the screen, so it runs while the last frame still waits for its flip -
+; then, once that buffer is on show, draw the other one and ask for a flip.
 MainLoop:
         BORDER 1                ; blue: game logic
         call ReadInput
         call UpdatePlayer
+        BORDER 2                ; red: road
+        call RoadPrepare
+        BORDER 0                ; black: waiting for the last flip
+        call WaitFlip
         call SelectBackBuffer
         BORDER 3                ; magenta: sprites
         call EraseSprites
@@ -37,8 +44,7 @@ MainLoop:
         call DrawCar
         BORDER 5                ; cyan: HUD
         call DrawHud
-        BORDER 0                ; black: waiting for flip
-        call FlipBuffers
+        call RequestFlip
         jr MainLoop
 
         INCLUDE "interrupt.asm"
@@ -72,6 +78,21 @@ TablesEnd:
         EDUP
 PanoLdiEnd:
         ret
+
+; Dual-write chain for the road's kerb bytes: entered at DualEnd - 7*n to
+; copy n bytes (HL) -> (DE) and (DE + 256), the two lines of a line pair
+        DUP STRIP_PAD
+        ld a, (hl)
+        ld (de), a
+        inc d
+        ld (de), a
+        dec d
+        inc l
+        inc e
+        EDUP
+DualEnd:
+        ret
+        ASSERT high (DualEnd - 7 * STRIP_PAD) == high DualEnd
         ASSERT $ <= XOR_END - 5 * 8
 
 ; Unrolled XOR chain for sprites: entered at XorEnd - 5*n for n bytes
@@ -99,14 +120,7 @@ hv      DEFL 0
         db hv
 hv      DEFL hv + 1
         EDUP
-        ASSERT $ <= LDI_END - 2 * STRIP_PAD
-
-; Unrolled LDI chain: entered at LdiEnd - 2*n to copy n bytes (HL) -> (DE)
-        ORG LDI_END - 2 * STRIP_PAD
-        DUP STRIP_PAD
-        ldi
-        EDUP
-LdiEnd: ret
+        ASSERT $ <= FILL_END - 64
 
 ; Unrolled fill: entered at FILL_END - 2*n to write n bytes (see FillA)
         ORG FILL_END - 64

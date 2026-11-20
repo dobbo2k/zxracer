@@ -182,6 +182,7 @@ GoalScreen:
 
 ; Mute the game's sound, keep the last game frame on show (screen B).
 ScreensEnter:
+        call WaitFlip
         ld a, 1
         ld (Mute), a
         call Silence

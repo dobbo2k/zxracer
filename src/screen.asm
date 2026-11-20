@@ -99,9 +99,10 @@ SelectBackBuffer:
         ld (AttrHi), a
         ret
 
-; Ask the interrupt handler to display the buffer just drawn, wait for it,
-; then swap roles.
-FlipBuffers:
+; Ask the interrupt handler to display the buffer just drawn (at least
+; MIN_FRAMES after the last flip) and swap roles. Does not wait: the next
+; frame's logic runs meanwhile.
+RequestFlip:
         ld a, (BackBuf)
         or a
         ld a, P7FFD_ROM48 | 7                ; show A
@@ -110,14 +111,19 @@ FlipBuffers:
 .set:   ld (FlipValue), a
         ld a, 1
         ld (FlipPending), a
-.wait:  halt
-        ld a, (FlipPending)
-        or a
-        jr nz, .wait
         ld a, (BackBuf)
         xor 1
         ld (BackBuf), a
         ret
+
+; Wait until a requested flip has happened (before drawing into the back
+; buffer, or touching the paging or the screens).
+WaitFlip:
+.wait:  ld a, (FlipPending)
+        or a
+        ret z
+        halt
+        jr .wait
 
 ; A = value, B = count (0-32), HL = destination; advances L only.
 FillA:

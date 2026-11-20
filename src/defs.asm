@@ -14,7 +14,6 @@ AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the gam
 TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)
 PANO_LDI_END    EQU $BA00       ; unrolled 32-LDI chain for the panorama
 XOR_END         EQU $BB00       ; unrolled XOR chain ends here (with JP (IY))
-LDI_END         EQU $BC00       ; unrolled LDI chain ends here (with RET)
 SCN_DATA        EQU $5B00       ; scenery sprites: spare RAM in bank 5 (always paged)
 FILL_END        EQU $BD00       ; unrolled fill block ends here (with RET)
 ISR_JP          EQU $BDBD       ; IM2 lands here: JP Isr

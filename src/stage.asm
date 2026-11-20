@@ -22,6 +22,9 @@ NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 ; A = stage index: load its theme and track, reset the track state and
 ; the display.
 LoadStage:
+        push af
+        call WaitFlip           ; (no flip may happen while banks are paged)
+        pop af
         ld (Stage), a
         ld l, a
         ld h, 0
@@ -156,6 +159,7 @@ CopyFromBank:
 ; Start both buffers afresh in the new palette: bitmaps, attributes, HUD
 ; labels, and every per-buffer record of what is on screen.
 ResetDisplay:
+        call WaitFlip
         call InitScreens
         xor a
         call InitHud

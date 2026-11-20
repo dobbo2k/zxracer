@@ -210,6 +210,8 @@ Main loop @25 Hz:
   3. draw horizon → road → sprites (far→near) → player car into BACK buffer
   4. update HUD cells that changed
   5. wait for frame counter ≥ 2, flip $7FFD bit 3 at the start of vertical blank
+  (as built: logic and the road's shape run while the previous frame waits for
+  its flip; see §3.6, "Overlapped frame pipeline")
 ```
 
 ### 3.6 Performance budget per game frame (25 fps)
@@ -235,6 +237,18 @@ Main loop @25 Hz:
 | M2+M3 | attract-mode lap of the curvy test track, road + car | 147,000 + 5,800 | 18.6 fps |
 | M4+M5 | lap with scenery and panorama; road paired lines, depth-weighted curves | 117,400 (peak 160,000) | 19.3 fps (2 TV frames 43%, 3 frames 54%, 4 frames 3%) |
 | M7 | traffic, signs, frame rate locked to 3 TV frames | 118,000 (peak 152,000) + sprites 43,000 | 15.7 fps (3 TV frames 83%, 4 frames 17%) |
+| Before M11 | full autopilot game with hills, forks, momentum (work 220–250k on bends) | ~165,000 | 12.5–13 fps on bends and hills |
+| M11 pass 1 | same: logic and road shape overlapped with the flip wait, dual-line kerb chain, unrolled pass 1, car redraw only when touched, table-based `ZLine` | ~155,000 | 15.6 fps over the whole game (16–16.5 on stage 1) |
+
+**Overlapped frame pipeline (M11):** the main loop runs the game logic and the
+road's shape for the next frame (`RoadPrepare`: curve list, fork, pass 1, hill
+mapping, bands - nothing that touches the screen) while the frame just drawn
+still waits for its flip, then `WaitFlip`, draws the back buffer and
+`RequestFlip`s without waiting. A frame that needs a little over 3 TV frames no
+longer costs a whole 4th: the rate averages out instead of dropping to 12.5 fps.
+Anything that pages banks or writes the screens outside the drawing phase
+(stage loads, title / goal screens, display resets) waits for a pending flip
+first.
 
 The 30k road budget was unrealistic for 96 scanlines on a 3.5 MHz Z80. **Decision:**
 the guaranteed minimum is 16.7 fps (212,700 T per game frame) with scenery and

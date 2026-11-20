@@ -31,6 +31,7 @@ RowD:           db 0
 RowBand:        db 0
 RowForced:      db 0
 RowMerged:      db 0
+RowStaleCar:    db 0            ; stale kerb cells under the car (car rows)
 RowRW0:         db 0
 RowRW1:         db 0
 Pass1PX:        dw $8000        ; PlayerX the pass-1 tables were built for

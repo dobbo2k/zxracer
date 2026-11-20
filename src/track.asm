@@ -126,30 +126,47 @@ BuildCurveList:
         ret
 
 ; DE = depth (>= 1) -> A = largest line i with Z[i] >= depth, i.e. the
-; nearest line that already lies beyond it ($FF if none).
-; Z decreases with i, so binary-search the first i with Z[i] < depth.
-ZLine:  ld bc, ROAD_LINES       ; B = lo = 0, C = hi = 96
-.bs:    ld a, b
-        cp c
-        jr z, .done
-        add a, c
-        rra
-        ld l, a                 ; mid
+; nearest line that already lies beyond it ($FF if none). Keeps BC, DE.
+; The depth tables (ZNear by 4 units, ZFar by 16) give a line at or below
+; the answer; then step up while Z[i] < depth.
+ZLine:  ld a, d
+        cp 4
+        jr nc, .far
+        ld l, e                 ; ZNear[depth >> 2]
+        ld a, d
+        srl a
+        rr l
+        srl a
+        rr l
+        ld h, high ZNear
+        ld a, (hl)
+        jr .ref
+.far:   cp 16
+        ld a, 2                 ; 4096 and beyond: lines 0-2 at most
+        jr nc, .ref
+        ld a, e                 ; ZFar[depth >> 4]
+        and $F0
+        or d
+        rrca
+        rrca
+        rrca
+        rrca
+        ld l, a
+        ld h, high ZFar
+        ld a, (hl)
+.ref:   cp $FF
+        ret z
+        ld l, a
         ld h, high ZLo
         ld a, (hl)
         sub e
         ld h, high ZHi
         ld a, (hl)
         sbc a, d
-        jr c, .less             ; Z[mid] < depth
-        ld b, l
-        inc b
-        jr .bs
-.less:  ld c, l
-        jr .bs
-.done:  ld a, b
+        ld a, l
+        ret nc                  ; Z[i] >= depth
         dec a
-        ret
+        jr .ref
 
 ; Called by RoadPass1 when it reaches a line in the curve list (A = line):
 ; switch to the next curvature(s) and arm the next boundary.
@@ -205,11 +222,14 @@ ApplyCurve:
         rr l
         ld a, l
         ld (RoadPass1.cl + 1), a
+        ld (RoadPass1.clb + 1), a
         ld a, h
         ld (RoadPass1.ch + 1), a
+        ld (RoadPass1.chb + 1), a
         rlca
         sbc a, a
         ld (RoadPass1.ch2 + 1), a
+        ld (RoadPass1.ch2b + 1), a
         pop bc
         pop hl
         ret
