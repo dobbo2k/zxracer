@@ -16,8 +16,9 @@ TunSky:         db C_, C_           ; the ceiling (white ink: the message line; 
 ; from the line where the road meets the tunnel (its edges size the
 ; opening); road rows it paints are marked so the road redraws them later.
 ; ---------------------------------------------------------------------------
-F_              EQU $08             ; the mountain face: blue rock
-A_              EQU $70             ; the arch: bright yellow (white would be lost in the snow)
+F_              EQU $09             ; the mountain face: blue rock (blue ink too: the
+                                    ; backdrop's pixels underneath must not show)
+A_              EQU $76             ; the arch: bright yellow, yellow ink (white would be lost in the snow)
 D_              EQU $00             ; dark
 S_              EQU $FF             ; (left as it is)
 C_              EQU $07             ; the ceiling: black, white ink
