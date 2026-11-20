@@ -143,9 +143,8 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   black kerbs and yellow lamps rush past, until the way out - the sky round
   the far road - opens up. With the engine sound (options), the engine
   booms off the walls.
-- **Between stages:** the music fades out over the stage's last stretch, a
-  drum fill plays while the next stage loads, and the new stage's tune swells
-  in.
+- **Between stages:** a drum fill plays while the next stage loads, its
+  colours sweep down the screen, and the new stage's tune swells in.
 - **The goal's gantry:** a chequered beam on red posts spans the road over
   the finish. Running into one from behind slows you right down; hit one that is
   much slower than you (at speed) and the car spins out, sliding on in a cloud of

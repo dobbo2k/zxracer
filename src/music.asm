@@ -593,13 +593,12 @@ MusicStart:
 ; src/musicb2.asm, bank 2)
 
 ; ---------------------------------------------------------------------------
-; Between stages the music fades out over the stage's last 2048 units, and
-; the next stage's tune comes in quietly (the stage overlay sets FadeIn) and
-; swells over a second; the loader plays a drum fill in between
-; (src/stageov.asm). Each interrupt (MusicPlay): FadeAtt, the larger of the
-; two, comes off every music volume (Atten).
+; Between stages: the music plays on to the checkpoint, the loader plays a
+; drum fill (src/stageov.asm) and sets FadeIn, and the next stage's tune
+; comes in quietly and swells over a second. Each interrupt (MusicPlay):
+; FadeAtt comes off every music volume (Atten).
 MusicFade:
-        ld hl, FadeIn           ; coming in: a step every 4 interrupts
+        ld hl, FadeIn           ; a step every 4 interrupts
         ld a, (FrameCount)
         and 3
         jr nz, .k
@@ -607,26 +606,7 @@ MusicFade:
         or a
         jr z, .k
         dec (hl)
-.k:     ld b, (hl)
-        ld a, (Mute)            ; (the front end's tunes: no fading out)
-        or a
-        jr nz, .set
-        ld hl, (StageLen)       ; going out: 15 - (units left) / 128
-        ld de, (Pos)
-        or a
-        sbc hl, de
-        jr nc, .left
-        ld hl, 0                ; (past the end, before the checkpoint: still out)
-.left:  ld a, h
-        cp 2048 / 256
-        jr nc, .set
-        add hl, hl
-        ld a, 15
-        sub h
-        cp b
-        jr c, .set
-        ld b, a
-.set:   ld a, b
+.k:     ld a, (hl)
         ld (FadeAtt), a
         ret
 

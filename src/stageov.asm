@@ -149,6 +149,7 @@ OvCheckpoint:
         pop af
         call LoadStage
         call FillEnd            ; the fill's last hit; the next tune will swell in
+        call Sweep              ; the new stage's colours down the screen
         ld hl, (StageClock)     ; (the time, for the message)
         push hl
         ld hl, 0
@@ -602,8 +603,54 @@ CopyToCache:
         jr .chunk
 
 ; ---------------------------------------------------------------------------
-; The drum fill between stages, while this loads (src/music.asm fades the
-; music out before and the next tune in after): every FILL_GAP frames a hit
+; The change of stage on screen: once the new stage is loaded, its colours
+; sweep down the frozen last frame (screen B, on show), two character rows a
+; frame - sky, the backdrop's band, grass in light and dark bands - the old
+; picture's pixels hidden (ink the paper's colour). The display reset after
+; it clears the screen and the game draws the new stage.
+Sweep:
+        ld hl, $D800 + 3 * 32
+        ld c, 3                 ; row
+.row:   ld a, c
+        cp PANO_ROW0
+        ld a, (PalSky)
+        jr c, .col
+        ld a, c
+        cp ROAD_ROW0
+        ld a, (PalPano)
+        jr c, .col
+        bit 1, c                ; (bands of two rows)
+        ld a, (PalGrassL)
+        jr z, .col
+        ld a, (PalGrassD)
+.col:   and $78                 ; bright and paper; the ink the same
+        ld b, a
+        rrca
+        rrca
+        rrca
+        and 7
+        or b
+        ld b, 32
+.fill:  ld (hl), a
+        inc hl
+        djnz .fill
+        bit 0, c                ; every second row: the next frame
+        call nz, .frame
+        inc c
+        ld a, c
+        cp 24
+        jr c, .row
+        ret
+.frame: ld a, (FrameCount)
+        ld b, a
+.w:     ld a, (FrameCount)
+        cp b
+        jr z, .w
+        ret
+
+; ---------------------------------------------------------------------------
+; The drum fill between stages, while this loads (the next tune then swells
+; in: src/music.asm): every FILL_GAP frames a hit
 ; of noise through channel A's envelope - the AY lets it die away by itself,
 ; the loading goes on - and a longer, deeper one to end on.
 FILL_GAP        EQU 3               ; frames between hits

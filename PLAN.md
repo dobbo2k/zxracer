@@ -522,13 +522,15 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   at volume 9 (`TunEcho`). Room: buffer B's sprite command list moved to the
   top 120 bytes of bank 7, which every theme pack now leaves free
   (`THEME_TOP`).
-- **Between stages** *(as built)*: the music fades out over a stage's last
-  2048 units (`MusicFade`: `FadeAtt` = 15 - units left / 128 comes off
-  every music volume, `Atten`); at the checkpoint the stage overlay mutes the
-  interrupt's sound and plays a drum fill while it loads - a hit every 3
+- **Between stages** *(as built)*: at the checkpoint the stage overlay mutes
+  the interrupt's sound and plays a drum fill while it loads - a hit every 3
   frames of noise through channel A's hardware envelope (the AY decays it,
   so no interrupt code is needed), and a longer, deeper last one - then sets
-  `FadeIn` so the next tune swells in over a second. Room: small variables
+  `FadeIn` so the next tune swells in over a second (`MusicFade`, `Atten`).
+  Once loaded, the new stage's colours sweep down the frozen last frame two
+  rows a frame (`Sweep`: sky, backdrop band, grass bands, the old pixels
+  hidden), then the display reset. (A fade-out over the stage's last stretch
+  was tried and taken out after play testing.) Room: small variables
   and tables moved from bank 5 into the table pages' holes, the track cache
   shrank to 608 bytes (the two longest stages lose a little small scenery
   to fit).
