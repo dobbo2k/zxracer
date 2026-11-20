@@ -31,6 +31,7 @@ THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
 TRACK_CACHE = 0x7D80                # bank 5, after the resident data and code
 FRONTEND_RESERVE = 7168             # room kept in a pack bank for the front-end overlay
+THEME_TOP = 120                    # the cache's last bytes stay free (src/main.asm: CmdListB)
 PAR_V = 17                         # par times: depth units per 50 Hz frame on a straight
 PAR_K = 1600                       # ... and sqrt(PAR_K / |curve|) on a curve
 STAGEOV_RESERVE = 1536              # ... and for the between-stages overlay (run at $4000)
@@ -41,7 +42,7 @@ PANO_W, PANO_H = 256, 16
 PANO_COPIES, PANO_STEP = 2, 4         # pre-rotated copies of the panorama (src/horizon.asm)
 SHARED_TYPES = ["sign_r", "sign_l", "fork"]          # in every theme pack
 TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 4, 5, 8, 9
-            "van": 6, "truck": 7}
+            "van": 6, "truck": 7, "sign_tunnel": 10}         # (10: themes with tunnels only)
 LANDMARK_SHARE = 0.18               # of the big roadside scenery: the theme's landmark
 SMALL2_SHARE = 0.4                  # of the small scenery: the theme's second small type
 RESIDENT_TYPES = ["traffic", "van", "truck"]          # in bank 5
@@ -225,6 +226,9 @@ def make_track(row, seed, theme):
     tunnel = tunnel_for(row, seed, theme, stage_len)
     if tunnel:                                       # nothing at the roadside in the tunnel
         objs = [o for o in objs if not tunnel[0] - 600 <= o[0] <= tunnel[1] + 200]
+        ts = tunnel[0]                               # warning signs before it
+        objs += [(ts - 1700, 250, TYPE_IDS["sign_tunnel"]), (ts - 1700, -250, TYPE_IDS["sign_tunnel"]),
+                 (ts - 1000, 250, TYPE_IDS["sign_tunnel"])]
     # no scenery right on the road edge near curve signs etc.: keep sorted, unique z
     objs.sort()
     return merge_hills(segs, hills), objs, stage_len, tunnel
@@ -318,7 +322,7 @@ def theme_pack(name, theme):
     # DrawForkRow finds the kerb cells it drew by their attributes
     assert {pal["kerb_l"], pal["kerb_d"]}.isdisjoint(
         {pal["grass_l"], pal["grass_d"], pal["road"]}), name
-    types = SHARED_TYPES + theme["types"]
+    types = SHARED_TYPES + theme["types"] + (["sign_tunnel"] if theme.get("tunnels") else [])
     out = [f"        MODULE {name}",
            "        dw TypeDir, Panorama, Name",
            "        db " + ", ".join(str(pal[k]) for k in
@@ -342,8 +346,8 @@ def theme_pack(name, theme):
         out += consts + dirl + data
         size += scn.type_bytes(t)
     out.append("        ENDMODULE")
-    if size > THEME_CACHE_SIZE:
-        raise SystemExit(f"theme {name}: {size} bytes, the cache holds {THEME_CACHE_SIZE}")
+    if size > THEME_CACHE_SIZE - THEME_TOP:
+        raise SystemExit(f"theme {name}: {size} bytes, the cache holds {THEME_CACHE_SIZE - THEME_TOP}")
     return out, size
 
 

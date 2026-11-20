@@ -806,6 +806,7 @@ RowAttrs:
         ld a, (AttrHi)
         add a, h
         ld h, a
+        push hl
         ld a, (RowBand)
         ld bc, (PalGrassL)      ; C = light grass, B = dark grass
         ld de, (PalKerbL)       ; E = light kerb, D = dark kerb
@@ -847,7 +848,30 @@ RowAttrs:
         add a, 33
         ld b, a
         ld a, d
-        jp FillA
+        call FillA
+        pop hl                  ; (the row's first cell)
+        ld a, (RowBand)         ; a tunnel's light band: lamps on the walls,
+        cp $80                  ; the cells beside the kerbs (only from inside)
+        ret nz
+        ld a, (TunInside)
+        or a
+        ret z
+        ld a, (RowA)
+        or a
+        jr z, .lr
+        dec a
+        add a, l
+        ld e, a
+        ld d, h
+        ld a, TUN_LAMP
+        ld (de), a
+.lr:    ld a, (RowD)
+        cp 32
+        ret nc
+        add a, l
+        ld l, a
+        ld (hl), TUN_LAMP
+        ret
 
 ; Old kerb cells that are not part of the new kerb ranges must be cleared on
 ; every line of the row: [oA, min(oB, a)), [max(oA, b), oB),

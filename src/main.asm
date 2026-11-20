@@ -158,6 +158,9 @@ TunEnd:         dw 0
 TunInside:      db 0            ; the car is in it (the sky is its ceiling)
 TunJ0:          db 0            ; road lines in it this frame: TunJ0 .. TunJ0 + TunJN - 1
 TunJN:          db 0
+GateZ:          dw 0            ; this stage's gantry (src/tunnelb2.asm)
+GateWas:        db 0            ; it was drawn (its sky rows to be painted afresh)
+GatePat:        ds 5            ; a gantry row's colours (src/tunnelb2.asm)
 ; (cleared together at a new run)
 MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
 StageClock:     dw 0            ; 50 Hz frames on this stage
@@ -167,9 +170,14 @@ Traffic:        ds N_TRAFFIC * CAR_SIZE
         ASSERT $ <= IM2_TABLE
         ORG IM2_TABLE + 257
 Bss2:
-CmdListA:       db 0            ; buffer A's sprite commands (B's: src/vars.asm)
+CmdListA:       db 0            ; buffer A's sprite commands
                 ds MAX_SPR * CMD_SIZE
         ASSERT $ <= STACK_TOP - 128  ; (the stack keeps 128 bytes)
+; Buffer B's: the top of bank 7, which no theme pack reaches (make_stages.py
+; keeps THEME_TOP free; bank 7 is paged in all through a game)
+THEME_TOP       EQU 120
+CmdListB        EQU $10000 - THEME_TOP
+        ASSERT 1 + MAX_SPR * CMD_SIZE <= THEME_TOP
 
         INCLUDE "holes.asm"     ; small data in the unused ends of the table pages
 

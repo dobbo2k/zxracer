@@ -83,8 +83,6 @@ SprSrc:         dw 0
 SprStride:      dw 0
 CmdPtr:         dw 0
 CmdList:        dw CmdListA
-CmdListB:       db 0
-                ds MAX_SPR * CMD_SIZE
 
 ; horizon
 HorizonX:       dw 0            ; scroll, 8.8 pixels

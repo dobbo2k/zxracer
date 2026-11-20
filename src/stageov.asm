@@ -399,6 +399,16 @@ StageHeaders:
         sbc a, a
         and 1
         ld (HasFork), a
+        ld hl, (ForkZ)          ; the gantry: just before the fork, or at the goal
+        ld de, -200
+        or a
+        jr nz, .gate
+        ld hl, (StageLen)
+        ld de, -150
+.gate:  add hl, de
+        ld (GateZ), hl
+        xor a
+        ld (GateWas), a
         ld hl, 0
         ld (PlayerDx), hl
         ld (SegStart), hl

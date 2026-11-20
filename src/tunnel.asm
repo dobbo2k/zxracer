@@ -6,7 +6,8 @@
 ; its ceiling and the backdrop is not drawn.
 ; ---------------------------------------------------------------------------
 TunWall:        db $48, $08         ; walls: bright blue, blue (light / dark bands)
-TunKerbs:       db $70, $00         ; kerbs: bright yellow, black
+TUN_LAMP        EQU $76             ; lamps on the walls (src/road.asm RowAttrs): bright yellow
+TunKerbs:       db $78, $00         ; kerbs: bright white, black
 TunSky:         db C_, C_           ; the ceiling (white ink: the message line; the backdrop is cleared)
 
 ; ---------------------------------------------------------------------------
@@ -25,9 +26,11 @@ ARCH_MIN        EQU 24              ; the road's width (pixels) at the mouth fro
 C_              EQU $07             ; the ceiling: black, white ink
 
 DrawPortal:
+        xor a
+        ld (PtGate), a
         ld a, (TunJN)
         or a
-        ret z
+        jp z, Gate              ; (no tunnel in view: perhaps a gantry, src/tunnelb2.asm)
         ld a, (TunInside)
         or a
         ld hl, Band + ROAD_LINES - 2
@@ -45,6 +48,7 @@ DrawPortal:
         ret
 .found: ld a, l
         sub low Band
+.atLine:                        ; (A = the screen line; Gate comes in here)
         ld l, a
         add a, ROAD_ROW0 * 8
         ld (PtY), a             ; its screen line
@@ -150,7 +154,20 @@ DrawPortal:
         and 7
         or c
         ld (PatOut + 2), a
-        ld a, (TunInside)
+        ld a, (PtGate)          ; a gantry: its beam (two rows when it is wide), then the posts
+        or a
+        jr z, .tun
+        ld a, (PtN + 2)
+        cp 10
+        ld a, b
+        jr c, .b1
+        dec a
+.b1:    dec a
+        cp 3
+        jr nc, .row
+        ld a, 3
+        jr .row
+.tun:   ld a, (TunInside)
         or a
         ld a, 3
         jr nz, .row             ; (the way out: the whole ceiling, as the opening moves)
@@ -167,30 +184,15 @@ DrawPortal:
         cp (hl)
         ret nc
         call PortalRow
+        call Chequer            ; (a gantry's beam)
         ld a, (PtR)
         inc a
         jr .row
 
-; A -> A / 8
-Cell:   rrca
-        rrca
-        rrca
-        and 31
-        ret
-
 ; A = row: its five runs in the colours of its kind
 PortalRow:
         ld c, a
-        ld l, a
-        ld h, 0
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        ld a, (AttrHi)
-        add a, h
-        ld h, a
+        call RowAttrHL
         ld a, c
         sub ROAD_ROW0
         jr c, .kind
@@ -202,7 +204,10 @@ PortalRow:
         ld h, a
         ld (hl), 1
         pop hl
-.kind:  ld de, PatFace
+.kind:  ld a, (PtGate)
+        or a
+        jp nz, GateKind         ; (src/tunnelb2.asm)
+        ld de, PatFace
         ld a, (PtTop)
         dec a
         cp c
@@ -257,16 +262,36 @@ PortalRow:
         pop ix
         ret
 
-PatFace:        db F_, F_, F_, F_, F_
-PatArch:        db F_, A_, A_, A_, F_
-PatSky:         db F_, A_, D_, A_, F_
-PatRoad:        db F_, A_, S_, A_, F_
-PatOut:         db C_, C_, 0, C_, C_    ; (the sky, set per frame)
-                db D_, D_, S_, D_, D_
-PatCeil:        db C_, C_, C_, C_, C_   ; (the way out: above the opening)
 PtN:            ds 5
 PtY:            db 0
 PtRow:          db 0
 PtTop:          db 0
 PtR:            db 0
 PtFar:          db 0                ; $FF: too far for the arch
+PtGate:         db 0                ; drawing a gantry, not a tunnel
+
+; ---------------------------------------------------------------------------
+; Engine sound mode, no beep on C (EngineSounds): in a tunnel the engine
+; booms - C plays it again a little off its pitch and quieter, beating
+; against it like an echo off the walls. (With music on, A, B and C are all
+; the music's.)
+TunEcho:
+        ld a, (TunInside)
+        or a
+        ld e, %00101110         ; out of one: tone A, noise B
+        jp z, EngineSounds.mw
+        ld hl, (EnginePeriod)
+        inc hl
+        inc hl
+        inc hl
+        ld e, l
+        ld a, 4
+        call AyWrite
+        ld e, h
+        ld a, 5
+        call AyWrite
+        ld e, 9
+        ld a, 10
+        call AyWrite
+        ld e, %00101010         ; tone A and C, noise B
+        jp EngineSounds.mw

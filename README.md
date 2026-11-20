@@ -137,10 +137,14 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   lanes. Later rows bring more of them, more lorries and vans, more lane
   changes, and drivers who swerve into your path as you close in (from row 2,
   more often each row) - on top of longer stages with sharper bends.
-- **Tunnels:** each Alpine Pass stage drives through the mountain: a rock
-  face with a yellow arch and a dark mouth grows ahead of you, then the sky
-  becomes the tunnel's ceiling and blue walls with yellow and black kerbs
-  rush past, until the way out - the sky round the far road - opens up. Running into one from behind slows you right down; hit one that is
+- **Tunnels:** each Alpine Pass stage drives through the mountain. TUNNEL
+  signs warn you; a rock face with a yellow arch and a dark mouth grows ahead,
+  then the sky becomes the tunnel's ceiling and blue walls with white and
+  black kerbs and yellow lamps rush past, until the way out - the sky round
+  the far road - opens up. With the engine sound (options), the engine
+  booms off the walls.
+- **Gantries:** a chequered beam on red posts spans the road just before
+  each fork (the checkpoint) and over the finish at the goal. Running into one from behind slows you right down; hit one that is
   much slower than you (at speed) and the car spins out, sliding on in a cloud of
   tyre smoke until it stops, and she lets him have it (with lines of its own:
   "< YOU TAILGATED HIM!"). Driving into a palm off

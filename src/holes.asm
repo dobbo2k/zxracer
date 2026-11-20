@@ -226,7 +226,7 @@ EngineSounds:
         call AyWrite
 .bp:    ld e, %00101010
         jr .mw
-.mx:    ld e, %00101110
+.mx:    jp TunEcho              ; (src/tunnel.asm: C free - a tunnel's echo?)
 .mw:    ld a, 7
         jp AyWrite
 ; (a checkpoint message: moved here from bank 5 for room)

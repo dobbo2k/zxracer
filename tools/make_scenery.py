@@ -144,6 +144,20 @@ def sign(direction):
     return draw
 
 
+def sign_tunnel():
+    """Tunnel warning: a board on a post with a tunnel mouth cut out of it -
+    an arch over the road - 160 x 160."""
+    W, H = 160, 160
+    im = Image.new("L", (W, H), 0)
+    d = ImageDraw.Draw(im)
+    d.rectangle([70, 70, 90, 159], fill=255)                        # post
+    d.rounded_rectangle([4, 4, 156, 96], radius=10, fill=255)        # board
+    d.pieslice([34, 18, 126, 110], 180, 360, fill=0)                 # the arch ...
+    d.rectangle([34, 63, 126, 84], fill=0)                           # ... and its sides
+    d.polygon([(72, 84), (88, 84), (98, 64), (62, 64)], fill=255)    # the road going in
+    return im
+
+
 def fork():
     """Fork marker: a wide board with arrows both ways on two posts, 192 x 128."""
     W, H = 192, 128
@@ -396,6 +410,7 @@ TYPES = {
     "sign_r": (sign(1), 0.5, SHIFTS_SCENERY),
     "sign_l": (sign(-1), 0.5, SHIFTS_SCENERY),
     "fork": (fork, 0.6, SHIFTS_SCENERY),
+    "sign_tunnel": (sign_tunnel, 0.5, SHIFTS_SCENERY),
     "bush": (bush, 0.35, SHIFTS_SCENERY),
     "cactus": (cactus, 0.85, SHIFTS_SCENERY),
     "rock": (rock, 0.35, SHIFTS_SCENERY),

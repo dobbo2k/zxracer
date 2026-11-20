@@ -508,6 +508,18 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   redraws them. About 7% off the frame rate while a tunnel is in view. Room
   came from drawing the timer's big digits from the font (`PrintBig`,
   -250 bytes of bank 5) and moving small routines into bank 2's gaps.
+- **Gantries, tunnel signs, lamps and echo** *(as built)*: `GateZ` (set at a
+  stage start: 200 units before the fork's split, or 150 before the goal)
+  is drawn by the tunnel's mouth painter when no tunnel is in view
+  (`Gate`, `GateKind`: posts and a beam in the row runs; `Chequer`
+  alternates the beam's cells); once past, the sky rows are painted afresh.
+  The alpine theme has an extra scenery type (id 10, `sign_tunnel`), placed
+  1700 and 1000 units before each tunnel. In a tunnel's light bands
+  `RowAttrs` lights the wall cell beside each kerb (lamps, from inside
+  only); in the engine sound mode C plays the engine 3 steps off its pitch
+  at volume 9 (`TunEcho`). Room: buffer B's sprite command list moved to the
+  top 120 bytes of bank 7, which every theme pack now leaves free
+  (`THEME_TOP`).
 - **Hills** *(as built)*: the hill value under the car changes the speed every
   frame (2/256 per unit: climbs slow it, descents help).
 - **Stages:** 15 original stages (coast, desert, alpine pass, forest, city night,
