@@ -72,8 +72,8 @@ Freeing memory *(as built)*:
   `ResetDisplay`) and two tables read a little past their end. The crew's
   lines, the high-score table, the route and the lamp graphic live there;
   `gen_tables.py` marks each table's end and the build asserts nothing grows
-  into them. About 400 bytes of holes are still free (the biggest: 160 bytes
-  after `ZHi` minus 142 used, 150 after the strips).
+  into them. About 390 bytes of holes are still free, the biggest piece
+  164 bytes in the strip page.
 - **Car frames** as shared top and bottom parts: the drift frames' two smoke
   puffs differ only in the bottom cell row (`png2zx.py` split mode).
 
