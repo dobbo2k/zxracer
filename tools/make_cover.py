@@ -690,17 +690,19 @@ def hair_stream(x, y, front):
     for k in range(n):
         t = k / max(1, n - 1)
         if front:
-            p0 = (x + 26 + r.uniform(-6, 6), y + 10 + t * 26)
-            p3 = (x + 150 + t * 60 + r.uniform(-10, 10), y + 50 + t * 40 + r.uniform(-8, 8))
-            p1 = (x + 70, y + 4 + t * 20)
-            p2 = (x + 110 + t * 30, y + 60 + t * 20)
-            w = r.uniform(8, 13)
+            # blown back towards us: over the headrest and down her right shoulder,
+            # inside the cockpit (clear of the windscreen frame)
+            p0 = (x + 14 + t * 16 + r.uniform(-4, 4), y + 4 + t * 22)
+            p1 = (x + 44 + t * 8, y + 10 + t * 16)
+            p2 = (x + 62 + t * 6, y + 56 + t * 14)
+            p3 = (x + 66 + t * 14 + r.uniform(-4, 4), y + 96 + t * 18 + r.uniform(-6, 6))
+            w = r.uniform(8, 12)
         else:
-            p0 = (x + 20 + r.uniform(-8, 8), y - 30 + t * 60)
-            p3 = (x + 170 + t * 50 + r.uniform(-15, 15), y - 10 + t * 70 + r.uniform(-10, 10))
-            p1 = (x + 80, y - 40 + t * 40)
-            p2 = (x + 130, y + t * 40 - 10)
-            w = r.uniform(12, 18)
+            p0 = (x + 10 + r.uniform(-8, 8), y - 30 + t * 56)
+            p1 = (x + 46, y - 26 + t * 40)
+            p2 = (x + 64, y + 20 + t * 30)
+            p3 = (x + 70 + t * 10 + r.uniform(-6, 6), y + 70 + t * 30 + r.uniform(-6, 6))
+            w = r.uniform(12, 17)
         shape, spine = lock(p0, p1, p2, p3, w, "url(#hlock2)" if k % 3 == 0 else "url(#hlock)")
         o.append(shape)
         o.append(f'<path d="{smooth_d(spine[2:-2], False)}" stroke="#fff6c8" stroke-width="1.6" fill="none" '
