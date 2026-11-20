@@ -53,3 +53,51 @@ AyPut:  di
         call AyWrite
         ei
         ret
+
+; From the interrupt: the sound. A crash has the AY to itself while it lasts
+; (the music keeps time unheard); else the music, or without it the engine.
+SoundTick:
+        ld a, (Mute)
+        or a
+        jr z, .game
+        ld a, (GameState)       ; muted in a game: paused, silent
+        cp ST_PLAYING
+        ret z
+        ld a, (MusicOn)         ; the front end: its tune, if on
+        or a
+        ret z
+        jp MusicPlay
+.game:  ld a, (CrashOn)
+        or a
+        jr z, .noCrash
+        ld a, (MusicOn)
+        or a
+        call nz, MusicKeep
+        jp CrashTick
+.noCrash:
+        ld a, (MusicOn)
+        or a
+        jp nz, MusicPlay
+        jp EngineSounds
+
+; A = the speed at impact (0-20): the crash sound, bigger the faster - it
+; holds longer (speed / 2 interrupts) and fades slower (one step every
+; speed / 4 + 1), a thud above speed 6, debris above 12
+CrashStart:
+        ld (CrashI), a
+        ld b, a
+        srl a
+        ld (CrashHold), a
+        ld a, b
+        srl a
+        srl a
+        inc a
+        ld (CrashRate), a
+        ld (CrashCnt), a
+        ld a, 15
+        ld (CrashVol), a
+        xor a
+        ld (CrashAge), a
+        inc a
+        ld (CrashOn), a
+        ret

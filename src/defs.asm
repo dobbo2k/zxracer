@@ -1,5 +1,5 @@
 ; ---------------------------------------------------------------------------
-; ZX Racer - global constants and macros
+; Speed Run - global constants and macros
 ; ---------------------------------------------------------------------------
 
 ; Build options

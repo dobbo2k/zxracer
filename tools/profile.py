@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Profile ZX Racer using the PROFILE border bars logged by zxsim.
+"""Profile Speed Run using the PROFILE border bars logged by zxsim.
 
 Each phase of the main loop sets a border colour; this script turns the
 border-change log into average T-states per phase per game frame.

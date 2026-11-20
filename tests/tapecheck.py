@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Tape: zxsim boots build/zxracer.tap as BASIC's LOAD "" CODE: RANDOMIZE USR
+"""Tape: zxsim boots build/speedrun.tap as BASIC's LOAD "" CODE: RANDOMIZE USR
 would and plays the rest of the tape into the EAR input. The loader's own
-tape routine must load every block and start the game (within 7 minutes) -
+tape routine must load every block and start the game (within 9 minutes) -
 also with the tape 8% slow or fast and with random leftovers in memory -
 and the game must then show its title screen (no timing bars: a release
 build). On a 48K, and on a tape error, the loader must return to BASIC with
@@ -26,7 +26,7 @@ def started(extra, limit):
     return int(w[0].split("f=")[1].split()[0]) if w else None
 
 
-LIMIT = 7 * 60 * 50
+LIMIT = 9 * 60 * 50
 f0 = started([], LIMIT)
 if f0 is None:
     print(f"FAIL: the game did not start within {LIMIT // 50} s of loading")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate precomputed lookup tables for the ZX Racer engine.
+"""Generate precomputed lookup tables for the Speed Run engine.
 
 Writes an sjasmplus include file. Every table is 256-byte aligned so the
 engine can index it with a single 8-bit register (H = page, L = index).

@@ -128,7 +128,7 @@ HI_SIZE         EQU 7
 HiTable:
         db $00, $00, $06, $00, "ACE"
         db $00, $00, $05, $00, "SUN"
-        db $00, $00, $04, $00, "ZXR"
+        db $00, $00, $04, $00, "RUN"
         db $00, $00, $03, $00, "BOB"
         db $00, $00, $02, $00, "DOT"
 ; AY tone periods of the music's notes, C2 to B6 (tools/make_music.py)
@@ -290,3 +290,160 @@ DemoTraffic:
 .aim:   ld (DemoAim), hl
         ret
         ASSERT $ <= StateB2 + 256
+        ORG StateA3 + $8C
+        ASSERT RowABand_end <= StateA3 + $8C
+; A crash (CrashStart): the AY is its own until it fades. B: a noise burst,
+; a crack deepening to a rumble, held then fading; A: a falling, gritty
+; thud (or, spinning, the tyre squeal); C: clattering debris. From the
+; interrupt (AF, BC, DE, HL free).
+CrashTick:
+        ld a, %00101111         ; mixer: noise B on, the rest as we go
+        ld (CrMix), a
+        ld hl, CrashAge
+        inc (hl)
+        ld a, (CrashHold)
+        or a
+        jr z, .fade
+        dec a
+        ld (CrashHold), a
+        jr .vol
+.fade:  ld hl, CrashCnt
+        dec (hl)
+        jr nz, .vol
+        ld a, (CrashRate)
+        ld (hl), a
+        ld hl, CrashVol
+        dec (hl)
+        jr z, .end
+.vol:   ld a, (CrashVol)
+        ld e, a
+        ld a, 9
+        call AyWrite
+        ld a, (CrashAge)        ; noise: a crack, deepening
+        srl a
+        add a, 6
+        cp 31
+        jr c, .np
+        ld a, 31
+.np:    ld e, a
+        ld a, 6
+        call AyWrite
+        jp CrashTickA
+.end:   xor a
+        ld (CrashOn), a
+        ld e, a
+        ld a, 8
+        call AyWrite
+        ld e, 0
+        ld a, 9
+        call AyWrite
+        ld e, 0
+        ld a, 10
+        jp AyWrite
+        ASSERT $ <= StateA3 + 256
+        ORG StateB3 + $8C
+        ASSERT RowBBand_end <= StateB3 + $8C
+CrashTickA:                     ; A: squeal while spinning, else the thud
+        ld a, (Spin)
+        or a
+        jr z, .thud
+        ld a, (FrameCount)      ; the squeal: a wavering high tone
+        and 6
+        add a, 40
+        ld e, a
+        ld d, 0
+        ld a, 10
+        jr .tone
+.thud:  ld a, (CrashI)          ; the thud: falling (coarse period 2..9),
+        cp 6                    ; fading over 16 interrupts
+        jr c, .aoff
+        ld a, (CrashAge)
+        cp 16
+        jr nc, .aoff
+        ld e, a
+        srl a
+        add a, 2
+        ld d, a
+        ld a, 15
+        sub e
+        ld e, 0
+.tone:  ld (CrVolA), a
+        ld hl, CrMix
+        res 0, (hl)             ; tone A
+        res 3, (hl)             ; and noise A: grit
+        xor a
+        call AyWrite
+        ld e, d
+        ld a, 1
+        call AyWrite
+        ld a, (CrVolA)
+        ld e, a
+        jr .avol
+.aoff:  ld e, 0
+.avol:  ld a, 8
+        call AyWrite
+        jp CrashTickC
+        ASSERT $ <= StateB3 + 256
+        ORG StateA1 + $E0
+        ASSERT StAE_end <= StateA1 + $E0
+CrashMix:
+        ld a, (CrMix)
+        ld e, a
+        ld a, 7
+        jp AyWrite
+CrMix:          db 0
+CrVolA:         db 0
+CrashOn:        db 0
+CrashI:         db 0            ; the speed at impact
+CrashAge:       db 0
+CrashHold:      db 0
+CrashRate:      db 0
+CrashCnt:       db 0
+CrashVol:       db 0
+        ASSERT $ <= StateA1 + 256
+        ORG StateB1 + $60
+        ASSERT StBD_end <= StateB1 + $60
+; The music keeps time through a crash: its channels step on, unheard
+MusicKeep:
+        ld a, (Paged)
+        or a
+        ret nz
+        push ix
+        ld ix, ChanA
+        call MusicStep
+        ld ix, ChanB
+        call MusicStep
+        ld ix, ChanC
+        call MusicStep
+        pop ix
+        ret
+        ASSERT $ <= StateB1 + $80
+        ORG Gap3Free            ; (after the starting lights, src/main.asm)
+CrashTickC:                     ; C: debris, a clatter of high notes
+        ld e, 0
+        ld a, (CrashI)
+        cp 12
+        jr c, .c
+        ld a, (CrashAge)
+        cp 40
+        jr nc, .c
+        rra
+        jr c, .c                ; (every other interrupt)
+        ld e, a
+        add a, a
+        add a, e
+        and 31
+        add a, 24
+        ld e, a                 ; a high, jumping pitch
+        ld a, 4
+        call AyWrite
+        ld e, 0
+        ld a, 5
+        call AyWrite
+        ld hl, CrMix
+        res 2, (hl)
+        ld e, 11
+.c:     ld a, 10
+        call AyWrite
+        jp CrashMix
+        ASSERT $ <= FILL_END - 64

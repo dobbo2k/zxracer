@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the tape image build/zxracer.tap from the release snapshot
+"""Build the tape image build/speedrun.tap from the release snapshot
 (build/release.sna: no timing bars).
 
 Blocks:
-  1. BASIC "ZX RACER" (autostart line 10):
+  1. BASIC "SPEED RUN" (autostart line 10):
        10 BORDER 0: PAPER 0: INK 7: CLEAR 32767
        20 LOAD "" CODE
        30 LET e=USR 48640
@@ -18,7 +18,7 @@ Blocks:
      tables, chains) and the resident part of bank 5 ($5B00 up to ScnEnd),
      which replaces BASIC - then the game starts.
 
-usage: make_tap.py build/release.sna build/release.sym build/zxracer.tap
+usage: make_tap.py build/release.sna build/release.sym build/speedrun.tap
 """
 import os
 import subprocess
@@ -152,7 +152,7 @@ def main(sna, sym, out):
     loader = open(os.path.join(build, "loader.bin"), "rb").read()
 
     prog = basic_program()
-    tape = header(0, "ZX RACER", len(prog), 10, len(prog)) + tap_block(0xFF, prog)
+    tape = header(0, "SPEED RUN", len(prog), 10, len(prog)) + tap_block(0xFF, prog)
     tape += header(3, "loader", len(loader), LOADER_ORG, 32768) + tap_block(0xFF, loader)
     for *_, data in blocks:
         tape += tap_block(0xFF, bytes(data))

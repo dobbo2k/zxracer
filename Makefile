@@ -1,4 +1,4 @@
-# ZX Racer build. Requires sjasmplus >= 1.20 on PATH, Python 3 and a C compiler.
+# Speed Run build. Requires sjasmplus >= 1.20 on PATH, Python 3 and a C compiler.
 ASM      ?= sjasmplus
 CC       ?= cc
 PYTHON   ?= python3
@@ -41,12 +41,12 @@ build/cputest.sna: tests/cputest.asm | build
 	$(ASM) --nologo --msg=war tests/cputest.asm
 
 # CPU core self-test, then a smoke run of the game with screenshots
-test: $(ZXSIM) build/cputest.sna build/zxracer.sna build/video.sna build/zxracer.tap
+test: $(ZXSIM) build/cputest.sna build/zxracer.sna build/video.sna build/speedrun.tap
 	$(PYTHON) tests/run_cputest.py $(ZXSIM) build/cputest.sna
 	$(PYTHON) tests/smoke.py $(ZXSIM) build/zxracer.sna build
 	$(PYTHON) tests/carcheck.py $(ZXSIM) build/zxracer.sna build
 	$(PYTHON) tests/stagecheck.py $(ZXSIM) build/zxracer.sna build/video.sna
-	$(PYTHON) tests/tapecheck.py $(ZXSIM) build/zxracer.tap build/release.sym build
+	$(PYTHON) tests/tapecheck.py $(ZXSIM) build/speedrun.tap build/release.sym build
 
 # Border-bar profile: T-states per phase per game frame
 profile: $(ZXSIM) build/zxracer.sna
@@ -57,10 +57,10 @@ profile: $(ZXSIM) build/zxracer.sna
 build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 src/main.asm
 
-build/zxracer.tap: build/release.sna tools/make_tap.py tools/make_screens.py src/loader.asm | build
+build/speedrun.tap: build/release.sna tools/make_tap.py tools/make_screens.py src/loader.asm | build
 	$(PYTHON) tools/make_tap.py build/release.sna build/release.sym $@
 
-tap: build/zxracer.tap
+tap: build/speedrun.tap
 
 build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm

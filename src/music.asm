@@ -69,21 +69,7 @@ SQ_SLIDE        EQU 12
 SQ_NOISE        EQU 4               ; the squeal's grit: a high noise
 SQ_CYCLE        EQU 128
 
-SoundTick:
-        ld a, (Mute)
-        or a
-        jr z, .game
-        ld a, (GameState)       ; muted in a game: paused, silent
-        cp ST_PLAYING
-        ret z
-        ld a, (MusicOn)         ; the front end: its tune, if on
-        or a
-        ret z
-        jr MusicPlay
-.game:  ld a, (MusicOn)
-        or a
-        jr nz, MusicPlay
-        jp EngineSounds
+; (SoundTick, the interrupt's way in: src/musicb2.asm)
 
 ; One interrupt of music (and the squeal and hits)
 MusicPlay:

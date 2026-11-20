@@ -1,4 +1,6 @@
-# ZX Racer
+# Speed Run
+
+(Formerly "ZX Racer"; the repository keeps that name.)
 
 An original pseudo-3D arcade road racer for the **ZX Spectrum 128K**, inspired by
 the late-80s sprite-scaling coast-road racers.
@@ -12,7 +14,7 @@ Python 3 with Pillow, and a C compiler (for the test emulator).
 
 ```sh
 make          # -> build/zxracer.sna (128K snapshot, with border timing bars)
-make tap      # -> build/zxracer.tap: the tape release (no timing bars)
+make tap      # -> build/speedrun.tap: the tape release (no timing bars)
 make test     # Z80 core self-test, headless runs with screenshots in build/, tape load
 make profile  # T-states per phase per game frame (border timing bars)
 make run      # launches Fuse in 128K mode
@@ -20,7 +22,7 @@ make video    # build/gameplay.mp4: 48 s of autopilot gameplay with synthesised 
 ```
 
 **Loading the tape:** on a 128K / +2 / +2A / +3 choose *Tape Loader* (or type
-`LOAD ""`) and play `build/zxracer.tap`. A BASIC loader loads a small machine-code
+`LOAD ""`) and play `build/speedrun.tap`. A BASIC loader loads a small machine-code
 loader, which reads the rest with its own tape routine (standard blocks at the
 normal speed, no ROM calls): the loading screen, then the game's memory banks,
 compressed - about 6½ minutes. Emulators' instant "flash load" only speeds up the
@@ -116,8 +118,10 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   chords, pitch slides, vibrato on held notes, slap-style funk bass, tom-roll
   fills and an epic final section. With the music on there is no engine note:
   just tyre squeal (sliding, spinning, and a chirp now and then on a fast
-  bend), off-road gravel, and the bumps and crashes, which briefly take over a
-  channel. Waiting at the lights and in the attract demo you hear the engine.
+  bend), off-road gravel and bumps, which briefly take over a channel, and
+  crashes, which take over all three: a crack that deepens into a rumble, a
+  falling, gritty thud and clattering debris - louder, longer and with more of
+  it the faster you hit. Waiting at the lights and in the attract demo you hear the engine.
   The options switch to the engine instead of music: the engine note follows
   the revs (speed and gear), with gravel noise off-road.
 - **Speed:** locked at 16.7 fps; sharp bends with traffic still drop some frames to

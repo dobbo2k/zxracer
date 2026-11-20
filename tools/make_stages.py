@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the stage data for ZX Racer from assets/stages.yaml.
+"""Build the stage data for Speed Run from assets/stages.yaml.
 
 Outputs (sjasmplus include files):
   build/resident_data.asm  sprites every stage needs (traffic), bank 5

@@ -1,5 +1,5 @@
 ; ---------------------------------------------------------------------------
-; ZX Racer - entry point and main loop
+; Speed Run - entry point and main loop
 ; Target: ZX Spectrum 128K, assembled with sjasmplus
 ; ---------------------------------------------------------------------------
         DEVICE ZXSPECTRUM128
@@ -128,6 +128,7 @@ hv      DEFL hv + 1
         EDUP
         INCLUDE "crewtraffic.asm"   ; (in the gap before the fill block)
         INCLUDE "lightshold.asm"
+Gap3Free:                       ; (src/holes.asm uses the rest)
         ASSERT $ <= FILL_END - 64
 
 ; Unrolled fill: entered at FILL_END - 2*n to write n bytes (see FillA)

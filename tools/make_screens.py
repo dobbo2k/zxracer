@@ -292,7 +292,7 @@ def title_screen(loading=False):
         m = silhouette("palm", h)
         paste_mask(im, m, x, base - h, (0, 0, 0))
     # the logo
-    m = logo_mask("ZX RACER", 4, 6, 0.3)
+    m = logo_mask("SPEED RUN", 4, 6, 0.3)
     lx = (W - m.width) // 2 + 4
     for y in range(m.height):
         colour = rgb(WHITE) if y < 8 else rgb(YELLOW) if y < 24 else rgb(RED)

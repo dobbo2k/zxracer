@@ -100,9 +100,14 @@ UpdateTraffic:
         ld (CrashTimer), a
         ld (Spin), a
         call CrewPickTraffic
-        ld a, SFX_CRASH
+        ld a, (Speed)           ; the crash, as hard as the car hit
+        call CrashStart
         ld de, SPIN_NUDGE
-        jr .nudge
+        ld hl, (Pos)
+        add hl, de
+        ld (ix + 0), l
+        ld (ix + 1), h
+        jr .next
 .bump:  ; slow the player below it, nudge it ahead
         ld a, (ix + 3)
         sub 4

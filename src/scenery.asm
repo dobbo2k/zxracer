@@ -110,10 +110,11 @@ ObjHit: ld e, a
         ld a, CRASH_FRAMES
         ld (CrashTimer), a
         call CrewPick
+        ld a, (Speed)           ; the crash, as hard as the car hit
+        call CrashStart
         xor a
         ld (Speed), a
-        ld a, SFX_CRASH
-        jp PlaySfx
+        ret
 
 ; Replay the draw commands this buffer holds (XOR = erase).
 EraseSprites:

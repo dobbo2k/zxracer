@@ -43,7 +43,7 @@ played into the EAR input (port `$FE` bit 6) with the ROM's timings - pilot tone
 sync, 855 / 1710 T pulses per bit, a second's silence between blocks - for the
 game's own loader to read. `-x PERCENT` plays the tape slower or faster, `-R SEED`
 fills memory (and the absent ROM) with random bytes first. `tests/tapecheck.py`
-uses these to load `build/zxracer.tap` end to end.
+uses these to load `build/speedrun.tap` end to end.
 
 The summary line reports `flips` (writes to `$7FFD` that change the displayed
 screen), so `fps = flips × 50 / frames`.

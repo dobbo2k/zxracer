@@ -1,4 +1,4 @@
-# ZX Racer stages: a 5-row pyramid (1 + 2 + 3 + 4 + 5 = 15 stages).
+# Speed Run stages: a 5-row pyramid (1 + 2 + 3 + 4 + 5 = 15 stages).
 # At the end of each stage the road forks: the left branch leads to the
 # stage below-left in the next row, the right branch to below-right.
 # The last row ends at the goal.

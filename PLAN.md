@@ -1,4 +1,4 @@
-# ZX Racer — Development Plan
+# Speed Run — Development Plan
 
 An original, arcade-style "sunny coast-road" racer for the **ZX Spectrum 128K**,
 in the spirit of the late-80s sprite-scaling road racers: a convertible sports car,
@@ -209,10 +209,10 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 
 ### 3.2d Tape release (as built)
 
-`make tap` builds `build/zxracer.tap` from a release snapshot (`-DRELEASE`, no timing
+`make tap` builds `build/speedrun.tap` from a release snapshot (`-DRELEASE`, no timing
 bars) with `tools/make_tap.py`:
 
-1. BASIC `ZX RACER` (autostart 10): `BORDER 0: PAPER 0: INK 7: CLEAR 32767`,
+1. BASIC `SPEED RUN` (autostart 10): `BORDER 0: PAPER 0: INK 7: CLEAR 32767`,
    `LOAD "" CODE`, `LET e=USR 48640`, `IF e=1 THEN PRINT "128K ONLY"`,
    `IF e>1 THEN PRINT "TAPE ERROR, BLOCK ";e-10`.
 2. CODE `loader` at `$BE00` (`src/loader.asm`): checks that banks 1 and 3 differ
@@ -493,9 +493,17 @@ last interrupt (not when tied on). Effects take a channel and the music keeps
 time unheard: tyre squeal takes A (fully while sliding or spinning, held 12
 interrupts over the flicker at the grip limit; with noise mixed in for grit;
 near the limit a 24-interrupt
-chirp at most every 128), a bump or crash or off-road gravel takes B (and the
+chirp at most every 128), a bump or off-road gravel takes B (and the
 noise generator),
-the green light's beep takes C. The player skips interrupts while another bank
+the green light's beep takes C. A crash (`CrashStart` with the speed at impact,
+`CrashTick` in the state pages' holes) has the whole AY while it lasts, the
+music keeping time unheard (`MusicKeep`): B a noise burst - a crack (noise
+period 6) deepening to a rumble (31), held for speed/2 interrupts at volume
+15, then fading one step every speed/4 + 1 (about 0.3 s at walking pace, 1.7 s
+at full speed); A a falling, gritty thud (tone and noise, coarse period 2-9,
+16 interrupts) above speed 6, or the squeal in a spin-out; C clattering
+debris (a jumping high pitch on alternate interrupts, the first 40) above
+speed 12. The player skips interrupts while another bank
 is paged over the tune (`Paged`, set by `CopyFromBank` and `ShowPic`) and is
 silent while the game is paused. Main-code AY writes go through `AyPut`
 (interrupts off) so the interrupt's writes can't split them.

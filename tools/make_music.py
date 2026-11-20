@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Original tunes for ZX Racer, and their encoding for src/music.asm.
+"""Original tunes for Speed Run, and their encoding for src/music.asm.
 
 A tune is three channels on the AY: drums (channel A), bass (B) and melody
 (C), written in sections. A section has a bass pattern (the bass follows each
