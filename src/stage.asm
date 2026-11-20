@@ -153,6 +153,8 @@ Checkpoint:
         ld a, (StageRow)
         cp NUM_ROWS
         jr nc, .goal
+        ld a, 1                 ; the interrupt's sound off till the new stage
+        ld (Mute), a            ; (StageOvE turns it on again, after the load)
         ld hl, OvCheckpoint
         ld e, 0
         jp StageOvE

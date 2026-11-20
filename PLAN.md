@@ -523,22 +523,19 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   top 120 bytes of bank 7, which every theme pack now leaves free
   (`THEME_TOP`).
 - **Between stages** *(as built)*: at the checkpoint the stage overlay mutes
-  the interrupt's sound and plays a drum fill while it loads - a hit every 3
-  frames of noise through channel A's hardware envelope (the AY decays it,
-  so no interrupt code is needed), and a longer, deeper last one - and the
-  next tune starts at full volume. The last frame stays on show meanwhile
-  (about 18 frames, 0.36 s), then the display reset. A short high beep (C,
-  8 interrupts; before the extended-play flourish when there is one) starts
-  on the interrupt that flips to the new stage's first frame: the overlay
-  sets `JingleHold`, and `JingleTick` (moved to bank 5) waits until
-  `LastFlip` = `FrameCount`. (A fade-out over the
-  stage's last stretch, a fade-in of the next tune and a sweep of the new
-  stage's colours down the screen were tried and taken out after play
-  testing.) The video tools model the AY's envelope: zxsim's `-y` log sets
-  bit 7 of register 13 in a frame that wrote it (a restart). Room: small
-  variables and tables moved from bank 5 into the table pages' holes, the track cache
-  shrank to 608 bytes (the two longest stages lose a little small scenery
-  to fit).
+  the interrupt's sound while it loads (no engine blip), with the last frame
+  on show (about 18 frames, 0.36 s), then the display reset. A short high
+  beep (C, 8 interrupts; before the extended-play flourish when there is
+  one) starts on the interrupt that flips to the new stage's first frame:
+  the overlay sets `JingleHold`, and `JingleTick` (moved to bank 5) waits
+  until `LastFlip` = `FrameCount`. The next tune starts at full volume.
+  (A fade-out over the stage's last stretch, a drum fill during the load, a
+  fade-in of the next tune and a sweep of the new stage's colours down the
+  screen were tried and taken out after play testing.) The video tools
+  model the AY's envelope: zxsim's `-y` log sets bit 7 of register 13 in a
+  frame that wrote it (a restart). Room: small variables and tables moved
+  from bank 5 into the table pages' holes, the track cache shrank to 608
+  bytes (the two longest stages lose a little small scenery to fit).
 - **Hills** *(as built)*: the hill value under the car changes the speed every
   frame (2/256 per unit: climbs slow it, descents help).
 - **Stages:** 15 original stages (coast, desert, alpine pass, forest, city night,

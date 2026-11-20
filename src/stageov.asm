@@ -73,12 +73,6 @@ OvRestartAt:
 ; par time (extended play) - and the messages: the time, the bonus, the new
 ; stage's name.
 OvCheckpoint:
-        ld a, 1                 ; the interrupt's sound off while it loads (StageOvE
-        ld (Mute), a            ; turns it on again); with music, a drum fill meanwhile
-        ld a, (OvMusic)
-        ld (OvFill), a
-        or a
-        call nz, FillHit
         ld a, (StageRow)        ; this stage's time, for the results
         add a, a
         ld e, a
@@ -148,7 +142,6 @@ OvCheckpoint:
         ld (Pos), hl
         pop af
         call LoadStage
-        call FillEnd            ; the fill's last hit, then the next tune
         ld hl, (StageClock)     ; (the time, for the message)
         push hl
         ld hl, 0
@@ -578,8 +571,7 @@ CopyToCache:
         ld (LdSrc), de
         ld (LdLen), bc
         ld (LdDst), hl
-.chunk: call FillTick
-        ld hl, (LdLen)
+.chunk: ld hl, (LdLen)
         ld a, h
         or l
         ret z
@@ -604,62 +596,6 @@ CopyToCache:
         ldir                    ; bounce -> theme cache (bank 7 is paged again)
         ld (LdDst), de
         jr .chunk
-
-
-; ---------------------------------------------------------------------------
-; The drum fill between stages, while this loads (the next tune then
-; starts at full volume): every FILL_GAP frames a hit
-; of noise through channel A's envelope - the AY lets it die away by itself,
-; the loading goes on - and a longer, deeper one to end on.
-FILL_GAP        EQU 3               ; frames between hits
-FILL_SNARE      EQU 6 * 256 + 36    ; noise period, envelope period (~80 ms)
-FILL_LAST       EQU 18 * 256 + 170  ; (~400 ms)
-FillTick:
-        ld a, (OvFill)
-        or a
-        ret z
-        ld a, (FrameCount)
-        ld hl, OvHitAt
-        sub (hl)
-        cp FILL_GAP
-        ret c
-FillHit:
-        ld a, (FrameCount)
-        ld (OvHitAt), a
-        ld de, FILL_SNARE
-FillDE: ld a, d
-        ld (HitRegs + 3), a
-        ld a, e
-        ld (HitRegs + 7), a
-        ld hl, HitRegs
-        ld b, 6
-.l:     ld a, (hl)
-        inc hl
-        ld e, (hl)
-        inc hl
-        push bc
-        push hl
-        call AyPut
-        pop hl
-        pop bc
-        djnz .l
-        ret
-FillEnd:
-        ld a, (OvFill)
-        or a
-        ret z
-        xor a
-        ld (OvFill), a
-        ld de, FILL_LAST
-        jr FillDE
-HitRegs:        db 7, %00110111     ; mixer: noise on A only
-                db 6, 0             ; noise period
-                db 8, 16            ; A's volume: the envelope's
-                db 11, 0            ; envelope period
-                db 12, 0
-                db 13, 0            ; its shape: down, then silence (writing it starts it)
-OvFill:         db 0
-OvHitAt:        db 0
 
 ; The traffic at a stage start (its moves: src/traffic.asm, bank 2)
 InitTraffic:

@@ -6,7 +6,7 @@ Audio: zxsim logs the AY-3-8912 registers at the end of every frame (-y);
 this script synthesises them (3 square-wave tone channels, 17-bit LFSR
 noise, the AY's logarithmic volume table and its envelope generator) at
 44.1 kHz. zxsim sets bit 7 of the logged register 13 in a frame that wrote
-it, which restarts the envelope (the drum fill between stages).
+it, which restarts the envelope.
 
 usage: make_video.py ZXSIM SNA OUT.mp4 [frames] [zxsim key options...]
 """

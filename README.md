@@ -143,7 +143,7 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   black kerbs and yellow lamps rush past, until the way out - the sky round
   the far road - opens up. With the engine sound (options), the engine
   booms off the walls.
-- **Between stages:** a drum fill plays while the next stage loads; a short
+- **Between stages:** the sound stops while the next stage loads; a short
   beep marks the new stage's first frame, and its tune comes straight in.
 - **The goal's gantry:** a chequered beam on red posts spans the road over
   the finish. Running into one from behind slows you right down; hit one that is
