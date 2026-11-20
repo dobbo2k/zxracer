@@ -83,7 +83,8 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
 - **Traffic:** cars in two lanes. Running into one from behind slows you right
   down; driving into a palm off the road is a crash that stops you and spins the
   car. The attract-mode driver changes lane to avoid traffic.
-- **Sound:** AY engine note that follows the speed, gravel noise off-road, tyre squeal.
+- **Sound:** AY engine note that follows the revs (speed and gear), gravel noise
+  off-road, bumps and crashes.
 - **Speed:** locked at 16.7 fps; sharp bends with traffic still drop some frames to
   12.5 fps (PLAN.md §3.6).
 - **Next:** a performance pass, then more scenery and music. See PLAN.md §7.

@@ -332,7 +332,7 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   steering, building up over about a third of a second and carrying on after a
   bend. Past the grip limit (|curvature × speed| >
   200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
-  quarter of the excess, half the steering and grip, a tyre squeal, and holding
+  quarter of the excess, half the steering and grip, tyre smoke, and holding
   the throttle no longer adds speed (it scrubs off until the tyres grip again).
 - **Gears** *(as built)*: LOW / HIGH, changed with SPACE or fire (on a press).
   LOW: +1 speed per update up to 13 (182 km/h); above it (changed down at speed)
@@ -418,7 +418,7 @@ docs/       Technical notes, profiling results
 | **M6** | Physics & collisions | Gears, drift, off-road, crashes & tumble animation | |
 | **M7** | Traffic | Traffic cars with lane AI, overtaking, collisions | 🟡 3 cars in lanes, respawn ahead, bumps, palm crashes with spin-out; lane changes to do |
 | **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 15 stages in 5 rows, real road forks (the road splits in two), 5 themes, checkpoints with time bonus, GOAL; goal scenes to do |
-| **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
+| **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note (follows speed and gear), gravel noise, bump / crash noise; music to do |
 | **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | 🟡 title screen with high score, title/demo cycle, 5 goal screens with time bonus; loading screen, options, key redefinition to do |
 | **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | 🟡 speed pass (overlapped pipeline: 15.6 fps average over a whole game), `.tap` release with loading screen and compressed banks (tested in zxsim with ROM-routine emulation; still to test on a real ROM / hardware) |
 
