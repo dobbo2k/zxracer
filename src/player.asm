@@ -25,6 +25,14 @@ UpdatePlayer:
         call CrashUpdate
         call LightsHold
         ; frames elapsed since the last update (1..4)
+        IF FIXED_ELAPSED
+        ld hl, LoopClock        ; (testing: 3 every time)
+        ld a, (hl)
+        add a, 3
+        ld (hl), a
+        ld a, 3
+        jr .el
+        ENDIF
         ld a, (FrameCount)
         ld hl, LastLogic
         ld b, a

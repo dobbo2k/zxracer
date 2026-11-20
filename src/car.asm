@@ -28,7 +28,7 @@ CarFrame:
         ld a, (Spin)            ; spinning out: slewing both ways, smoking
         or a
         jr z, .wreck
-        ld a, (FrameCount)
+        ld a, (CAR_CLOCK)
         and 6                   ; 0, 2, 4, 6
         rrca
         ld c, a                 ; 0-3
@@ -40,7 +40,7 @@ CarFrame:
         add a, b
         ld c, a                 ; 3-6
         ret
-.wreck: ld a, (FrameCount)
+.wreck: ld a, (CAR_CLOCK)
         and 4
         ld c, 1
         ret z
@@ -77,13 +77,18 @@ CarFrame:
         add a, a
         inc a
         ld c, a
-        ld a, (FrameCount)
+        ld a, (CAR_CLOCK)
         and 4
         ret z
         inc c
         ret
 
 
+        IF FIXED_ELAPSED
+CAR_CLOCK       EQU LoopClock       ; (testing: the puffs count updates)
+        ELSE
+CAR_CLOCK       EQU FrameCount      ; the smoke puffs' and the spin's animation
+        ENDIF
 DRIFT_LOOK      EQU 40              ; |P| (the bend's push): the car yaws into the bend
 SMOKE_AT        EQU 72              ; ... and its rear tyres smoke (past what steering holds)
 

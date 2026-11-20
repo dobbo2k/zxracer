@@ -20,6 +20,9 @@ DrawHorizonIfTime:
         add a, 4
         cp 9
         jr nc, DrawHorizon      ; 8+ pixels behind: always redraw
+        IF FIXED_ELAPSED
+        jr DrawHorizon          ; (testing: nothing depends on the timing)
+        ENDIF
         ld a, (FrameCount)      ; only one step behind: skip if running late
         ld hl, LastFlip
         sub (hl)

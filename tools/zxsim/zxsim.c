@@ -719,7 +719,8 @@ int main(int argc, char **argv) {
     static event shots[MAX_EVENTS], keys[MAX_EVENTS], joys[MAX_EVENTS];
     int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
     FILE *vid = NULL, *aylog = NULL;
-    const char *use_file = NULL;
+    const char *use_file = NULL, *ram_file = NULL;
+    long stop_at = -1, stop_n = 0;
     long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1, rand_seed = -1;
     const char *prof_file = NULL;
     static unsigned long long prof[65536];
@@ -747,6 +748,13 @@ int main(int argc, char **argv) {
             prof_from = strtol(v, &v, 0);
             if (*v == ':') prof_file = v + 1;
         }
+        else if (!strcmp(a, "-H") && i + 1 < argc) {
+            char *v = argv[++i];
+            stop_at = strtol(v, &v, 0);
+            stop_n = 1;
+            if (*v == ':') stop_n = strtol(v + 1, NULL, 0);
+        }
+        else if (!strcmp(a, "-D") && i + 1 < argc) ram_file = argv[++i];
         else if (!strcmp(a, "-u") && i + 1 < argc) {
             char *v = argv[++i];
             use_lo = strtol(v, &v, 0);
@@ -794,6 +802,7 @@ int main(int argc, char **argv) {
                 printf("watch f=%ld T=%ld PC=%04X AF=%04X BC=%04X DE=%04X HL=%04X IX=%04X IY=%04X SP=%04X\n",
                        frame, T, pc, af.w, bc.w, de.w, hl.w, ix.w, iy.w, sp);
             }
+            if (pc == stop_at && !halted && --stop_n <= 0) goto stopped;
             uint16_t pc0 = pc; long t0 = T;
             exec();
             if (prof_file && frame >= prof_from) prof[pc0] += (unsigned long long)(T - t0);
@@ -808,6 +817,14 @@ int main(int argc, char **argv) {
         for (int i = 0; i < nshots; i++) if (shots[i].frame == frame) save_ppm(shots[i].arg);
         if (vid) write_rgb(vid);
         if (aylog) fwrite(ay_reg, 1, 14, aylog);
+    }
+    if (0) {
+stopped:
+        if (!quiet) printf("stopped at %04X in frame %ld\n", (unsigned)stop_at, frame);
+    }
+    if (ram_file) {
+        FILE *rf = fopen(ram_file, "wb");
+        if (rf) { for (int b = 0; b < 8; b++) fwrite(ram[b], 1, 16384, rf); fclose(rf); }
     }
     if (prof_file) {
         FILE *pf = fopen(prof_file, "w");

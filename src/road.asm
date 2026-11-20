@@ -172,13 +172,32 @@ RoadPass1:
         ld hl, ZoneLines
         ld (ZonePtr), hl
         ld a, (hl)
-        ld (.nz + 1), a
+        ld (NextNZ), a
         ld a, (CurveList)
         call SetCurve
         ld hl, CurveList + 2
         ld (CurvePtr), hl
         ld a, (hl)
-        ld (.nb + 1), a
+        ld (NextNB), a
+        call NextEvent
+        ; P = 2 dx + 3 k: what a pair of lines adds to the centre (each line
+        ; up adds dx, and dx gains k each line); a pair then adds P, and P
+        ; gains 4 k
+        sla b
+        rl e
+        rl d
+        ld hl, CurK3
+        ld a, b
+        add a, (hl)
+        ld b, a
+        inc hl
+        ld a, e
+        adc a, (hl)
+        ld e, a
+        inc hl
+        ld a, d
+        adc a, (hl)
+        ld d, a
         pop hl
         exx
         ld l, ROAD_LINES - 1
@@ -188,14 +207,9 @@ RoadPass1:
 .cx:    exx
         ld a, l
         exx
-.nb:    cp $FF
-        call z, NextCurve
-        exx
-        ld a, l
-        exx
-.nz:    cp $FF
-        call z, NextZone
-        ; ---- odd line: edges and centre line from cx = total
+.nx:    cp $FF                  ; a curve boundary or zone line (NextEvent)
+        jp z, .event
+.go:    ; ---- odd line: edges and centre line from cx = total
         ld a, l
         ld ixl, a
         ld a, h
@@ -251,33 +265,20 @@ RoadPass1:
 .ffs:   inc l
 .stored:
         exx
-.acc:   ; ---- two lines up: twice dx += curvature, total += dx
-        ld a, b
-.cl:    add a, 0
-        ld b, a
-        ld a, e
-.ch:    adc a, 0
-        ld e, a
-        ld a, d
-.ch2:   adc a, 0
-        ld d, a
+.acc:   ; ---- two lines up: total += P, P += 4 k (patched by ApplyCurve)
         ld a, c
         add a, b
         ld c, a
         adc hl, de
         ld a, b
-.clb:   add a, 0
+.p4f:   add a, 0
         ld b, a
         ld a, e
-.chb:   adc a, 0
+.p4l:   adc a, 0
         ld e, a
         ld a, d
-.ch2b:  adc a, 0
+.p4h:   adc a, 0
         ld d, a
-        ld a, c
-        add a, b
-        ld c, a
-        adc hl, de
         exx
         dec l
         dec l
@@ -333,6 +334,52 @@ RoadPass1:
         ld c, a
         pop hl
         jp .store
+
+.event: ; the curvature changes on this line: P += 3 (k' - k)
+        push hl
+        ld hl, (CurK3)
+        ld (OldK3), hl
+        ld a, (CurK3 + 2)
+        ld (OldK3 + 2), a
+        exx
+        ld a, l
+        exx
+        ld hl, NextNB
+        cp (hl)
+        call z, NextCurve
+        exx
+        ld a, l
+        exx
+        ld hl, NextNZ
+        cp (hl)
+        call z, NextZone
+        call NextEvent
+        ld hl, CurK3
+        ld a, b
+        add a, (hl)
+        ld b, a
+        inc hl
+        ld a, e
+        adc a, (hl)
+        ld e, a
+        inc hl
+        ld a, d
+        adc a, (hl)
+        ld d, a
+        ld hl, OldK3
+        ld a, b
+        sub (hl)
+        ld b, a
+        inc hl
+        ld a, e
+        sbc a, (hl)
+        ld e, a
+        inc hl
+        ld a, d
+        sbc a, (hl)
+        ld d, a
+        pop hl
+        jp .go
 
 ; Light/dark band per line: bit STRIPE_BIT of (z + position), z of the
 ; depth line the screen line shows

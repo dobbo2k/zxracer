@@ -24,6 +24,8 @@ zxsim game.sna [options]
   -w ADDR[:N]     print registers the first N times PC reaches ADDR
   -u LO:HI:FILE   write a byte per address LO..HI-1 to FILE: bit 0 read, bit 1
                   written, bit 2 executed (which memory a run really uses)
+  -H ADDR[:N]     stop when PC reaches ADDR for the Nth time (then the exit dumps)
+  -D FILE         write all eight RAM banks (128 KB) to FILE at exit
   -d ADDR:LEN     hex-dump memory at exit
   -a              print the AY registers at exit
   -v FILE         write every frame as raw RGB24 320x288 (video capture)

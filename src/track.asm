@@ -179,7 +179,7 @@ NextCurve:
         call SetCurve
         inc hl
         ld a, (hl)              ; next boundary line
-        ld (RoadPass1.nb + 1), a
+        ld (NextNB), a
         ld (CurvePtr), hl
         ; another boundary on the same line? (A = next line, compare to this one)
         exx
@@ -200,10 +200,12 @@ ZoneLines:
 ; A = segment curvature -> patch RoadPass1's dx increment for the current zone
 SetCurve:
         ld (CurC), a
-; increment = (curvature << zone) >> 2, sign-extended into RoadPass1
+; k = (curvature << zone) >> 2 (16.8, signed): RoadPass1 adds 4 k to P per
+; line pair (patched), and its event path uses 3 k (CurK3) to correct P
 ApplyCurve:
         push hl
         push bc
+        push de
         ld a, (CurC)
         ld l, a
         rlca
@@ -219,19 +221,56 @@ ApplyCurve:
         sra h
         rr l
         sra h
-        rr l
-        ld a, l
-        ld (RoadPass1.cl + 1), a
-        ld (RoadPass1.clb + 1), a
+        rr l                    ; HL = k (8.8)
         ld a, h
-        ld (RoadPass1.ch + 1), a
-        ld (RoadPass1.chb + 1), a
         rlca
-        sbc a, a
-        ld (RoadPass1.ch2 + 1), a
-        ld (RoadPass1.ch2b + 1), a
+        sbc a, a                ; A:H:L = k
+        ld c, a
+        ld d, h
+        ld e, l                 ; C:D:E = k
+        add hl, hl
+        rla                     ; A:H:L = 2 k
+        ld b, a
+        push hl
+        add hl, hl
+        rla                     ; 4 k
+        ld (RoadPass1.p4h + 1), a
+        ld a, h
+        ld (RoadPass1.p4l + 1), a
+        ld a, l
+        ld (RoadPass1.p4f + 1), a
+        pop hl
+        add hl, de
+        ld a, b
+        adc a, c                ; A:H:L = 3 k
+        ld (CurK3), hl
+        ld (CurK3 + 2), a
+        pop de
         pop bc
         pop hl
+        ret
+
+; RoadPass1's next event line: the nearer (higher) of the next curve
+; boundary and zone line ($FF: none - both end with $FF)
+NextEvent:
+        push bc
+        ld a, (NextNB)
+        cp $FF
+        jr nz, .b
+        xor a
+.b:     ld b, a
+        ld a, (NextNZ)
+        cp $FF
+        jr nz, .z
+        xor a
+.z:     cp b
+        jr nc, .m
+        ld a, b
+.m:     or a
+        jr nz, .s
+        dec a
+.s:     ld (RoadPass1.nx + 1), a
+        pop bc
         ret
 
 ; Called by RoadPass1 at a zone line: double the curvature weight.
@@ -243,6 +282,6 @@ NextZone:
         inc hl
         ld (ZonePtr), hl
         ld a, (hl)
-        ld (RoadPass1.nz + 1), a
+        ld (NextNZ), a
         pop hl
         jr ApplyCurve

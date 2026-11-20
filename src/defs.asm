@@ -9,6 +9,9 @@ PROFILE         EQU 1           ; 1 = border colour timing bars
         IFNDEF AUTOPLAY
 AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the game (videos)
         ENDIF
+        IFNDEF FIXED_ELAPSED
+FIXED_ELAPSED   EQU 0           ; 1 = (testing) every update counts 3 TV frames and nothing
+        ENDIF                   ; drawn depends on the timing: identical runs at any speed
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
 TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)

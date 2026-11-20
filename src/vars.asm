@@ -43,6 +43,10 @@ CurvePtr:       dw 0
 CurC:           db 0            ; curvature of the current pass-1 chunk
 CurK:           db 0            ; curvature zone (weight 2^k / 4)
 ZonePtr:        dw 0
+NextNB:         db 0            ; pass 1: the next curve boundary line
+NextNZ:         db 0            ; ... and zone line
+CurK3:          ds 3            ; 3 k (fraction first)
+OldK3:          ds 3
 CurveList:      ds 2 + 3 * MAX_BOUNDS + 1
 
 ; track
@@ -115,7 +119,8 @@ Spin:           db 0
 Lights:         db 0            ; starting lights: frames left (0: none)
 LampState:      db 0
 BeepTime:       db 0
-Squeal:         db 0            ; the car shows tyre smoke or spins (DrawCar)
+Squeal:         db 0
+LoopClock:      db 0            ; (FIXED_ELAPSED testing: frames by updates)            ; the car shows tyre smoke or spins (DrawCar)
 Paged:          db 0            ; a bank other than 7 is paged at $C000
 StTune:         dw 0            ; the theme's tune (theme pack header +15)            ; a beep on channel C: interrupts left            ; the crash is a spin-out (the car slides on, slowing)
 ObjType:        db 0
