@@ -13,7 +13,8 @@ Blocks:
   2. CODE "loader" at $BE00 (src/loader.asm)
   3. headerless standard data blocks, read by the loader's own tape routine
      (no ROM calls, interrupts off):
-     compressed (tools/zpack.py): the loading screen (to $4000), the pack
+     compressed (tools/zpack.py): the loading screen (assets/gfx/loading.scr,
+     the cover art as a Spectrum screen; to $4000), the pack
      banks 0, 1, 3, 4, 6 (unpacked to $C000), bank 2 ($8000-$BDBF: code,
      tables, chains) and the resident part of bank 5 ($5B00 up to ScnEnd),
      which replaces BASIC - then the game starts.
@@ -29,6 +30,7 @@ import make_screens                 # noqa: E402
 import zpack                        # noqa: E402
 
 LOADER_ORG = 0xBE00
+LOADING_SCREEN = os.path.join(os.path.dirname(__file__), "..", "assets", "gfx", "loading.scr")
 BANK2_END = 0xBDC0                  # after ISR_JP; the IM2 table and stack are built at run time
 
 
@@ -174,7 +176,9 @@ def main(sna, sym, out):
     # (port while loading, load address, port while unpacking, unpack to, data);
     # unpack port $FF: stored as it is
     build = os.path.dirname(out)
-    blocks = [(0x10, 0x8000, 0x10, 0x4000, zpack.pack(make_screens.title_screen(loading=True), build))]
+    screen = open(LOADING_SCREEN, "rb").read()            # (tools/make_loading.py, from the cover art)
+    assert len(screen) == 6912
+    blocks = [(0x10, 0x8000, 0x10, 0x4000, zpack.pack(screen, build))]
     for b in (0, 1, 3, 4, 6):
         data = banks[b].rstrip(b"\0")
         if data:

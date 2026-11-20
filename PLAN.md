@@ -231,7 +231,8 @@ bars) with `tools/make_tap.py`:
    matter which ROM is paged (128K, +2, +2A, +3). (A first version called the
    ROM's LD-BYTES at `$0556`; it crashed back to BASIC in an emulator, most likely
    because the ROM paged in during `USR` was not the 48K BASIC ROM.) The blocks:
-   the loading screen (to `$4000`), the pack banks 0, 1, 3, 4, 6 (each loaded to
+   the loading screen (the cover art as a Spectrum screen, `assets/gfx/loading.scr`;
+   to `$4000`), the pack banks 0, 1, 3, 4, 6 (each loaded to
    `$8000` and unpacked to `$C000` in its bank), bank 2 (loaded into bank 7,
    unpacked to `$8000`) and the resident part of bank 5 (likewise, to `$5B00`),
    and it jumps to the game. Compression (`tools/zpack.py`, decoded by

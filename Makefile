@@ -57,7 +57,7 @@ profile: $(ZXSIM) build/zxracer.sna
 build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 src/main.asm
 
-build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py tools/make_screens.py src/loader.asm | build
+build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py assets/gfx/loading.scr src/loader.asm | build
 	$(PYTHON) tools/make_tap.py build/release.sna build/release.sym $@
 
 tap: build/speedrun.tap
@@ -65,16 +65,22 @@ tap: build/speedrun.tap
 # The release folder: both tape files, how to play, a printable inlay
 # (screenshots from an autopilot run)
 SHOTS := 3300 4600 8800 11600
-release: build/speedrun.tap build/video.sna $(ZXSIM) tools/make_inlay.py
+release: build/speedrun.tap build/video.sna $(ZXSIM) tools/make_inlay.py release/cover.png assets/gfx/spine.png
 	$(ZXSIM) build/video.sna -n 11700 -k 250:Q -k 256:none -q $(foreach f,$(SHOTS),-s $(f):build/shot_$(f).ppm)
-	$(PYTHON) tools/make_inlay.py build $(foreach f,$(SHOTS),build/shot_$(f).ppm)
+	$(PYTHON) tools/make_inlay.py build release/cover.png assets/gfx/spine.png $(foreach f,$(SHOTS),build/shot_$(f).ppm)
 	mkdir -p release
 	cp build/speedrun.tap build/speedrun.tzx build/inlay_outside.png build/inlay_inside.png release/
 
-# Hand-drawn style cover art (needs Node with Playwright and Chromium to render)
-cover: tools/make_cover.py | build
+# Hand-drawn style cover art (needs Node with Playwright and Chromium to render):
+# the cover, the tape's loading screen made from a 4:3 version of it, and the
+# lettering for the inlay's spine (the last two are kept in assets/gfx, so
+# building the tape does not need Chromium)
+cover: tools/make_cover.py tools/make_loading.py | build
 	mkdir -p release
-	$(PYTHON) tools/make_cover.py release/cover.png build/cover.svg
+	$(PYTHON) tools/make_cover.py release/cover.png build/cover.svg portrait
+	$(PYTHON) tools/make_cover.py build/cover_wide.png build/cover_wide.svg wide
+	$(PYTHON) tools/make_loading.py build/cover_wide.png assets/gfx/loading.scr assets/gfx/loading_preview.png
+	$(PYTHON) tools/make_cover.py assets/gfx/spine.png build/spine.svg spine
 
 build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm

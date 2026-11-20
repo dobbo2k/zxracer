@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """A printable cassette inlay (J-card) for the tape release, at 300 dpi:
 101.6 mm tall; outside: back flap (15 mm), spine (12.7 mm), front (65 mm);
-inside: screenshots and how to play. Drawn with the game's own title
-picture, logo lettering and 5x7 font (tools/make_screens.py) - no other
-fonts needed.
+inside: screenshots and how to play. The front is the cover art and the
+spine its lettering (tools/make_cover.py: release/cover.png,
+assets/gfx/spine.png); the rest uses the game's own logo lettering and 5x7
+font (tools/make_screens.py) on the cover's night sky - no fonts needed.
 
-usage: make_inlay.py OUTDIR SHOT.ppm...   (game screenshots from zxsim)
+usage: make_inlay.py OUTDIR COVER.png SPINE.png SHOT.ppm...   (screenshots from zxsim)
 -> OUTDIR/inlay_outside.png, inlay_inside.png, inlay_preview.png
 """
 import os
@@ -23,6 +24,7 @@ FLAP, SPINE, FRONT = round(15 * MM), round(12.7 * MM), round(65 * MM)
 W = FLAP + SPINE + FRONT
 
 RED, YELLOW, WHITE, CYAN = (215, 0, 0), (255, 255, 0), (255, 255, 255), (0, 215, 215)
+NIGHT = (20, 8, 52)                 # the cover's sky
 MAGENTA, GREEN, BLACK = (215, 0, 215), (0, 215, 0), (0, 0, 0)
 
 HOW_TO_PLAY = [
@@ -90,41 +92,24 @@ def centred(d, y, s, colour, scale, x0, width):
     text(d, x0 + (width - len(s) * 8 * scale) // 2, y, s, colour, scale)
 
 
-def front(title):
-    im = Image.new("RGB", (FRONT, H), BLACK)
-    d = ImageDraw.Draw(im)
-    checker(d, 0, 0, FRONT, 36, 36)
-    art = title.crop((0, 0, 256, 168)).resize((768, 504), Image.NEAREST)
-    im.paste(art, ((FRONT - 768) // 2, 60))
-    y = 600
-    for line, c in (("15 STAGES.", YELLOW), ("5 GOALS.", YELLOW), ("ONE CLOCK.", RED)):
-        centred(d, y, line, c, 6, 0, FRONT)
-        y += 66
-    for k, line in enumerate(("A ROAD RACE ACROSS THE COAST,", "THE DESERT, THE MOUNTAINS AND",
-                              "THE VALLEYS TO THE SUNSET -", "AGAINST THE CLOCK")):
-        assert len(line) * 24 <= FRONT - 24, line
-        centred(d, 820 + 32 * k, line, CYAN, 3, 0, FRONT)
-    centred(d, 1030, "FOR THE ZX SPECTRUM", WHITE, 4, 0, FRONT)
-    centred(d, 1080, "128K  +2  +2A  +3", WHITE, 4, 0, FRONT)
-    checker(d, 0, H - 36, FRONT, H, 36)
-    return im
+def front(cover):
+    """The cover art, scaled to the front panel (cropping its sides a little)."""
+    k = H / cover.height
+    im = cover.resize((round(cover.width * k), H), Image.LANCZOS)
+    x = (im.width - FRONT) // 2
+    return im.crop((x, 0, x + FRONT, H))
 
 
 def strip(width, height, draw):
     """A panel drawn sideways (reading top to bottom once turned)."""
-    im = Image.new("RGB", (height, width), BLACK)
+    im = Image.new("RGB", (height, width), NIGHT)
     draw(im, ImageDraw.Draw(im))
     return im.rotate(-90, expand=True)
 
 
-def spine():
-    def draw(im, d):
-        lg, _ = logo("SPEED RUN", 96)
-        im.paste(lg, (40, (SPINE - lg.height) // 2))
-        text(d, H - 40 - 4 * 8 * 5, (SPINE - 35) // 2, "128K", WHITE, 5)
-        d.rectangle([0, 0, H, 5], fill=RED)
-        d.rectangle([0, SPINE - 6, H, SPINE], fill=YELLOW)
-    return strip(SPINE, H, draw)
+def spine(art):
+    """The cover's lettering, turned to read down the spine."""
+    return art.resize((H, SPINE), Image.LANCZOS).rotate(-90, expand=True)
 
 
 def flap():
@@ -135,11 +120,11 @@ def flap():
     return strip(FLAP, H, draw)
 
 
-def outside(title):
-    im = Image.new("RGB", (W, H), BLACK)
+def outside(cover, spine_art):
+    im = Image.new("RGB", (W, H), NIGHT)
     im.paste(flap(), (0, 0))
-    im.paste(spine(), (FLAP, 0))
-    im.paste(front(title), (FLAP + SPINE, 0))
+    im.paste(spine(spine_art), (FLAP, 0))
+    im.paste(front(cover), (FLAP + SPINE, 0))
     d = ImageDraw.Draw(im)
     for x in (FLAP, FLAP + SPINE):                       # fold marks
         d.line([(x, 0), (x, 12)], fill=(90, 90, 90), width=2)
@@ -148,14 +133,14 @@ def outside(title):
 
 
 def inside(shots):
-    im = Image.new("RGB", (W, H), BLACK)
+    im = Image.new("RGB", (W, H), NIGHT)
     d = ImageDraw.Draw(im)
     gap = (W - 4 * 256) // 5
     for k, s in enumerate(shots[:4]):
         im.paste(s, (gap + k * (256 + gap), 24))
     y = 24 + 192 + 20
-    lg, _ = logo("HOW TO PLAY", 60, (YELLOW, RED))
-    im.paste(lg, ((W - lg.width) // 2, y))
+    lg, mask = logo("HOW TO PLAY", 60, (YELLOW, RED))
+    im.paste(lg, ((W - lg.width) // 2, y), mask)
     y += 60 + 24
     width = (W - 2 * 30) // 24
     colours = [CYAN, GREEN, YELLOW, MAGENTA, CYAN, GREEN]
@@ -173,10 +158,11 @@ def inside(shots):
     return im
 
 
-def main(outdir, *shots):
-    title = ms.preview(ms.title_screen())
+def main(outdir, cover, spine_art, *shots):
+    cover = Image.open(cover).convert("RGB")
+    spine_art = Image.open(spine_art).convert("RGB")
     shots = [Image.open(s).convert("RGB").crop((32, 48, 288, 240)) for s in shots]
-    out = outside(title)
+    out = outside(cover, spine_art)
     ins = inside(shots)
     out.save(os.path.join(outdir, "inlay_outside.png"), dpi=(300, 300))
     ins.save(os.path.join(outdir, "inlay_inside.png"), dpi=(300, 300))

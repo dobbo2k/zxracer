@@ -4,7 +4,7 @@ scene): a seeded SVG of sketchy, doubled ink lines, hatching, washed colour
 and paper grain, rendered to PNG with the pre-installed Chromium (Playwright).
 The lettering is brush-stroked from letter skeletons defined here (no fonts).
 
-usage: make_cover.py OUT.png [OUT.svg]
+usage: make_cover.py OUT.png [OUT.svg [portrait | wide | spine]]
 """
 import math
 import os
@@ -13,9 +13,38 @@ import subprocess
 import sys
 import tempfile
 
-W, H = 1300, 2000
-HZ = 1050                       # horizon
+# Layouts: the cover (portrait), a 4:3 version for the tape's loading screen,
+# and the lettering alone for the inlay's spine
+LAYOUTS = {
+    "portrait": dict(W=1300, H=2000, HZ=1050, sun=(650, 880, 330), clouds=(380, 860), stars=520, grid=22,
+                     title=[("SPEED", 120, 90, 1.12), ("RUN", 470, 290, 1.12)],
+                     stripes=((210, 5), (230, 7), (252, 9), (400, 5), (420, 7), (442, 9)), logo_grad=(90, 460),
+                     swoosh=((90, 545), (500, 515), (900, 530), (1220, 480)),
+                     tag=("FOR THE ZX SPECTRUM 128K", 118, 1880, 0.3),
+                     car=None,
+                     palms=[(900, 1086, 880, 890, 0.36, 1), (400, 1086, 420, 880, 0.34, -1),
+                            (1230, 1420, 1010, 610, 1.0, -1), (70, 1400, 290, 640, 1.0, 1)]),
+    "wide": dict(W=1600, H=1200, HZ=640, sun=(800, 470, 230), clouds=(230, 520), stars=320, grid=27,
+                 plain=True,             # (no paper grain, hatching or vignette: it becomes a Spectrum screen)
+                 title=[("SPEED RUN", 330, 34, 0.9)],
+                 swoosh=((300, 205), (700, 190), (1000, 200), (1320, 180)),
+                 tag=None,
+                 car=(800, 1128, 0.8),
+                 palms=[(590, 676, 605, 510, 0.26, -1), (1010, 676, 995, 505, 0.28, 1),
+                        (1500, 1180, 1290, 330, 0.8, -1), (90, 1170, 300, 340, 0.8, 1)]),
+}
+L = LAYOUTS["portrait"]
+W, H, HZ = L["W"], L["H"], L["HZ"]
 VX = W / 2                      # vanishing point x
+
+
+def use_layout(name):
+    global L, W, H, HZ, VX, rnd
+    L = LAYOUTS[name]
+    W, H, HZ = L["W"], L["H"], L["HZ"]
+    VX = W / 2
+    rnd = random.Random(1984)
+    clips.clear()
 INK = "#1b0f24"
 rnd = random.Random(1984)
 
@@ -94,6 +123,8 @@ def fill(pts, colour, extra=""):
 
 def hatch(clip, x0, y0, x1, y1, angle, spacing, colour=INK, width=1.6, opacity=0.5, amp=1.2):
     """Parallel pencil strokes over a box, clipped to a shape."""
+    if L.get("plain"):
+        return ""
     a = math.radians(angle)
     ux, uy = math.cos(a), math.sin(a)
     nx, ny = -uy, ux
@@ -102,14 +133,14 @@ def hatch(clip, x0, y0, x1, y1, angle, spacing, colour=INK, width=1.6, opacity=0
     out = [f'<g clip-path="url(#{clip})">']
     s = -R
     while s < R:
-        L = R * rnd.uniform(0.85, 1.0)
+        ln = R * rnd.uniform(0.85, 1.0)
         px, py = cx + nx * s, cy + ny * s
         # a stroke or two along the line, with gaps
-        t = -L
-        while t < L:
-            seg = rnd.uniform(L * 0.4, L * 1.4)
+        t = -ln
+        while t < ln:
+            seg = rnd.uniform(ln * 0.4, ln * 1.4)
             a0 = (px + ux * t, py + uy * t)
-            a1 = (px + ux * min(L, t + seg), py + uy * min(L, t + seg))
+            a1 = (px + ux * min(ln, t + seg), py + uy * min(ln, t + seg))
             out.append(f'<path d="{path_d(wobble([a0, a1], amp, 30))}" stroke="{colour}" '
                        f'stroke-width="{f(width * rnd.uniform(0.6, 1.2))}" fill="none" '
                        f'stroke-linecap="round" opacity="{opacity * rnd.uniform(0.6, 1.0):.2f}"/>')
@@ -217,7 +248,7 @@ def sky():
     out = [f'<rect x="0" y="0" width="{W}" height="{HZ + 4}" fill="url(#sky)"/>']
     # washes of cloud
     for k in range(7):
-        y = rnd.uniform(380, 860)
+        y = rnd.uniform(*L["clouds"])
         x = rnd.uniform(-200, W)
         w = rnd.uniform(260, 560)
         h = rnd.uniform(14, 34)
@@ -227,7 +258,7 @@ def sky():
         out.append(sketch(pts, 1.6, "#ffd0a8", 1, 2.5, opacity=0.35))
     # stars: little crosses and dots
     for k in range(70):
-        x, y = rnd.uniform(20, W - 20), rnd.uniform(20, 520) ** 1.0
+        x, y = rnd.uniform(20, W - 20), rnd.uniform(20, L["stars"])
         if rnd.random() < 0.25:
             r = rnd.uniform(5, 10)
             out.append(sketch([(x - r, y), (x + r, y)], 2, "#fff3c4", 1, 0.6, overshoot=0))
@@ -239,7 +270,7 @@ def sky():
 
 
 def sun():
-    cx, cy, r = VX, 880, 330
+    cx, cy, r = L["sun"]
     out = [f'<circle cx="{cx}" cy="{cy}" r="{r + 90}" fill="#ff5a7a" opacity="0.35" filter="url(#glow)"/>']
     out.append(f'<g mask="url(#sunbands)"><circle cx="{cx}" cy="{cy}" r="{r}" fill="url(#sung)" '
                f'filter="url(#wash)"/></g>')
@@ -298,7 +329,7 @@ def ground():
         y = depth_y(zz)
         out.append(sketch([(-20, y), (W + 20, y)], 1.4 + (y - HZ) / 300, "#ff4fe8", 1, 1.2,
                           opacity=min(0.85, 0.25 + (y - HZ) / 900), overshoot=0))
-    for k in range(-22, 23):
+    for k in range(-L["grid"], L["grid"] + 1):
         if abs(k) < 3:
             continue
         xb = VX + k * 120
@@ -520,11 +551,11 @@ def detailed_defs():
   <linearGradient id="hlockv" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#ffeaa0"/><stop offset="0.45" stop-color="#f2c444"/><stop offset="1" stop-color="#b07a18"/>
   </linearGradient>
-  <filter id="hsheen" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="3"/></filter>
+  <filter id="hsheen" filterUnits="userSpaceOnUse" x="-1000" y="-1000" width="4000" height="4000"><feGaussianBlur stdDeviation="3"/></filter>
   <pattern id="cstripe" width="16" height="40" patternUnits="userSpaceOnUse">
     <rect width="16" height="40" fill="#f4f2ec"/><rect x="5" width="5" height="40" fill="#2f55c8"/>
   </pattern>
-  <filter id="cblur" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="6"/></filter>
+  <filter id="cblur" filterUnits="userSpaceOnUse" x="-1000" y="-1000" width="4000" height="4000"><feGaussianBlur stdDeviation="6"/></filter>
 """
 
 
@@ -797,8 +828,8 @@ def speed_lines():
     out = []
     for k in range(26):
         side = rnd.choice((-1, 1))
-        y = rnd.uniform(1200, 1950)
-        x0 = VX + side * rnd.uniform(520, 640) * (y - HZ) / (H - HZ) + side * rnd.uniform(0, 80)
+        y = rnd.uniform(HZ + 150, H - 50)
+        x0 = VX + side * rnd.uniform(520, 640) * W / 1300 * (y - HZ) / (H - HZ) + side * rnd.uniform(0, 80)
         L = rnd.uniform(80, 220)
         dx = (x0 - VX) / max(1, y - HZ) * L
         out.append(sketch([(x0, y), (x0 + dx, y + L)], rnd.uniform(1.4, 3), "#fff6e0", 1, 0.8,
@@ -808,26 +839,32 @@ def speed_lines():
 
 def title_and_tag():
     out = []
-    txt, end = lettering("SPEED", 120, 90, 1.12, 30, slant=0.3)
-    out.append(txt)
-    txt2, end2 = lettering("RUN", 470, 290, 1.12, 30, slant=0.3)
-    out.append(txt2)
+    for word, x, y, sc in L["title"]:
+        txt, _ = lettering(word, x, y, sc, 30, slant=0.3)
+        out.append(txt)
     # swoosh under the title
-    sw = bez((90, 545), (500, 515), (900, 530), (1220, 480), 30)
-    out.append(sketch(sw, 9, "#ffd23a", 1, 1.4, opacity=0.9))
-    out.append(sketch([(x, y + 14) for x, y in sw], 4, "#ff3d7f", 1, 1.4, opacity=0.9))
+    sw = bez(*L["swoosh"], 30)
+    k = L["title"][0][3] / 1.12
+    out.append(sketch(sw, 9 * k, "#ffd23a", 1, 1.4, opacity=0.9))
+    out.append(sketch([(x, y + 14 * k) for x, y in sw], 4 * k, "#ff3d7f", 1, 1.4, opacity=0.9))
     # bottom tag
-    tag, _ = lettering("FOR THE ZX SPECTRUM 128K", 118, 1880, 0.3, 16, slant=0.2, grad="tagg", gap=118,
-                       wob=0.9, stripes=False)
-    out.append(tag)
+    if L["tag"]:
+        word, x, y, sc = L["tag"]
+        tag, _ = lettering(word, x, y, sc, 16, slant=0.2, grad="tagg", gap=118, wob=0.9, stripes=False)
+        out.append(tag)
     return "\n".join(out)
 
 
 def defs():
-    stripes = "".join(f'<rect x="0" y="{y}" width="{W}" height="{h}" fill="black"/>'
-                      for y, h in ((210, 5), (230, 7), (252, 9), (400, 5), (420, 7), (442, 9)))
-    bands = "".join(f'<rect x="0" y="{730 + k * 40 + k * k * 2}" width="{W}" height="{5 + k * 4}" fill="black"/>'
-                    for k in range(8))
+    # speed stripes through each title line's lower half; bands across the sun
+    rows = L.get("stripes") or [(ty + sc * dy, sc * h) for _, _, ty, sc in L["title"]
+                                for dy, h in ((107, 4.5), (125, 6.2), (145, 8))]
+    stripes = "".join(f'<rect x="0" y="{f(y)}" width="{W}" height="{f(h)}" fill="black"/>' for y, h in rows)
+    cx, cy, r = L["sun"]
+    k_ = r / 330
+    bands = "".join(f'<rect x="0" y="{f(cy - 150 * k_ + (k * 40 + k * k * 2) * k_)}" width="{W}" '
+                    f'height="{f((5 + k * 4) * k_)}" fill="black"/>' for k in range(8))
+    t0, t1 = L.get("logo_grad") or (L["title"][0][2], L["title"][-1][2] + 146 * L["title"][-1][3])
     return f"""
 <defs>
   <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
@@ -854,7 +891,7 @@ def defs():
   <linearGradient id="lamp" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#ffb0a0"/><stop offset="0.5" stop-color="#ff2a3a"/><stop offset="1" stop-color="#a0081a"/>
   </linearGradient>
-  <linearGradient id="logo" gradientUnits="userSpaceOnUse" x1="0" y1="90" x2="0" y2="460">
+  <linearGradient id="logo" gradientUnits="userSpaceOnUse" x1="0" y1="{f(t0)}" x2="0" y2="{f(t1)}">
     <stop offset="0" stop-color="#fff58a"/><stop offset="0.3" stop-color="#ffd23a"/>
     <stop offset="0.55" stop-color="#ff8a2a"/><stop offset="0.8" stop-color="#ff3a4a"/>
     <stop offset="1" stop-color="#d0105a"/>
@@ -869,8 +906,8 @@ def defs():
     <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="7" result="n"/>
     <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-  <filter id="soft" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="14"/></filter>
-  <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="40"/></filter>
+  <filter id="soft" filterUnits="userSpaceOnUse" x="-1000" y="-1000" width="4000" height="4000"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="glow" filterUnits="userSpaceOnUse" x="-1000" y="-1000" width="4000" height="4000"><feGaussianBlur stdDeviation="40"/></filter>
   <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
     <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="n"/>
     <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
@@ -898,25 +935,56 @@ def build():
         f'<g filter="url(#rough)">{mountains()}</g>',
         f'<g filter="url(#rough)">{ground()}</g>',
         f'<g filter="url(#rough)">{road()}</g>',
-        f'<g filter="url(#rough)">{palm(900, 1086, 880, 890, 0.36, 1)}{palm(400, 1086, 420, 880, 0.34, -1)}</g>',
-        f'<g filter="url(#rough)">{palm(1230, 1420, 1010, 610, 1.0, -1)}{palm(70, 1400, 290, 640, 1.0, 1)}</g>',
+        f'<g filter="url(#rough)">{"".join(palm(*p) for p in L["palms"][:2])}</g>',
+        f'<g filter="url(#rough)">{"".join(palm(*p) for p in L["palms"][2:])}</g>',
         f'<g filter="url(#rough)">{speed_lines()}</g>',
-        car_detailed(),
+        car_placed(),
         f'<g filter="url(#rough)">{title_and_tag()}</g>',
+    ] + ([] if L.get("plain") else [
         f'<rect width="{W}" height="{H}" filter="url(#blotch)" style="mix-blend-mode:soft-light" opacity="0.55"/>',
         f'<rect width="{W}" height="{H}" filter="url(#paper)" style="mix-blend-mode:multiply" opacity="0.35"/>',
         f'<rect width="{W}" height="{H}" fill="url(#vignette)"/>',
-    ])
+    ]))
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">'
             f'<rect width="{W}" height="{H}" fill="#140834"/>{defs()}{body}</svg>')
 
 
-def render(svg_path, png_path):
+def car_placed():
+    """The car, scaled and moved for this layout (drawn for the portrait)."""
+    if not L["car"]:
+        return car_detailed()
+    x, bottom, sc = L["car"]
+    return (f'<g transform="translate({x},{bottom}) scale({sc}) translate(-650,-1796)">'
+            f'{car_detailed()}</g>')
+
+
+def spine_svg(w=1200, h=150):
+    """The lettering alone on the cover's night sky, for the inlay's spine."""
+    use_layout("portrait")
+    txt, end = lettering("SPEED RUN", 40, 30, 0.6, 30, slant=0.3, stripes=False)
+    tag, _ = lettering("128K", w - 220, 50, 0.38, 22, slant=0.3, grad="tagg", stripes=False, shadow=False)
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
+            f'<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#140834"/>'
+            f'<stop offset="0.7" stop-color="#4a1670"/><stop offset="1" stop-color="#b8246e"/></linearGradient>'
+            f'<linearGradient id="logo" gradientUnits="userSpaceOnUse" x1="0" y1="30" x2="0" y2="118">'
+            f'<stop offset="0" stop-color="#fff58a"/><stop offset="0.35" stop-color="#ffd23a"/>'
+            f'<stop offset="0.65" stop-color="#ff8a2a"/><stop offset="1" stop-color="#ff3a4a"/></linearGradient>'
+            f'<linearGradient id="tagg" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="0" y2="106">'
+            f'<stop offset="0" stop-color="#9ff4ff"/><stop offset="1" stop-color="#3ac0ff"/></linearGradient>'
+            f'<filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="n"/>'
+            f'<feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/></filter>'
+            f'</defs><rect width="{w}" height="{h}" fill="url(#bg)"/>'
+            f'<rect y="0" width="{w}" height="6" fill="#ff3d7f"/><rect y="{h - 6}" width="{w}" height="6" fill="#ffd23a"/>'
+            f'<g filter="url(#rough)">{txt}{tag}</g></svg>')
+
+
+def render(svg_path, png_path, w=None, h=None):
+    w, h = w or W, h or H
     js = f"""
 const {{ chromium }} = require('playwright');
 (async () => {{
   const b = await chromium.launch();
-  const p = await b.newPage({{ viewport: {{ width: {W}, height: {H} }}, deviceScaleFactor: 1 }});
+  const p = await b.newPage({{ viewport: {{ width: {w}, height: {h} }}, deviceScaleFactor: 1 }});
   await p.goto('file://{os.path.abspath(svg_path)}');
   await p.screenshot({{ path: '{os.path.abspath(png_path)}' }});
   await b.close();
@@ -928,8 +996,14 @@ const {{ chromium }} = require('playwright');
     os.unlink(fjs.name)
 
 
-def main(png, svg=None):
+def main(png, svg=None, layout="portrait"):
+    """layout: portrait (the cover), wide (for the loading screen), spine"""
     svg = svg or os.path.splitext(png)[0] + ".svg"
+    if layout == "spine":
+        open(svg, "w").write(spine_svg())
+        render(svg, png, 1200, 150)
+        return
+    use_layout(layout)
     open(svg, "w").write(build())
     render(svg, png)
 

@@ -44,11 +44,18 @@ table and a self-driving demo; any of the game keys starts a game.
 **Release:** `make release` puts both tape files into `release/` with a
 how-to-play text (`release/README.txt`) and a printable cassette inlay
 (`inlay_outside.png`, `inlay_inside.png`: 300 dpi J-card, drawn by
-`tools/make_inlay.py` from the game's own title art, font and screenshots). `make cover` draws
-`release/cover.png`: a hand-drawn style cover illustration of the title
-scene (`tools/make_cover.py`: seeded sketchy ink lines, hatching, washes and
-paper grain as SVG, brush lettering from its own letter skeletons, rendered
-with Chromium).
+`tools/make_inlay.py`: the cover art on the front, its lettering down the
+spine, screenshots and how to play inside in the game's own font).
+`make cover` draws `release/cover.png`: a hand-drawn style cover
+illustration of the title scene (`tools/make_cover.py`: seeded sketchy ink
+lines, hatching, washes and paper grain as SVG, the car and crew drawn
+cleanly, brush lettering from its own letter skeletons, rendered with
+Chromium). It also draws a 4:3 version without the paper texture, which
+`tools/make_loading.py` turns into the tape's loading screen
+(`assets/gfx/loading.scr`: per 8 x 8 cell the best ink / paper pair, the
+pixels between them in 2 x 2 dither patterns), and the spine lettering
+(`assets/gfx/spine.png`); both are kept in the repository, so building the
+tape needs no Chromium.
 
 ## Layout
 
