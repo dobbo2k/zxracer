@@ -68,10 +68,16 @@ static inline void contend(uint16_t a) {
     T += pat[lt & 7];
 }
 
+/* -u: a map of the CPU addresses in [use_lo, use_hi) the program touched
+   (bit 0 read, bit 1 written, bit 2 executed) */
+static uint8_t usemap[65536];
+static long use_lo = -1, use_hi = -1;
+#define USE(a, bit) do { if ((long)(a) >= use_lo && (long)(a) < use_hi) usemap[a] |= (bit); } while (0)
+
 static inline uint8_t peek(uint16_t a) { return page[a >> 14][a & 0x3fff]; }
-static inline uint8_t rd(uint16_t a) { contend(a); T += 3; return peek(a); }
+static inline uint8_t rd(uint16_t a) { contend(a); T += 3; USE(a, 1); return peek(a); }
 static inline void wr(uint16_t a, uint8_t v) {
-    contend(a); T += 3;
+    contend(a); T += 3; USE(a, 2);
     if (a >= 0x4000) page[a >> 14][a & 0x3fff] = v;
 }
 
@@ -226,6 +232,7 @@ static void init_tables(void) {
 static inline uint8_t fetch_op(void) {
     contend(pc); T += 4;
     R = (R & 0x80) | ((R + 1) & 0x7f);
+    USE(pc, 4);
     return peek(pc++);
 }
 static inline uint8_t imm8(void) { return rd(pc++); }
@@ -712,6 +719,7 @@ int main(int argc, char **argv) {
     static event shots[MAX_EVENTS], keys[MAX_EVENTS], joys[MAX_EVENTS];
     int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
     FILE *vid = NULL, *aylog = NULL;
+    const char *use_file = NULL;
     long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1, rand_seed = -1;
     const char *prof_file = NULL;
     static unsigned long long prof[65536];
@@ -738,6 +746,12 @@ int main(int argc, char **argv) {
             char *v = argv[++i];
             prof_from = strtol(v, &v, 0);
             if (*v == ':') prof_file = v + 1;
+        }
+        else if (!strcmp(a, "-u") && i + 1 < argc) {
+            char *v = argv[++i];
+            use_lo = strtol(v, &v, 0);
+            if (*v == ':') use_hi = strtol(v + 1, &v, 0);
+            if (*v == ':') use_file = v + 1;
         }
         else if (!strcmp(a, "-w") && i + 1 < argc) {
             char *v = argv[++i];
@@ -808,6 +822,10 @@ int main(int argc, char **argv) {
         printf("ay");
         for (int r = 0; r < 14; r++) printf(" %02X", ay_reg[r]);
         printf("\n");
+    }
+    if (use_file && use_lo >= 0 && use_hi > use_lo) {
+        FILE *u = fopen(use_file, "wb");
+        if (u) { fwrite(usemap + use_lo, 1, (size_t)(use_hi - use_lo), u); fclose(u); }
     }
     if (dump_addr >= 0) {
         for (long i = 0; i < dump_len; i++)

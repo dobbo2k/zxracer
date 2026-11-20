@@ -138,29 +138,4 @@ DrawCrew:
         djnz .ar
         ret
 
-CrewLines:      ; her line, his reply
-        dw CrewSay0a, CrewSay0b
-        dw CrewSay1a, CrewSay1b
-        dw CrewSay2a, CrewSay2b
-        dw CrewSay3a, CrewSay3b
-        dw CrewSay4a, CrewSay4b
-        dw CrewSay5a, CrewSay5b
-        dw CrewSay6a, CrewSay6b
-        dw CrewSay7a, CrewSay7b
-CrewSay0a:  db "< WATCH THE ROAD!   ", 0
-CrewSay0b:  db "   SORRY, SORRY... >", 0
-CrewSay1a:  db "< ARE YOU BLIND?!   ", 0
-CrewSay1b:  db "  THE SUN WAS LOW! >", 0
-CrewSay2a:  db "< MY HAIR! MY HAIR! ", 0
-CrewSay2b:  db "   IT LOOKS GREAT! >", 0
-CrewSay3a:  db "< LET ME DRIVE!     ", 0
-CrewSay3b:  db "   NOT A CHANCE... >", 0
-CrewSay4a:  db "< NICE ONE, GENIUS! ", 0
-CrewSay4b:  db "    IT JUMPED OUT! >", 0
-CrewSay5a:  db "< I SAID SLOW DOWN! ", 0
-CrewSay5b:  db "   I WAS GOING TO! >", 0
-CrewSay6a:  db "< LOSE THE SHADES!  ", 0
-CrewSay6b:  db " THEY LOOK COOL... >", 0
-CrewSay7a:  db "< OPEN YOUR EYES!   ", 0
-CrewSay7b:  db "    THEY ARE OPEN! >", 0
         INCLUDE "crew_data.asm"

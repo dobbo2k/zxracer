@@ -144,6 +144,8 @@ FillBlock:
         ORG ISR_JP
         jp Isr
 
+        INCLUDE "holes.asm"     ; small data in the unused ends of the table pages
+
 ; Resident graphics in the spare part of bank 5 (always paged): the traffic
 ; sprite, the font and the player's car; then code that is not time-critical
 ; (bank 5 is contended). The track cache follows.

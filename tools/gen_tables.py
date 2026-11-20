@@ -50,6 +50,7 @@ def page(name, *halves):
         out.append(f"{label}:")
         for k in range(0, len(values), 16):
             out.append("        db " + ", ".join(f"${v & 0xFF:02X}" for v in values[k:k + 16]))
+        out.append(f"{label}_end:")             # (src/holes.asm uses what follows)
     out.append(f"        ORG {name} + 256")
     return out
 
@@ -63,9 +64,10 @@ def main(path):
     hi = [0x40 | (screen_addr(y) >> 8) for y in range(192)]
     for k in range(0, 192, 16):
         lines.append("        db " + ", ".join(f"${v:02X}" for v in lo[k:k + 16]))
-    lines += ["        ALIGN 256", "ScrHi:"]
+    lines += ["ScrLo_end:", "        ALIGN 256", "ScrHi:"]
     for k in range(0, 192, 16):
         lines.append("        db " + ", ".join(f"${v:02X}" for v in hi[k:k + 16]))
+    lines += ["ScrHi_end:"]
     road = [road_line(i) for i in range(ROAD_LINES)]
     # Per-line road constants and pass-1 outputs, all indexed by road line i.
     lines += page("X1Page", ("RoadX1", [r[1] for r in road]),           # road half-width (no kerb)
@@ -144,27 +146,28 @@ def main(path):
             lane2.append(bits & 0xFF)
     lines += ["        ALIGN 256", "MaskPage:", "LMask:"]
     lines.append("        db " + ", ".join(f"${v:02X}" for v in lmask))
-    lines += ["        ORG MaskPage + $40", "LaneM1:"]
+    lines += ["LMask_end:", "        ORG MaskPage + $40", "LaneM1:"]
     for k in range(0, 64, 16):
         lines.append("        db " + ", ".join(f"${v:02X}" for v in lane1[k:k + 16]))
-    lines += ["        ORG MaskPage + $80", "LaneM2:"]
+    lines += ["LaneM1_end:", "        ORG MaskPage + $80", "LaneM2:"]
     for k in range(0, 64, 16):
         lines.append("        db " + ", ".join(f"${v:02X}" for v in lane2[k:k + 16]))
+    lines += ["LaneM2_end:"]
     rmask = [0xFF >> b for b in range(8)]
     lmask_incl = [(~(0x7F >> b)) & 0xFF for b in range(8)]
     lines += ["        ORG MaskPage + $10", "RMask:",
               "        db " + ", ".join(f"${v:02X}" for v in rmask),
               "LMaskIncl:",
-              "        db " + ", ".join(f"${v:02X}" for v in lmask_incl)]
+              "        db " + ", ".join(f"${v:02X}" for v in lmask_incl), "LMaskIncl_end:"]
     lines += ["        ORG MaskPage + 256"]
 
     # Kerb strips (written at run time): StripL = PAD zeros, left mask, PAD x $FF;
     # StripR = PAD x $FF, right mask, PAD zeros
     pad = 12
     lines += ["        ALIGN 256", "StripPage:", "StripL:",
-              "        db " + ", ".join(["$00"] * pad + ["$00"] + ["$FF"] * pad),
+              "        db " + ", ".join(["$00"] * pad + ["$00"] + ["$FF"] * pad), "StripL_end:",
               "        ORG StripPage + $20", "StripR:",
-              "        db " + ", ".join(["$FF"] * pad + ["$00"] + ["$00"] * pad),
+              "        db " + ", ".join(["$FF"] * pad + ["$00"] + ["$00"] * pad), "StripR_end:",
               "        ORG StripPage + 256"]
 
     lines.append("")

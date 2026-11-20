@@ -22,6 +22,8 @@ zxsim game.sna [options]
   -b F            log every border write (frame, T, colour) from frame F
   -p F:file       from frame F accumulate T-states per PC into file
   -w ADDR[:N]     print registers the first N times PC reaches ADDR
+  -u LO:HI:FILE   write a byte per address LO..HI-1 to FILE: bit 0 read, bit 1
+                  written, bit 2 executed (which memory a run really uses)
   -d ADDR:LEN     hex-dump memory at exit
   -a              print the AY registers at exit
   -v FILE         write every frame as raw RGB24 320x288 (video capture)
