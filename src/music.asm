@@ -7,7 +7,7 @@
 ; tyre smoke) takes A over from the drums; a bump or crash takes B
 ; from the bass; the starting lights' last beep takes C. The music keeps time
 ; meanwhile (a squeal near the grip limit is a chirp now and then, so the
-; drums go on). Without music (the attract demo, waiting at the lights, or the
+; drums go on); gravel off the road takes B like a hit. Without music (the attract demo, waiting at the lights, or the
 ; sound set to the engine): the engine note on A, gravel and hits on B.
 ;
 ; Tunes (tools/make_music.py): dw bass, melody, drums; each a byte stream:
@@ -29,19 +29,34 @@ CH_V0           EQU 11              ; a note starts at this volume
 CH_FLOOR        EQU 12              ; and fades to this
 CH_DMASK        EQU 13              ; by one every (mask + 1) interrupts
 CH_NOTE         EQU 14              ; the last event (drums: which drum)
+CH_TGT          EQU 15              ; the note's own period (word)
+CH_ARPX         EQU 17              ; arpeggio: semitones of its 2nd and 3rd
+CH_ARPY         EQU 18              ; notes (both 0: off)
+CH_ARPPH        EQU 19              ; which of the three is sounding
+CH_VIB          EQU 20              ; vibrato: depth = period >> this (0: off)
+CH_AGE          EQU 21              ; interrupts since the note began
+CH_SLPEND       EQU 22              ; a slide into the next note: 2^this interrupts
+CH_SLLEFT       EQU 23              ; interrupts left of a slide
+CH_STEP         EQU 24              ; its step per interrupt (word)
+CH_BASE         EQU 26              ; the note (1-60)
+CH_SIZE         EQU 27
+VIB_DELAY       EQU 10              ; vibrato starts this far into a note
 
 ChanA:  dw 0, 0                     ; drums
         db 1, 1, 0
         dw 0
         db 0, 8, 0, 0, 0, 0
+        ds CH_SIZE - 15
 ChanB:  dw 0, 0                     ; bass
         db 1, 1, 0
         dw 0
         db 2, 9, 12, 8, 1, 0
+        ds CH_SIZE - 15
 ChanC:  dw 0, 0                     ; melody
         db 1, 1, 0
         dw 0
         db 4, 10, 13, 9, 3, 0
+        ds CH_SIZE - 15
 MusicOn:        db 0
 SoundMode:      db 0
 SfxBusy:        db 0                ; a hit has channel B (and the noise)
@@ -88,13 +103,34 @@ MusicPlay:
         ld a, 6
         call AyWrite
         ld a, 1
-.nohit: ld (SfxBusy), a
+        jr .busy
+.nohit: ld a, (Mute)            ; off the road and moving: gravel on B
+        or a
+        jr nz, .busy0
+        ld a, (OffRoad)
+        or a
+        jr z, .busy0
+        ld a, (Speed)
+        or a
+        jr z, .busy0
+        ld e, 10
+        ld a, 9
+        call AyWrite
+        ld e, 12
+        ld a, 6
+        call AyWrite
+        ld a, 1
+        jr .busy
+.busy0: xor a
+.busy:  ld (SfxBusy), a
         ld ix, ChanA
         call MusicStep
         ld ix, ChanB
         call MusicStep
+        call Pitch
         ld ix, ChanC
         call MusicStep
+        call Pitch
         ld a, %00111111         ; everything off, then on as used
         ld (MixBits), a
         ; A: the squeal, or the drums. A full squeal while the car slides
@@ -180,7 +216,7 @@ DrumOut:
         ld a, (ChanA + CH_NOTE)
         or a
         jr z, .run
-        cp 4
+        cp 6
         jr nc, .run             ; (a tie)
         dec a
         add a, a
@@ -245,110 +281,34 @@ DrumOut:
 
 ; Drums: per interrupt db volume (0: the end), noise period (0: none),
 ; dw tone period (0: none)
-DrumTab:        dw DrumKick, DrumSnare, DrumHat
-DrumKick:       db 15, 0
-                dw 300
-                db 14, 0
+DrumTab:        dw DrumKick, DrumSnare, DrumHat, DrumTom, DrumOpen
+DrumTom:        db 14, 0
+                dw 500
+                db 13, 0
                 dw 600
-                db 12, 0
+                db 11, 0
+                dw 720
+                db 9, 0
+                dw 860
+                db 6, 0
                 dw 1000
-                db 10, 0
-                dw 1500
-                db 7, 0
-                dw 2100
-                db 4, 0
-                dw 2800
+                db 3, 0
+                dw 1150
                 db 0
-DrumSnare:      db 14, 6
-                dw 250
-                db 13, 7
+DrumOpen:       db 11, 1
                 dw 0
-                db 11, 8
+                db 10, 1
                 dw 0
-                db 9, 9
-                dw 0
-                db 6, 10
-                dw 0
-                db 3, 10
-                dw 0
-                db 0
-DrumHat:        db 10, 1
+                db 8, 1
                 dw 0
                 db 6, 1
                 dw 0
+                db 4, 1
+                dw 0
+                db 2, 1
+                dw 0
                 db 0
 
-; No music: the engine on A, gravel and hits on B, the lights' beeps on C
-EngineSounds:
-        ; engine period with a small wobble every interrupt
-        ld hl, (EnginePeriod)
-        ld a, (FrameCount)
-        and 3
-        add a, l
-        ld l, a
-        jr nc, .nw
-        inc h
-.nw:    push hl
-        ld e, l
-        xor a                   ; tone A fine
-        call AyWrite
-        pop hl
-        ld e, h
-        ld a, 1                 ; tone A coarse
-        call AyWrite
-        ; engine volume: 11 when the game is running, quieter in attract
-        ld e, 11
-        ld a, (GameState)
-        cp ST_PLAYING
-        jr z, .vol
-        ld e, 7
-.vol:   ld a, 8
-        call AyWrite
-        ; effects: a burst of noise on B (bump, crash) overrides the gravel
-        ld a, (SfxTimer)
-        or a
-        jr z, .noSfx
-        dec a
-        ld (SfxTimer), a
-        ld e, a                 ; volume fades with the timer
-        ld a, 9
-        call AyWrite
-        ld a, (SfxType)
-        ld e, a                 ; noise period: low = rumble
-        ld a, 6
-        call AyWrite
-        jr .mix
-.noSfx:
-        ; gravel: noise on B while off the road and moving
-        ld e, 0
-        ld a, (OffRoad)
-        or a
-        jr z, .gr
-        ld a, (Speed)
-        or a
-        jr z, .gr
-        ld e, 10
-.gr:    ld a, 9
-        call AyWrite
-        ld e, 12                ; noise period
-        ld a, 6
-        call AyWrite
-.mix:
-        ; mixer: tone A, noise B (0 bits enable), and tone C for a beep
-        ld a, (BeepTime)
-        or a
-        jr z, .mx
-        dec a
-        ld (BeepTime), a
-        jr nz, .bp
-        ld e, a                 ; its end: volume C off
-        ld a, 10
-        call AyWrite
-.bp:    ld e, %00101010
-        jr .mw
-.mx:    ld e, %00101110
-.mw:    ld a, 7
-        jp AyWrite
 
 ; IX = channel: one interrupt of its tune
 MusicStep:
@@ -394,9 +354,60 @@ MusicStep:
         jr .ev
 .nl:    cp $60
         jr c, .note
+        cp $A0
+        jr nc, .cmd
         sub $5F                 ; a new length
         ld (ix + CH_LEN), a
         jr .ev
+.cmd:   ld c, a                 ; $A0+n arpeggio, $B0+n envelope,
+        and $0F                 ; $C0+s slide, $D0+s vibrato
+        ld b, a
+        ld a, c
+        cp $B0
+        jr nc, .env
+        ld a, b                 ; arpeggio n: ArpTab entry n-1 (0: off)
+        or a
+        jr z, .arp0
+        add a, a
+        add a, low (ArpTab - 2)
+        ld e, a
+        adc a, high (ArpTab - 2)
+        sub e
+        ld d, a
+        ld a, (de)
+        inc de
+        ld (ix + CH_ARPX), a
+        ld a, (de)
+.arpy:  ld (ix + CH_ARPY), a
+        ld (ix + CH_ARPPH), 0
+        jr .ev
+.arp0:  ld (ix + CH_ARPX), a
+        jr .arpy
+.env:   cp $C0
+        jr nc, .sl
+        ld a, b                 ; envelope n: EnvTab entry (3 bytes)
+        add a, a
+        add a, b
+        add a, low EnvTab
+        ld e, a
+        adc a, high EnvTab
+        sub e
+        ld d, a
+        ld a, (de)
+        ld (ix + CH_V0), a
+        inc de
+        ld a, (de)
+        ld (ix + CH_FLOOR), a
+        inc de
+        ld a, (de)
+        ld (ix + CH_DMASK), a
+        jr .ev
+.sl:    cp $D0
+        jr nc, .vib
+        ld (ix + CH_SLPEND), b
+        jp .ev
+.vib:   ld (ix + CH_VIB), b
+        jp .ev
 .note:  ld (ix + CH_PTR), l
         ld (ix + CH_PTR + 1), h
         ld c, a
@@ -408,20 +419,125 @@ MusicStep:
         ret z                   ; tied: the note goes on
         or a
         jr z, .vol              ; a rest: silence
-        dec a
-        add a, a
-        add a, low NoteTab
-        ld l, a
-        adc a, high NoteTab
-        sub l
-        ld h, a
-        ld a, (hl)
-        ld (ix + CH_PER), a
-        inc hl
-        ld a, (hl)
-        ld (ix + CH_PER + 1), a
-        ld a, (ix + CH_V0)
+        ld (ix + CH_BASE), a
+        call NotePeriod         ; -> DE
+        ld (ix + CH_TGT), e
+        ld (ix + CH_TGT + 1), d
+        ld (ix + CH_AGE), 0
+        ld (ix + CH_SLLEFT), 0
+        ld a, (ix + CH_SLPEND)  ; sliding in: from the last pitch
+        or a
+        jr z, .noSl
+        ld b, a
+        ld (ix + CH_SLPEND), 0
+        ld l, (ix + CH_PER)
+        ld h, (ix + CH_PER + 1)
+        ex de, hl
+        push af                 ; (A: the slide's 2^A)
+        or a
+        sbc hl, de              ; target - now
+        ld c, h                 ; (its sign: shift the size, so the steps
+        bit 7, h                ; never overshoot)
+        call nz, NegHL
+.shr:   srl h
+        rr l
+        djnz .shr
+        bit 7, c
+        call nz, NegHL
+        ld (ix + CH_STEP), l
+        ld (ix + CH_STEP + 1), h
+        pop af
+        ld b, a
+        ld a, 1
+.pow:   add a, a
+        djnz .pow
+        ld (ix + CH_SLLEFT), a
+.noSl:  ld a, (ix + CH_V0)
 .vol:   ld (ix + CH_VOL), a
+        ret
+
+; IX = channel: its pitch this interrupt - the arpeggio's note, a slide's
+; way, or the note with vibrato once it has sounded a while
+Pitch:  ld a, (ix + CH_NOTE)
+        or a
+        ret z                   ; a rest
+        ld a, (ix + CH_ARPX)
+        or (ix + CH_ARPY)
+        jr z, .slide
+        ld a, (ix + CH_ARPPH)   ; arpeggio: base, +X, +Y in turn
+        ld b, (ix + CH_BASE)
+        or a
+        jr z, .ap
+        ld c, (ix + CH_ARPX)
+        dec a
+        jr z, .ax
+        ld c, (ix + CH_ARPY)
+.ax:    ld a, b
+        add a, c
+        ld b, a
+.ap:    ld a, (ix + CH_ARPPH)
+        inc a
+        cp 3
+        jr c, .ph
+        xor a
+.ph:    ld (ix + CH_ARPPH), a
+        ld a, b
+        call NotePeriod
+        jr .set
+.slide: ld a, (ix + CH_SLLEFT)
+        or a
+        jr z, .vib
+        dec (ix + CH_SLLEFT)
+        jr z, .tgt
+        ld l, (ix + CH_PER)
+        ld h, (ix + CH_PER + 1)
+        ld e, (ix + CH_STEP)
+        ld d, (ix + CH_STEP + 1)
+        add hl, de
+        ex de, hl
+        jr .set
+.vib:   ld a, (ix + CH_AGE)
+        inc a
+        jr z, .old
+        ld (ix + CH_AGE), a
+.old:   ld b, (ix + CH_VIB)
+        inc b
+        dec b
+        jr z, .tgt
+        cp VIB_DELAY
+        jr c, .tgt
+        rrca                    ; phase: (age / 2) & 7
+        and 7
+        ld c, a
+        ld l, (ix + CH_TGT)
+        ld h, (ix + CH_TGT + 1)
+.dep:   srl h                   ; depth = period >> VIB
+        rr l
+        djnz .dep
+        ex de, hl
+        ld l, (ix + CH_TGT)
+        ld h, (ix + CH_TGT + 1)
+        ld a, c                 ; 0 1 2 1 0 -1 -2 -1 depths
+        and 3
+        jr z, .vset
+        cp 2
+        jr nz, .one
+        add hl, de
+.one:   bit 2, c
+        jr nz, .neg
+        add hl, de
+        jr .vset
+.neg:   or a
+        sbc hl, de
+        cp 2
+        jr nz, .vset
+        sbc hl, de
+.vset:  ex de, hl
+        jr .set
+.tgt:   ld e, (ix + CH_TGT)
+        ld d, (ix + CH_TGT + 1)
+.set:   ld (ix + CH_PER), e
+        ld (ix + CH_PER + 1), d
         ret
 
 ; IX = channel: its tone and volume to the AY
@@ -474,44 +590,13 @@ MusicStart:
         ld (ix + CH_START + 1), d
         ld (ix + CH_LEFT), 1
         ld (ix + CH_VOL), 0
+        ld (ix + CH_ARPX), 0    ; no effects until the tune says
+        ld (ix + CH_ARPY), 0
+        ld (ix + CH_VIB), 0
+        ld (ix + CH_SLPEND), 0
+        ld (ix + CH_SLLEFT), 0
         ret
 
-; The current theme's tune
-MusicTheme:
-        ld hl, (StTune)
-        jr MusicStart
-
-; At the green light: the theme's tune, in a game
-MusicGo:
-        ld a, (GameState)
-        cp ST_PLAYING
-        ret nz
-        jr MusicTheme
-
-; Stop the music, silence its channels
-MusicStop:
-        xor a
-        ld (MusicOn), a
-        di
-        ld e, a
-        ld a, 8
-        call AyWrite
-        ld e, 0
-        ld a, 9
-        call AyWrite
-        ld e, 0
-        ld a, 10
-        call AyWrite
-        ei
-        ret
-
-; A = register, E = value, from outside the interrupt (which writes the AY
-; too: a register selected and then written must not be split)
-AyPut:  di
-        call AyWrite
-        ei
-        ret
-
-; AY tone periods, C2 to B6 (tools/make_music.py)
-NoteTab:
-        INCLUDE "music_notes.asm"
+; (NoteTab, the tone periods, ArpTab, EnvTab and some of the drums are in
+; src/holes.asm; NotePeriod, MusicTheme, MusicGo, MusicStop and AyPut in
+; src/musicb2.asm, bank 2)

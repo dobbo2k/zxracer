@@ -60,6 +60,7 @@ MainLoop:
         INCLUDE "hud.asm"
         INCLUDE "game.asm"
         INCLUDE "sound.asm"
+        INCLUDE "musicb2.asm"
         INCLUDE "traffic.asm"
         INCLUDE "fork.asm"
         INCLUDE "hills.asm"

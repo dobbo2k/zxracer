@@ -44,6 +44,78 @@ EngineUpdate:
         ld (EnginePeriod), hl
         ret
 
+; No music: the engine on A, gravel and hits on B, the lights' beeps on C
+EngineSounds:
+        ; engine period with a small wobble every interrupt
+        ld hl, (EnginePeriod)
+        ld a, (FrameCount)
+        and 3
+        add a, l
+        ld l, a
+        jr nc, .nw
+        inc h
+.nw:    push hl
+        ld e, l
+        xor a                   ; tone A fine
+        call AyWrite
+        pop hl
+        ld e, h
+        ld a, 1                 ; tone A coarse
+        call AyWrite
+        ; engine volume: 11 when the game is running, quieter in attract
+        ld e, 11
+        ld a, (GameState)
+        cp ST_PLAYING
+        jr z, .vol
+        ld e, 7
+.vol:   ld a, 8
+        call AyWrite
+        ; effects: a burst of noise on B (bump, crash) overrides the gravel
+        ld a, (SfxTimer)
+        or a
+        jr z, .noSfx
+        dec a
+        ld (SfxTimer), a
+        ld e, a                 ; volume fades with the timer
+        ld a, 9
+        call AyWrite
+        ld a, (SfxType)
+        ld e, a                 ; noise period: low = rumble
+        ld a, 6
+        call AyWrite
+        jr .mix
+.noSfx:
+        ; gravel: noise on B while off the road and moving
+        ld e, 0
+        ld a, (OffRoad)
+        or a
+        jr z, .gr
+        ld a, (Speed)
+        or a
+        jr z, .gr
+        ld e, 10
+.gr:    ld a, 9
+        call AyWrite
+        ld e, 12                ; noise period
+        ld a, 6
+        call AyWrite
+.mix:
+        ; mixer: tone A, noise B (0 bits enable), and tone C for a beep
+        ld a, (BeepTime)
+        or a
+        jr z, .mx
+        dec a
+        ld (BeepTime), a
+        jr nz, .bp
+        ld e, a                 ; its end: volume C off
+        ld a, 10
+        call AyWrite
+.bp:    ld e, %00101010
+        jr .mw
+.mx:    ld e, %00101110
+.mw:    ld a, 7
+        jp AyWrite
+
 SFX_BUMP        EQU 6               ; noise period of the effect
 SFX_CRASH       EQU 24
 

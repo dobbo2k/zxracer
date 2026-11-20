@@ -454,19 +454,25 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 music (a game after the green light, the title screens): drums on A, bass on
 B, melody on C, no engine. Without (the attract demo, waiting at the lights,
 or the sound set to the engine): the engine note on A, gravel and hits on B.
-Tunes are written in `tools/make_music.py` (per bar a chord, which the bass
-pattern follows, and the melody in sixteenths; a one-bar drum pattern played
-7 bars and then a fill) and encoded as byte streams (note, rest, tie, length,
-loop): 260-500 bytes each. Drums are per-interrupt programs on channel A
+Tunes are written in `tools/make_music.py` in sections (a bass pattern
+following each bar's chord, a drum pattern with a fill for the last bar, and
+the melody in sixteenths with slides `/E5`, arpeggios `@A5.m` and envelope
+changes `!1`) and encoded as byte streams (note, rest, tie, length, loop,
+and commands: arpeggio, envelope, slide, vibrato): 320-930 bytes each. The
+player's effects: arpeggios cycle the chord's three notes every interrupt;
+a slide moves from the last pitch to the new note in 2, 4 or 8 equal steps;
+vibrato (melody) starts 10 interrupts into a note, a triangle of +-2 x
+period/64; envelopes: pluck, sustained lead, soft, bass, heavy bass. Drums are per-interrupt programs on channel A
 (kick: a falling tone; snare: noise with a tone hit; hi-hat: a click of high
-noise). Each theme's tune is in its theme pack (header +15; room made by
+noise; open hi-hat: a longer one; tom: a falling mid tone, for fills). Each theme's tune is in its theme pack (header +15; room made by
 storing the horizon panorama in 2 pre-shifted copies instead of 4, so it
 scrolls in 4-pixel steps), the title tune in the front-end overlay. A note
 starts at volume 13 (melody) / 12 (bass), fades to 9 / 8 and is silent for its
 last interrupt (not when tied on). Effects take a channel and the music keeps
 time unheard: tyre squeal takes A (fully while sliding or spinning, held 12
 interrupts over the flicker at the grip limit; near the limit a 24-interrupt
-chirp at most every 128), a bump or crash takes B (and the noise generator),
+chirp at most every 128), a bump or crash or off-road gravel takes B (and the
+noise generator),
 the green light's beep takes C. The player skips interrupts while another bank
 is paged over the tune (`Paged`, set by `CopyFromBank` and `ShowPic`) and is
 silent while the game is paused. Main-code AY writes go through `AyPut`

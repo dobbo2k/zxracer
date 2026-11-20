@@ -10,11 +10,18 @@
         ASSERT ScrLo_end <= ScrLo + $C4
 CrewSay0a: db "< WATCH THE ROAD!   ", 0
 CrewSay0b: db "   SORRY, SORRY... >", 0
+; Arpeggios (semitones of the 2nd and 3rd notes): 1 major, 2 minor,
+; 3 seventh, 4 minor seventh, 5 major seventh, 6 sus4, 7 power (5th, octave),
+; 8 octave
+ArpTab:         db 4, 7,  3, 7,  4, 10,  3, 10,  4, 11,  5, 7,  7, 12,  12, 12
         ASSERT $ <= ScrLo + 256
         ORG ScrHi + $C4
         ASSERT ScrHi_end <= ScrHi + $C4
 CrewSay1a: db "< ARE YOU BLIND?!   ", 0
 CrewSay1b: db "  THE SUN WAS LOW! >", 0
+; Envelopes: start volume, the volume it fades to, fade every (mask+1)
+; 0 pluck, 1 sustained lead, 2 soft, 3 bass, 4 heavy bass
+EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3
         ASSERT $ <= ScrHi + 256
         ORG X1Page + $60
         ASSERT RoadX1_end <= X1Page + $60
@@ -97,6 +104,20 @@ LampGlyph:
         db $7F, $FE, $7F, $FE, $3F, $FC, $3F, $FC, $1F, $F8, $0F, $F0, $03, $C0, $00, $00
 ; the route of the last game (the stage played on each row; $FF: not reached)
 Route:          ds 5, $FF
+; the music's snare drum (src/music.asm)
+DrumSnare:      db 14, 6
+                dw 250
+                db 13, 7
+                dw 0
+                db 11, 8
+                dw 0
+                db 9, 9
+                dw 0
+                db 6, 10
+                dw 0
+                db 3, 10
+                dw 0
+                db 0
         ASSERT $ <= MaskPage + 256
         ORG StripPage + $39
         ASSERT StripR_end <= StripPage + $39
@@ -109,4 +130,26 @@ HiTable:
         db $00, $00, $04, $00, "ZXR"
         db $00, $00, $03, $00, "BOB"
         db $00, $00, $02, $00, "DOT"
+; AY tone periods of the music's notes, C2 to B6 (tools/make_music.py)
+NoteTab:
+        INCLUDE "music_notes.asm"
+; the music's kick drum and hi-hat (src/music.asm)
+DrumKick:       db 15, 0
+                dw 300
+                db 14, 0
+                dw 600
+                db 12, 0
+                dw 1000
+                db 10, 0
+                dw 1500
+                db 7, 0
+                dw 2100
+                db 4, 0
+                dw 2800
+                db 0
+DrumHat:        db 10, 1
+                dw 0
+                db 6, 1
+                dw 0
+                db 0
         ASSERT $ <= StripPage + 256
