@@ -4,8 +4,9 @@
 Video: every 50 Hz frame from zxsim (-v), scaled 2x with nearest-neighbour.
 Audio: zxsim logs the AY-3-8912 registers at the end of every frame (-y);
 this script synthesises them (3 square-wave tone channels, 17-bit LFSR
-noise, the AY's logarithmic volume table) at 44.1 kHz. Envelopes are not
-used by the game and are not modelled.
+noise, the AY's logarithmic volume table and its envelope generator) at
+44.1 kHz. zxsim sets bit 7 of the logged register 13 in a frame that wrote
+it, which restarts the envelope (the drum fill between stages).
 
 usage: make_video.py ZXSIM SNA OUT.mp4 [frames] [zxsim key options...]
 """
@@ -24,6 +25,23 @@ VOLUMES = [0.0, 0.0137, 0.0205, 0.0291, 0.0423, 0.0618, 0.0847, 0.1369,
            0.1691, 0.2647, 0.3527, 0.4499, 0.5704, 0.6873, 0.8482, 1.0]
 
 
+def envelope(shape, pos):
+    """The AY's envelope level (0-15) at positions pos, in steps from its start."""
+    step = np.floor(pos).astype(np.int64)
+    cycle, s = step // 16, step % 16
+    up = bool(shape & 4)
+    first = s if up else 15 - s
+    if not shape & 8:                   # one ramp, then silence
+        return np.where(cycle == 0, first, 0)
+    if shape & 1:                       # one ramp, then hold
+        end = 15 if up != bool(shape & 2) else 0
+        return np.where(cycle == 0, first, end)
+    if shape & 2:                       # up and down
+        rising = (cycle % 2 == 0) == up
+        return np.where(rising, s, 15 - s)
+    return first                        # saw: the ramp again and again
+
+
 def synth(regs):
     """regs: (frames, 14) uint8 -> mono float32 samples."""
     spf = RATE // FPS
@@ -31,11 +49,20 @@ def synth(regs):
     t = np.arange(spf)
     phase = [0.0, 0.0, 0.0]
     lfsr, noise_acc = 1, 0.0
+    env_pos = 1e9                       # (no envelope started: silent)
+    vol_tab = np.array(VOLUMES, dtype=np.float32)
     for f, r in enumerate(regs):
         r = [int(v) for v in r]         # numpy uint8 would overflow the shifts
+        if r[13] & 0x80:
+            env_pos = 0.0
+        eper = (r[11] | (r[12] << 8)) or 1
+        estep = AY_CLOCK / (256 * eper) / RATE
+        epos = env_pos + t * estep
+        env_pos += spf * estep
+        env = vol_tab[envelope(r[13] & 15, epos)]
         periods = [(r[2 * c] | ((r[2 * c + 1] & 15) << 8)) or 1 for c in range(3)]
         mixer = r[7]
-        vols = [VOLUMES[r[8 + c] & 15] for c in range(3)]
+        vols = [env if r[8 + c] & 16 else VOLUMES[r[8 + c] & 15] for c in range(3)]
         # noise: one LFSR step per noise period
         nper = (r[6] & 31) or 1
         nstep = AY_CLOCK / (16 * nper) / RATE
@@ -49,7 +76,7 @@ def synth(regs):
             noise[k] = lfsr & 1
         frame = np.zeros(spf, dtype=np.float32)
         for c in range(3):
-            if vols[c] == 0:
+            if np.isscalar(vols[c]) and vols[c] == 0:
                 continue
             freq = AY_CLOCK / (16 * periods[c])
             ph = phase[c] + t * freq / RATE

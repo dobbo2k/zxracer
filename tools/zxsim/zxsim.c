@@ -21,6 +21,7 @@
  *   -a              print the AY registers at exit
  *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture)
  *   -y FILE         write the 14 AY registers at the end of every frame to FILE
+ *                   (register 13's bit 7 set: it was written that frame)
  *   -q              quiet summary
  *   -R SEED         fill RAM and the (absent) ROM with random bytes first, as
  *                   a real machine's leftovers would be (robustness testing)
@@ -127,6 +128,7 @@ static uint8_t port_in(uint16_t port) {
 
 static int no_paging;
 static uint8_t ay_reg[16], ay_sel;     /* AY-3-8912: registers only, no audio */
+static int ay_env_hit;                 /* register 13 written this frame */
 static int log_border_from = -1;
 static long flips;
 static void port_out(uint16_t port, uint8_t v) {
@@ -136,7 +138,10 @@ static void port_out(uint16_t port, uint8_t v) {
             printf("border frame=%ld T=%ld colour=%d\n", frame, T, border);
     }
     if ((port & 0xC002) == 0xC000) ay_sel = v & 15;              /* $FFFD */
-    else if ((port & 0xC002) == 0x8000) ay_reg[ay_sel] = v;      /* $BFFD */
+    else if ((port & 0xC002) == 0x8000) {                       /* $BFFD */
+        ay_reg[ay_sel] = v;
+        if (ay_sel == 13) ay_env_hit = 1;
+    }
     if (!(port & 0x8002) && !no_paging) {    /* $7FFD decoding: A15=0, A1=0 */
         if ((p7ffd ^ v) & 8) flips++;
         p7ffd = v; update_paging();
@@ -879,7 +884,13 @@ int main(int argc, char **argv) {
         T -= FRAME_T;
         for (int i = 0; i < nshots; i++) if (shots[i].frame == frame) save_ppm(shots[i].arg);
         if (vid) write_rgb(vid);
-        if (aylog) fwrite(ay_reg, 1, 14, aylog);
+        if (aylog) {            /* register 13 bit 7: the envelope restarted */
+            uint8_t r[14];
+            memcpy(r, ay_reg, 14);
+            if (ay_env_hit) r[13] |= 0x80;
+            ay_env_hit = 0;
+            fwrite(r, 1, 14, aylog);
+        }
     }
     if (0) {
 stopped:

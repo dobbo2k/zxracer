@@ -69,7 +69,6 @@ MusicPlay:
         ld a, (Paged)           ; another bank over the tune
         or a
         ret nz
-        call MusicFade
         push ix
         ld a, (SfxTimer)        ; a hit: a noise burst on B
         or a
@@ -225,7 +224,6 @@ DrumOut:
         ld a, (hl)              ; volume (0: the end)
         or a
         jr z, .end
-        call Atten
         ld e, a
         ld a, 8
         call AyWrite
@@ -539,7 +537,6 @@ MusicOut:
         inc a
         call AyWrite
         ld a, (ix + CH_VOL)
-        call Atten
         ld e, a
         ld a, (ix + CH_VREG)
         jp AyWrite
@@ -591,30 +588,3 @@ MusicStart:
 ; (NoteTab, the tone periods, ArpTab, EnvTab and some of the drums are in
 ; src/holes.asm; NotePeriod, MusicTheme, MusicGo, MusicStop and AyPut in
 ; src/musicb2.asm, bank 2)
-
-; ---------------------------------------------------------------------------
-; Between stages: the music plays on to the checkpoint, the loader plays a
-; drum fill (src/stageov.asm) and sets FadeIn, and the next stage's tune
-; comes in quietly and swells over a second. Each interrupt (MusicPlay):
-; FadeAtt comes off every music volume (Atten).
-MusicFade:
-        ld hl, FadeIn           ; a step every 4 interrupts
-        ld a, (FrameCount)
-        and 3
-        jr nz, .k
-        ld a, (hl)
-        or a
-        jr z, .k
-        dec (hl)
-.k:     ld a, (hl)
-        ld (FadeAtt), a
-        ret
-
-; A = a volume -> A less the fade (not below 0)
-Atten:  push hl
-        ld hl, FadeAtt
-        sub (hl)
-        pop hl
-        ret nc
-        xor a
-        ret

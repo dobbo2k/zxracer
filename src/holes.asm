@@ -47,8 +47,6 @@ MixBits:        db 0                ; the mixer setting being built
 DrumPtr:        dw 0                ; the drum sounding: its next step (0: none)
 SqHold:         db 0                ; interrupts until the next chirp may start
 SqTimer:        db 0                ; interrupts left of a chirp
-FadeAtt:        db 0                ; the music's volumes less this (MusicFade)
-FadeIn:         db 0                ; a new tune coming in: steps of fade left
         ASSERT $ <= X1Page + 256
         ORG LWPage + $60
         ASSERT LaneWp_end <= LWPage + $60

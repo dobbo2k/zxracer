@@ -151,7 +151,7 @@ OvCheckpoint:
         ld (Pos), hl
         pop af
         call LoadStage
-        call FillEnd            ; the fill's last hit; the next tune will swell in
+        call FillEnd            ; the fill's last hit, then the next tune
         call Sweep              ; (the rest of the colour sweep)
         ld hl, (StageClock)     ; (the time, for the message)
         push hl
@@ -719,8 +719,8 @@ OvSweep:        db 0
 OvSwept:        db 0                ; (a checkpoint: the sweep cleared rows 3-23)
 
 ; ---------------------------------------------------------------------------
-; The drum fill between stages, while this loads (the next tune then swells
-; in: src/music.asm): every FILL_GAP frames a hit
+; The drum fill between stages, while this loads (the next tune then
+; starts at full volume): every FILL_GAP frames a hit
 ; of noise through channel A's envelope - the AY lets it die away by itself,
 ; the loading goes on - and a longer, deeper one to end on.
 FILL_GAP        EQU 3               ; frames between hits
@@ -762,8 +762,6 @@ FillEnd:
         ret z
         xor a
         ld (OvFill), a
-        ld a, 12                ; the next tune comes in this much quieter
-        ld (FadeIn), a
         ld de, FILL_LAST
         jr FillDE
 HitRegs:        db 7, %00110111     ; mixer: noise on A only
