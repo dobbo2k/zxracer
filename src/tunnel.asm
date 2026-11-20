@@ -21,6 +21,7 @@ F_              EQU $09             ; the mountain face: blue rock (blue ink too
 A_              EQU $76             ; the arch: bright yellow, yellow ink (white would be lost in the snow)
 D_              EQU $00             ; dark
 S_              EQU $FF             ; (left as it is)
+ARCH_MIN        EQU 24              ; the road's width (pixels) at the mouth from which the arch shows
 C_              EQU $07             ; the ceiling: black, white ink
 
 DrawPortal:
@@ -99,7 +100,26 @@ DrawPortal:
         cpl
         add a, 32
         ld (hl), a
-        ; its height: three quarters of its width
+        ; far away (the road narrow there): no arch yet - its cells are face
+        ld a, b
+        cp ARCH_MIN
+        sbc a, a
+        ld (PtFar), a
+        jr z, .h
+        ld hl, PtN
+        ld a, (hl)              ; [0, a0) takes in [a0, C0) ...
+        inc hl
+        add a, (hl)
+        ld (hl), 0
+        dec hl
+        ld (hl), a
+        ld hl, PtN + 3
+        ld a, (hl)              ; ... and (a1, 32) takes in (C1, a1]
+        ld (hl), 0
+        inc hl
+        add a, (hl)
+        ld (hl), a
+.h:     ; its height: three quarters of its width
         ld a, b
         srl a
         ld c, a
@@ -192,7 +212,10 @@ PortalRow:
         jr z, .fa
         ld de, PatCeil
         jr .go
-.fa:    ld a, (PtTop)           ; ... the mouth's face and the arch's row
+.fa:    ld a, (PtFar)           ; ... the mouth's face and the arch's row
+        or a
+        jr nz, .go              ; (no arch from far away)
+        ld a, (PtTop)
         dec a
         cp c
         jr nz, .go
@@ -246,3 +269,4 @@ PtY:            db 0
 PtRow:          db 0
 PtTop:          db 0
 PtR:            db 0
+PtFar:          db 0                ; $FF: too far for the arch
