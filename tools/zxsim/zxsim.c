@@ -24,7 +24,8 @@
  *   -q              quiet summary
  *   -R SEED         fill RAM and the (absent) ROM with random bytes first, as
  *                   a real machine's leftovers would be (robustness testing)
- *   -T file.tap     tape boot instead of a snapshot: does what the BASIC loader
+ *   -T file.tap     tape boot instead of a snapshot (.tap, or .tzx with standard
+ *                   and turbo data blocks): does what the BASIC loader
  *                   would (loads the first CODE block to its address and calls
  *                   it, 48K BASIC ROM paged, bank 0 at $C000), then plays the
  *                   following blocks into the EAR input (port $FE bit 6) with
@@ -589,7 +590,7 @@ static void interrupt(void) {
 }
 
 /* ------------------------------------------------------------------ tape */
-static long tape_len, tape_pos;
+static long tape_len;
 /* the signal: pulse lengths in T; a negative length is a gap (no edge) */
 static long *pulses;
 static long npulses, pulse_i;
@@ -598,13 +599,68 @@ static int ear;
 
 static long long now_t(void) { return (long long)frame * FRAME_T + T; }
 
-/* the next TAP block: returns its body (flag, data, checksum) and length */
-static uint8_t *tape_next(long *len) {
-    if (tape_pos + 2 > tape_len) return NULL;
-    *len = tape[tape_pos] | tape[tape_pos + 1] << 8;
-    uint8_t *b = tape + tape_pos + 2;
-    tape_pos += 2 + *len;
-    return tape_pos <= tape_len ? b : NULL;
+/* tape blocks (from a .tap, or a .tzx's standard / turbo data blocks) */
+struct tblock {
+    uint8_t *data; long len;            /* flag, data, checksum */
+    int pilot, pilot_n, sync1, sync2, zero, one, last_bits;
+    long pause_ms;
+};
+static struct tblock *tblocks;
+static long ntblocks, tblock_i;
+
+static void add_tblock(uint8_t *d, long len, int pilot, int pilot_n, int s1, int s2,
+                       int zero, int one, int last_bits, long pause_ms) {
+    static long cap;
+    if (ntblocks == cap) { cap = cap ? cap * 2 : 64; tblocks = realloc(tblocks, cap * sizeof *tblocks); }
+    tblocks[ntblocks++] = (struct tblock){d, len, pilot, pilot_n, s1, s2, zero, one, last_bits, pause_ms};
+}
+
+/* split the file into blocks: .tap, or .tzx blocks 10 (standard), 11 (turbo),
+   30 / 32 (text, skipped) */
+static int tape_parse(void) {
+    if (tape_len >= 10 && !memcmp(tape, "ZXTape!\x1a", 8)) {
+        long p = 10;
+        while (p < tape_len) {
+            uint8_t id = tape[p++];
+            uint8_t *h = tape + p;
+            if (id == 0x10) {
+                long len = h[2] | h[3] << 8;
+                add_tblock(h + 4, len, 2168, h[4] < 128 ? 8063 : 3223, 667, 735, 855, 1710, 8,
+                           h[0] | h[1] << 8);
+                p += 4 + len;
+            } else if (id == 0x11) {
+                long len = h[15] | h[16] << 8 | (long)h[17] << 16;
+                add_tblock(h + 18, len, h[0] | h[1] << 8, h[10] | h[11] << 8, h[2] | h[3] << 8,
+                           h[4] | h[5] << 8, h[6] | h[7] << 8, h[8] | h[9] << 8, h[12],
+                           h[13] | h[14] << 8);
+                p += 18 + len;
+            } else if (id == 0x30) {
+                p += 1 + h[0];
+            } else if (id == 0x32) {
+                p += 2 + (h[0] | h[1] << 8);
+            } else {
+                fprintf(stderr, "zxsim: TZX block %02X not supported\n", id);
+                return -1;
+            }
+        }
+    } else {
+        long p = 0;
+        while (p + 2 <= tape_len) {
+            long len = tape[p] | tape[p + 1] << 8;
+            if (p + 2 + len > tape_len) break;
+            uint8_t *d = tape + p + 2;
+            add_tblock(d, len, 2168, d[0] < 128 ? 8063 : 3223, 667, 735, 855, 1710, 8, 1000);
+            p += 2 + len;
+        }
+    }
+    return 0;
+}
+
+/* the next block: returns its body (flag, data, checksum) and length */
+static struct tblock *tape_next(long *len) {
+    if (tblock_i >= ntblocks) return NULL;
+    *len = tblocks[tblock_i].len;
+    return &tblocks[tblock_i++];
 }
 
 static long tape_speed = 100;
@@ -615,21 +671,22 @@ static void add_pulse(long t) {
     pulses[npulses++] = t;
 }
 
-/* the rest of the tape as a signal: pilot (2168 T pulses), sync (667, 735),
-   two 855 / 1710 T pulses per 0 / 1 bit, then a second of silence */
+/* the rest of the tape as a signal: per block its pilot, sync pulses, two
+   pulses per bit (zero / one lengths), then its pause */
 static void tape_signal(void) {
     long len;
-    uint8_t *b;
+    struct tblock *t;
     add_pulse(-3500000);                        /* (the gap after the loader) */
-    while ((b = tape_next(&len))) {
-        for (int i = b[0] < 128 ? 8063 : 3223; i > 0; i--) add_pulse(2168);
-        add_pulse(667); add_pulse(735);
+    while ((t = tape_next(&len))) {
+        uint8_t *b = t->data;
+        for (int i = t->pilot_n; i > 0; i--) add_pulse(t->pilot);
+        add_pulse(t->sync1); add_pulse(t->sync2);
         for (long i = 0; i < len; i++)
-            for (int k = 7; k >= 0; k--) {
-                long p = (b[i] >> k & 1) ? 1710 : 855;
+            for (int k = 7; k >= (i == len - 1 ? 8 - t->last_bits : 0); k--) {
+                long p = (b[i] >> k & 1) ? t->one : t->zero;
                 add_pulse(p); add_pulse(p);
             }
-        add_pulse(-3500000);
+        if (t->pause_ms) add_pulse(-3500L * t->pause_ms);
     }
     pulse_end = pulses[0] < 0 ? -pulses[0] : pulses[0];
 }
@@ -652,13 +709,16 @@ static int tape_boot(const char *fn) {
     tape = malloc(tape_len);
     if (fread(tape, 1, tape_len, f) != (size_t)tape_len) { fclose(f); return -1; }
     fclose(f);
+    if (tape_parse()) return -1;
     long len;
-    uint8_t *b;
-    while ((b = tape_next(&len))) {
+    struct tblock *t;
+    while ((t = tape_next(&len))) {
+        uint8_t *b = t->data;
         if (b[0] == 0 && b[1] == 3) {            /* CODE header: its data follows */
             uint16_t addr = b[14] | b[15] << 8;
-            uint8_t *d = tape_next(&len);
-            if (!d) break;
+            struct tblock *dt = tape_next(&len);
+            if (!dt) break;
+            uint8_t *d = dt->data;
             p7ffd = 0x10; update_paging();
             memset(ram[5] + 0x1800, 0x07, 768);   /* CLS with INK 7, PAPER 0 */
             for (long i = 0; i < len - 2; i++) wr((uint16_t)(addr + i), d[1 + i]);

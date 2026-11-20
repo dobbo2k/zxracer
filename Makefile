@@ -57,7 +57,7 @@ profile: $(ZXSIM) build/zxracer.sna
 build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 src/main.asm
 
-build/speedrun.tap: build/release.sna tools/make_tap.py tools/make_screens.py src/loader.asm | build
+build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py tools/make_screens.py src/loader.asm | build
 	$(PYTHON) tools/make_tap.py build/release.sna build/release.sym $@
 
 tap: build/speedrun.tap

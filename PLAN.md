@@ -231,11 +231,21 @@ bars) with `tools/make_tap.py`:
    matter which ROM is paged (128K, +2, +2A, +3). (A first version called the
    ROM's LD-BYTES at `$0556`; it crashed back to BASIC in an emulator, most likely
    because the ROM paged in during `USR` was not the 48K BASIC ROM.) The blocks:
-   the loading screen (raw, so it appears line by line), then the pack banks 0, 1,
-   3, 4, 6 (each loaded to `$8000` and unpacked to `$C000` in its bank), bank 2
-   (loaded into bank 7, unpacked to `$8000`) and the resident part of bank 5
-   (likewise, to `$5B00`), and it jumps to the game. LZ compression (the screens'
-   format) saves 30%: 72 KB, about 6½ minutes. While it loads, a progress bar
+   the loading screen (to `$4000`), the pack banks 0, 1, 3, 4, 6 (each loaded to
+   `$8000` and unpacked to `$C000` in its bank), bank 2 (loaded into bank 7,
+   unpacked to `$8000`) and the resident part of bank 5 (likewise, to `$5B00`),
+   and it jumps to the game. Compression (`tools/zpack.py`, decoded by
+   `Unpack`): LZ77 with interlaced Elias-gamma lengths and offsets' high parts,
+   a repeat-last-offset match and an optimal parse (two states per position:
+   after a literal run, after a match) - 95.7 KB to 52.9 KB, near zlib's 52.3 KB;
+   the screens' byte-level LZ managed 71.8 KB. The .tap loads in about 6
+   minutes. The .tzx (same blocks) has BASIC and the loader at the ROM's speed
+   and the rest as turbo blocks (TZX ID 11): bit pulses of 420 / 840 T instead
+   of 855 / 1710, a 1600-pulse pilot and half a second's pause (time to
+   unpack) - about 3 minutes. Its loader (`-DTURBO`) shortens the edge
+   routine's settling delay for data bits and moves the bit threshold; the
+   pilot and sync detection are unchanged. In zxsim both load from 80% to
+   120% tape speed (the pilot detection sets that window). While it loads, a progress bar
    fills the loading screen's bottom row (a cell every 2 KB or so: a check every
    256 bytes, cheap enough for the edge timing). On a 48K (returns 1) or a tape error
    (returns 10 + the block number) it goes back to BASIC - its stack, `BANK_M`
@@ -244,8 +254,9 @@ bars) with `tools/make_tap.py`:
 
 `tests/tapecheck.py` boots the tape in zxsim (`-T`: does what `LOAD "" CODE: RANDOMIZE
 USR` would, then plays the tape into the EAR input - no ROM image needed) and checks
-that the game starts and shows its title, also with the tape 8% slow or fast and
-with random bytes in memory. Not yet done: the BASIC
+that the game starts and shows its title, that everything loaded matches the
+snapshot byte for byte, also with the tape 8% slow or fast and with random bytes
+in memory, and the same for the .tzx (zxsim plays TZX blocks 10 and 11). Not yet done: the BASIC
 part under the real ROMs, and real hardware.
 
 ### 3.2b The road fork (as built)

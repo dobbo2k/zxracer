@@ -14,7 +14,7 @@ Python 3 with Pillow, and a C compiler (for the test emulator).
 
 ```sh
 make          # -> build/zxracer.sna (128K snapshot, with border timing bars)
-make tap      # -> build/speedrun.tap: the tape release (no timing bars)
+make tap      # -> build/speedrun.tap and build/speedrun.tzx (turbo): the tape release
 make test     # Z80 core self-test, headless runs with screenshots in build/, tape load
 make profile  # T-states per phase per game frame (border timing bars)
 make run      # launches Fuse in 128K mode
@@ -22,11 +22,14 @@ make video    # build/gameplay.mp4: 48 s of autopilot gameplay with synthesised 
 ```
 
 **Loading the tape:** on a 128K / +2 / +2A / +3 choose *Tape Loader* (or type
-`LOAD ""`) and play `build/speedrun.tap`. A BASIC loader loads a small machine-code
-loader, which reads the rest with its own tape routine (standard blocks at the
-normal speed, no ROM calls): the loading screen, then the game's memory banks,
-compressed - about 6½ minutes. Emulators' instant "flash load" only speeds up the
-first two blocks; use the emulator's fast-forward / turbo tape option for the rest.
+`LOAD ""`) and play `build/speedrun.tzx` - about 3 minutes - or, if your
+player or emulator cannot play turbo TZX blocks, `build/speedrun.tap` - about 6
+minutes, at the normal speed. A BASIC loader loads a small machine-code loader,
+which reads the rest with its own tape routine (no ROM calls): the loading
+screen, then the game's memory banks, compressed (`tools/zpack.py`). In the
+.tzx those blocks are turbo blocks (bits about twice as fast). Emulators'
+instant "flash load" only speeds up the first two blocks; use the emulator's
+fast-forward / turbo tape option for the rest.
 On a 48K Spectrum it stops with "128K ONLY"; if a block fails to load it says
 "TAPE ERROR, BLOCK n". `build/release.sna` is the same game as
 a snapshot.

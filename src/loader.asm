@@ -8,7 +8,7 @@
 ; normal speed, but with its own loading routine, so it does not depend on
 ; which ROM is paged in (128K, +2, +2A, +3 alike) and keeps interrupts off
 ; throughout, filling a progress bar along the loading screen's bottom row.
-; The blocks: the loading screen, then the compressed pack
+; The blocks: the loading screen, then the compressed (tools/zpack.py) pack
 ; banks (each loaded to $8000 and unpacked to $C000 in its bank), bank 2
 ; (loaded into bank 7, unpacked to $8000) and last the resident part of
 ; bank 5 (likewise, to $5B00), which overwrites BASIC itself - so it never
@@ -16,6 +16,22 @@
 ; number to BASIC, which reports it (nothing has been loaded over BASIC's own
 ; memory before the last block, and BASIC's paging is restored from BANK_M).
 ; ---------------------------------------------------------------------------
+; Bit timings (the turbo build, for the .tzx: data bits in 420 / 840 T
+; pulses instead of 855 / 1710, and a shorter settling delay while reading
+; them; the pilot and sync stay the ROM's)
+        IFDEF TURBO
+DATA_DELAY      EQU 6               ; Edge1's settling delay for data bits
+BIT_B           EQU $B0             ; ReadByte's count start per bit ...
+BIT_B0          EQU $B3             ; ... the first (after the byte's bookkeeping)
+BIT_TH          EQU $BE             ; longer than this: a 1
+        ELSE
+DATA_DELAY      EQU 22
+BIT_B           EQU $B0
+BIT_B0          EQU $B2
+BIT_TH          EQU $CB
+        ENDIF
+PILOT_DELAY     EQU 22
+
         ORG $BE00
 Loader:
         di
@@ -79,7 +95,7 @@ Loader:
         ld bc, $7FFD
         out (c), a
         pop hl
-        call UnLZ
+        call Unpack
         pop hl
         jr .blk
 .go:    xor a
@@ -108,6 +124,8 @@ BlockNo:        db 0
 ; then the data, then a checksum making the XOR of all of them 0). Carry
 ; set if it loaded correctly. Keeps waiting while there is no signal.
 LoadBlock:
+        ld a, PILOT_DELAY
+        ld (Edge1 + 1), a
         ld a, $7F
         in a, ($FE)
         rra
@@ -131,6 +149,8 @@ LoadBlock:
         jr nc, .sync            ; still the pilot tone
         call Edge1
         ret nc
+        ld a, DATA_DELAY        ; (the data bits' timing)
+        ld (Edge1 + 1), a
         ld a, c
         xor $03                 ; blue / yellow stripes from now on
         ld c, a
@@ -182,13 +202,13 @@ TickN:          db TICK_N
 ; -> L = the next byte (H ^= it), carry set; carry clear on a timeout
 ReadByte:
         ld l, 1                 ; marker bit: shifts out after 8 bits
-        ld b, $B2               ; (a little time was spent since the last bit)
+        ld b, BIT_B0            ; (a little time was spent since the last bit)
 .bit:   call Edge2              ; a full cycle: 855 T pulses for 0, 1710 T for 1
         ret nc
-        ld a, $CB
+        ld a, BIT_TH
         cp b                    ; carry if it took longer than the threshold
         rl l
-        ld b, $B0
+        ld b, BIT_B
         jr nc, .bit
         ld a, h
         xor l
@@ -201,7 +221,7 @@ ReadByte:
 ; time) or SPACE is held. Each edge flips the border stripe colour.
 Edge2:  call Edge1
         ret nc
-Edge1:  ld a, 22
+Edge1:  ld a, PILOT_DELAY        ; (set per block part: LoadBlock)
 .d:     dec a
         jr nz, .d
         and a
@@ -223,35 +243,55 @@ Edge1:  ld a, 22
         scf
         ret
 
-; HL = packed data (tools/make_screens.py format), DE = destination
-UnLZ:   ld a, (hl)
-        inc hl
-        cp $FF
-        ret z
-        cp $80
-        jr nc, .match
-        inc a
-        ld c, a
-        ld b, 0
+; HL = packed data (tools/zpack.py format), DE = destination. A holds the
+; bits not yet used, above a marker bit.
+Unpack: ld a, $80
+.lit:   call Gamma              ; a literal run
         ldir
-        jr UnLZ
-.match: sub $80 - 3
-        ld c, a
-        ld b, 0
-        ld a, (hl)
-        inc hl
-        push hl
-        ld h, (hl)
-        ld l, a
-        push de
-        ex de, hl
+        call GetBit
+        jr c, .new
+        call Gamma              ; a repeat match: the last offset again
+.copy:  push hl
+        push bc
+        ld bc, (LastOff)
+        ld h, d
+        ld l, e
         or a
-        sbc hl, de
-        pop de
+        sbc hl, bc
+        pop bc
         ldir
         pop hl
+        call GetBit
+        jr nc, .lit
+.new:   call Gamma              ; a match: offset's high part + 1 (256: the end)
+        inc b
+        dec b
+        ret nz
+        dec c
+        ld b, c
+        ld c, (hl)
         inc hl
-        jr UnLZ
+        inc bc
+        ld (LastOff), bc
+        call Gamma
+        inc bc                  ; length
+        jr .copy
+; -> BC: an interlaced Elias-gamma number
+Gamma:  ld bc, 1
+.g:     call GetBit
+        ret c
+        call GetBit
+        rl c
+        rl b
+        jr .g
+; -> carry: the next bit
+GetBit: add a, a
+        ret nz
+        ld a, (hl)
+        inc hl
+        rla
+        ret
+LastOff:        dw 0
 
 ; GAME_START; Blocks: per block the $7FFD value while loading, the length,
 ; the load address, the $7FFD value while unpacking ($FF: stored as it is)
