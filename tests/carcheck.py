@@ -12,9 +12,9 @@ from PIL import Image
 zxsim, sna, outdir = sys.argv[1:4]
 d = os.path.join(outdir, "carcheck")
 os.makedirs(d, exist_ok=True)
-# (the frames before 90 are the title screen and the stage load)
+# (the frames before 120 are the title screen, its jingle and the stage load)
 # (Q at frame 60 leaves the title screen and starts a game)
-frames = [f for f in range(90, 860, 4)]
+frames = [f for f in range(120, 860, 4)]
 cmd = [zxsim, sna, "-n", "861", "-q", "-k", "60:Q", "-k", "400:Q+P", "-k", "420:Q",
        "-k", "520:Q+O", "-k", "545:Q", "-k", "700:Q+P", "-k", "760:Q"]
 for f in frames:

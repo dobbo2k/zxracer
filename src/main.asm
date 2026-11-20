@@ -94,7 +94,8 @@ PanoLdiEnd:
 DualEnd:
         ret
         ASSERT high (DualEnd - 7 * STRIP_PAD) == high DualEnd
-        INCLUDE "respawn.asm"   ; (fits in the gap before the XOR chain)
+        INCLUDE "respawn.asm"   ; (small pieces in the gap before the XOR chain)
+        INCLUDE "lights.asm"
         ASSERT $ <= XOR_END - 5 * 8
 
 ; Unrolled XOR chain for sprites: entered at XorEnd - 5*n for n bytes
@@ -116,12 +117,16 @@ hv      DEFL 1
         db $81, hv
 hv      DEFL hv + 2
         EDUP
+        INCLUDE "beep.asm"      ; (in the gap before SrcLine)
+        ASSERT $ <= SrcLine
         ORG SrcLine
 hv      DEFL 0
         DUP ROAD_LINES
         db hv
 hv      DEFL hv + 1
         EDUP
+        INCLUDE "crewtraffic.asm"   ; (in the gap before the fill block)
+        INCLUDE "lightshold.asm"
         ASSERT $ <= FILL_END - 64
 
 ; Unrolled fill: entered at FILL_END - 2*n to write n bytes (see FillA)
@@ -133,6 +138,7 @@ FillBlock:
         EDUP
         ret
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
+        INCLUDE "pics.asm"
         ASSERT $ <= ISR_JP
 
         ORG ISR_JP
@@ -149,6 +155,7 @@ FillBlock:
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
         INCLUDE "stages.asm"
         INCLUDE "crew.asm"      ; the crew's crash close-ups
+        INCLUDE "lampdraw.asm"  ; the starting lights' lamps
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 

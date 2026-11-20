@@ -102,9 +102,20 @@ SoundTick:
         ld a, 6
         call AyWrite
 .mix:
-        ; mixer: tone A, noise B (0 bits enable)
-        ld e, %00101110
-        ld a, 7
+        ; mixer: tone A, noise B (0 bits enable), and tone C for a beep
+        ld a, (BeepTime)
+        or a
+        jr z, .mx
+        dec a
+        ld (BeepTime), a
+        jr nz, .bp
+        ld e, a                 ; its end: volume C off
+        ld a, 10
+        call AyWrite
+.bp:    ld e, %00101010
+        jr .mw
+.mx:    ld e, %00101110
+.mw:    ld a, 7
         jp AyWrite
 
 SFX_BUMP        EQU 6               ; noise period of the effect

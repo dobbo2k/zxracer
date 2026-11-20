@@ -7,7 +7,8 @@
 ; reads the rest of the tape itself - standard ROM-format blocks at the
 ; normal speed, but with its own loading routine, so it does not depend on
 ; which ROM is paged in (128K, +2, +2A, +3 alike) and keeps interrupts off
-; throughout. The blocks: the loading screen, then the compressed pack
+; throughout, filling a progress bar along the loading screen's bottom row.
+; The blocks: the loading screen, then the compressed pack
 ; banks (each loaded to $8000 and unpacked to $C000 in its bank), bank 2
 ; (loaded into bank 7, unpacked to $8000) and last the resident part of
 ; bank 5 (likewise, to $5B00), which overwrites BASIC itself - so it never
@@ -146,6 +147,9 @@ LoadBlock:
         ld (ix + 0), l
         inc ix
         dec de
+        ld a, e
+        or a
+        call z, Tick            ; every 256 bytes
         ld a, d
         or e
         jr nz, .data
@@ -154,6 +158,26 @@ LoadBlock:
         ld a, h
         cp 1                    ; carry: the XOR is 0
         ret
+
+; Every 256 bytes after the loading screen: every TICK_N-th time, one more
+; cell of the progress bar along its bottom row
+Tick:   ld a, (BlockNo)
+        cp 2
+        ret c
+        push hl
+        ld hl, TickN
+        dec (hl)
+        jr nz, .t
+        ld (hl), TICK_N
+        ld hl, (BarPtr)
+        ld (hl), BAR_ATTR
+        inc hl
+        ld (BarPtr), hl
+.t:     pop hl
+        ret
+BAR_ATTR        EQU $70             ; bright yellow
+BarPtr:         dw $5AE0            ; row 23
+TickN:          db TICK_N
 
 ; -> L = the next byte (H ^= it), carry set; carry clear on a timeout
 ReadByte:

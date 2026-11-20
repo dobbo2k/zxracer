@@ -280,6 +280,8 @@ Initials:
         ld b, 19
         ld a, $05
         call AttrRow
+        ld hl, TuneHigh
+        call Tune
         call WaitRelease
         xor a
         ld (HiSlot), a
@@ -699,9 +701,8 @@ GoalScreen:
         ld de, TxtBonus
         call PrintAt
         call .show
-        ld b, 50
-.w1:    halt
-        djnz .w1
+        ld hl, TuneGoal
+        call Tune
         ; the bonus: each second left is 1000 points
 .count: ld a, (Time)
         or a
@@ -1016,9 +1017,13 @@ ScreensEnter:
         out (c), a
         ret
 
-; Back to the game: screen A on show, the game draws into B next. Keeps A.
+; Back to the game: screen A on show, the game draws into B next. Keeps A
+; (1: a game starts - with a flourish).
 ScreensLeave:
         push af
+        dec a
+        ld hl, TuneStart
+        call z, Tune
         call Silence
         xor a
         ld (Mute), a
@@ -1226,6 +1231,81 @@ WaitRelease:
         ret z
         djnz .w
         ret
+
+; HL = tune: per note dw tone period (0: the end), db 50 Hz frames
+Tune:   ld e, (hl)
+        inc hl
+        ld d, (hl)
+        inc hl
+        ld a, d
+        or e
+        ret z
+        ld b, (hl)
+        inc hl
+        push hl
+        push bc
+        push de
+        xor a
+        call AyWrite            ; tone A fine
+        pop de
+        ld e, d
+        ld a, 1
+        call AyWrite            ; coarse
+        ld e, %00111110         ; tone A only
+        ld a, 7
+        call AyWrite
+        ld e, 12
+        ld a, 8
+        call AyWrite
+        pop bc
+.h:     halt
+        djnz .h
+        ld e, 0                 ; a moment's silence between notes
+        ld a, 8
+        call AyWrite
+        halt
+        pop hl
+        jr Tune
+
+; notes: AY tone periods (1.7734 MHz / 16 / frequency)
+N_G4    EQU 283
+N_C5    EQU 212
+N_E5    EQU 168
+N_G5    EQU 141
+N_A5    EQU 126
+N_C6    EQU 106
+N_E6    EQU 84
+N_G6    EQU 71
+TuneStart:      dw N_C5
+                db 3
+                dw N_E5
+                db 3
+                dw N_G5
+                db 3
+                dw N_C6
+                db 8, 0, 0
+TuneGoal:       dw N_G4
+                db 6
+                dw N_C5
+                db 6
+                dw N_E5
+                db 6
+                dw N_G5
+                db 12
+                dw N_E5
+                db 6
+                dw N_G5
+                db 30, 0, 0
+TuneHigh:       dw N_E5
+                db 5
+                dw N_G5
+                db 5
+                dw N_C6
+                db 5
+                dw N_E6
+                db 5
+                dw N_G6
+                db 20, 0, 0
 
 ; A = tone period (low byte): a short beep on channel A
 Beep:   ld e, a

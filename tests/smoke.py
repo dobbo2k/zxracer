@@ -10,8 +10,9 @@ from PIL import Image
 
 zxsim, sna, outdir = sys.argv[1:4]
 T = 760                     # the title (8 s) and the high-score table (6 s) end at ~720
+L = 230                     # the starting lights hold the car this long
 shots = {T + 149: "attract_1", T + 299: "attract_2",
-         T + 369: "straight", T + 439: "steer_right", T + 509: "steer_left"}
+         T + L + 369: "straight", T + L + 439: "steer_right", T + L + 509: "steer_left"}
 # title, attract mode (demo driver) until T + 300, then a game: accelerate, steer
 # symbols, to read game variables at the end of the run
 syms = {}
@@ -19,9 +20,9 @@ for line in open(sna.replace(".sna", ".sym")):
     if ": EQU 0x" in line:
         name, val = line.split(": EQU ")
         syms[name.strip()] = int(val, 16)
-keys = ["-k", f"{T + 300}:Q", "-k", f"{T + 370}:Q+P", "-k", f"{T + 390}:Q",
-        "-k", f"{T + 440}:Q+O", "-k", f"{T + 460}:Q"]
-cmd = [zxsim, sna, "-n", str(T + 510), "-a", "-d", f"{syms['Pos']}:2", "-s", f"100:{outdir}/title.ppm",
+keys = ["-k", f"{T + 300}:Q", "-k", f"{T + L + 370}:Q+P", "-k", f"{T + L + 390}:Q",
+        "-k", f"{T + L + 440}:Q+O", "-k", f"{T + L + 460}:Q"]
+cmd = [zxsim, sna, "-n", str(T + L + 510), "-a", "-d", f"{syms['Pos']}:2", "-s", f"100:{outdir}/title.ppm",
        "-s", f"560:{outdir}/hiscores.ppm"] + keys
 for f, name in shots.items():
     cmd += ["-s", f"{f}:{outdir}/{name}.ppm"]
@@ -34,13 +35,13 @@ if "entered ROM" in res.stderr:
 # frame rate over the demo and the game only (the title shows no flips)
 flips = int(res.stdout.split("flips=")[1].split()[0])
 pre = subprocess.run([zxsim, sna, "-n", str(T)], capture_output=True, text=True).stdout
-fps = round((flips - int(pre.split("flips=")[1].split()[0])) * 50 / 510, 2)
+fps = round((flips - int(pre.split("flips=")[1].split()[0])) * 50 / (L + 510), 2)
 print(f"fps after the title: {fps}")
 ay = [int(v, 16) for v in res.stdout.split("ay ")[1].split()[:14]]
 dump = res.stdout.split("ay ")[1].splitlines()[1].split()
 pos = int(dump[0], 16) | (int(dump[1], 16) << 8)
 if pos < 1000:                      # (from a standing start)
-    print(f"FAIL: the car only travelled {pos} units in the 210 frames since the start")
+    print(f"FAIL: the car only travelled {pos} units in the 210 frames since the lights went green")
     ok = False
 period = ay[0] | (ay[1] << 8)
 if not (ay[8] and period < 1200 and not ay[7] & 1):

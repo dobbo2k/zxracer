@@ -9,13 +9,18 @@ CREW_REPLY      EQU 70              ; she speaks until the crash timer drops bel
 
 ; At a crash: pick what they say
 CrewPick:
+        ld de, CrewLines
+        ld c, 7
+; DE = a table of line pairs, C = their number - 1 (a power of two - 1)
+CrewPickDE:
+        push de
         call Random
-        and 7
+        and c
         add a, a
         add a, a
         ld l, a
         ld h, 0
-        ld de, CrewLines
+        pop de
         add hl, de
         ld e, (hl)
         inc hl

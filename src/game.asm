@@ -123,6 +123,7 @@ StartGame:
         ld (hl), a
         ld a, START_TIME
         ld (Time), a
+        call LightsStart
         call StageMessage       ; the first stage's name
         ld a, NAME_FRAMES
         ld (StateTimer), a

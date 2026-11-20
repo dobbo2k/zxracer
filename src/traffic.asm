@@ -144,7 +144,7 @@ UpdateTraffic:
         ld a, CRASH_FRAMES
         ld (CrashTimer), a
         ld (Spin), a
-        call CrewPick
+        call CrewPickTraffic
         ld a, SFX_CRASH
         ld de, SPIN_NUDGE
         jr .nudge

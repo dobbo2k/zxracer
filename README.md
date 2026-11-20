@@ -78,8 +78,9 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   it widens, a median opens and two branches pull apart, and the branch you
   drive down picks the next stage (left or right in the next row). Checkpoints
   add time; the last row ends at the GOAL.
-- **Game:** HUD with score, stage, big countdown timer and speed; game over,
-  attract mode.
+- **Game:** HUD with score, stage, big countdown timer and speed; starting
+  lights (three lamps over the road light red one by one with a beep, then turn
+  green: go), game over, attract mode.
 - **Title and goal screens:** a title screen (logo, sunset, high score) and the
   high-score table between demo runs, and five goal scenes, one for each
   route's last stage, that count the time left into the score as a bonus (1000
@@ -88,12 +89,15 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
 - **After a game:** the route you drove through the stage pyramid (with the
   stages' names), then, for a top-five score, your initials (steer to pick a
   letter, accelerate to take it, brake to go back) and the table with your
-  entry flashing. The table lasts until the Spectrum is switched off.
+  entry flashing. The table lasts until the Spectrum is switched off. The
+  screens have their own jingles (a start flourish, a goal fanfare, a high-score
+  tune).
 - **Traffic:** cars, vans and lorries in two lanes; now and then one changes
   lanes. Later rows bring more of them, more lorries and vans and more lane
   changes. Running into one from behind slows you right down; hit one that is
   much slower than you (at speed) and the car spins out, sliding on in a cloud of
-  tyre smoke until it stops, and she lets him have it. Driving into a palm off
+  tyre smoke until it stops, and she lets him have it (with lines of its own:
+  "< YOU TAILGATED HIM!"). Driving into a palm off
   the road is a crash too. The attract-mode driver keeps to the outer edge of
   the road to pass traffic.
 - **Hills:** climbs slow the car (in HIGH it loses speed on a long one),

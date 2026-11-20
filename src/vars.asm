@@ -111,7 +111,10 @@ NTraffic:       db 3            ; this row's traffic (InitTraffic copies Traffic
 VanFrom:        db 6
 TruckFrom:      db 7
 LaneChance:     db 2
-Spin:           db 0            ; the crash is a spin-out (the car slides on, slowing)
+Spin:           db 0
+Lights:         db 0            ; starting lights: frames left (0: none)
+LampState:      db 0
+BeepTime:       db 0            ; a beep on channel C: interrupts left            ; the crash is a spin-out (the car slides on, slowing)
 ObjType:        db 0
 CrashTimer:     db 0
 SfxTimer:       db 0

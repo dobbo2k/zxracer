@@ -23,6 +23,7 @@ UpdatePlayer:
         call GameUpdate
         call DemoDriver
         call CrashUpdate
+        call LightsHold
         ; frames elapsed since the last update (1..4)
         ld a, (FrameCount)
         ld hl, LastLogic

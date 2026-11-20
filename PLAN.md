@@ -176,6 +176,12 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   with PAUSED on the message line and the sound off; no time passes in the
   game.
 
+- Starting lights *(as built, `src/lights.asm`)*: a new game holds the car (no
+  input, no time passing) for 230 frames while three lamps (16×16 circles in
+  black 2×2-cell boxes, drawn into both screens) light red one by one, each
+  with a beep on channel C, then all green with a higher one; they clear
+  40 frames later. The front-end screens play short tunes on channel A.
+
 ### 3.2d Tape release (as built)
 
 `make tap` builds `build/zxracer.tap` from a release snapshot (`-DRELEASE`, no timing
@@ -195,7 +201,9 @@ bars) with `tools/make_tap.py`:
    3, 4, 6 (each loaded to `$8000` and unpacked to `$C000` in its bank), bank 2
    (loaded into bank 7, unpacked to `$8000`) and the resident part of bank 5
    (likewise, to `$5B00`), and it jumps to the game. LZ compression (the screens'
-   format) saves 30%: 67 KB, about 6½ minutes. On a 48K (returns 1) or a tape error
+   format) saves 30%: 72 KB, about 6½ minutes. While it loads, a progress bar
+   fills the loading screen's bottom row (a cell every 2 KB or so: a check every
+   256 bytes, cheap enough for the edge timing). On a 48K (returns 1) or a tape error
    (returns 10 + the block number) it goes back to BASIC - its stack, `BANK_M`
    paging and interrupts restored; nothing has been loaded over BASIC's memory
    before the last block - and BASIC says which.
