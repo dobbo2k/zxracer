@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stages: attract mode must drive through the forks into later rows, and
 an autopilot game (AUTOPLAY build) must reach the goal and return to attract
-mode on stage 1 (after the goal screen and the title). The autopilot takes
+mode on stage 1 (after the end-of-game screens and the title). The autopilot takes
 the left branch on even stages and the right one on odd stages, so it must
 arrive on stage 0 -> 1 -> 4 -> 7 -> 12.
 usage: stagecheck.py ZXSIM NORMAL.sna VIDEO.sna
@@ -35,14 +35,14 @@ def run(snap, symfile, frames, extra, names):
 
 
 ok = True
-v = run(sna, sna.replace(".sna", ".sym"), 9000, [], ["StageRow"])
-print(f"attract mode after 9000 frames: row {v['StageRow']}")
+v = run(sna, sna.replace(".sna", ".sym"), 12000, [], ["StageRow"])   # (with title / table breaks)
+print(f"attract mode after 12000 frames: row {v['StageRow']}")
 if v["StageRow"] < 4:
     print("FAIL: attract mode did not get through the forks")
     ok = False
 keys = ["-k", "250:Q", "-k", "256:none"]
 goal = None
-for frames in range(8000, 11001, 100):     # (the goal screen lasts 200 frames)
+for frames in range(8000, 12001, 100):     # (the goal screen lasts 200 frames)
     v = run(video, video.replace(".sna", ".sym"), frames, keys, ["GameState", "StageRow", "Stage", "Time"])
     if v["GameState"] == 2:
         goal = frames, v
@@ -54,7 +54,7 @@ if goal:
 if not (goal and v["StageRow"] == 5 and v["Stage"] == 12 and v["Time"] > 0):
     print(f"FAIL: the autopilot did not reach the goal in time by the expected branches")
     ok = False
-v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 11000) + 1800, keys,
+v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 12000) + 4500, keys,   # (goal, route, initials, table, title, table)
         ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):
     print(f"FAIL: no return to attract mode on stage 1 after the goal ({v})")

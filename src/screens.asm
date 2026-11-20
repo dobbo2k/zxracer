@@ -37,6 +37,29 @@ EndGame:
         call Restart
         jr Attract
 
+Silence:
+        ld e, 0
+        ld a, 8
+        call AyWrite
+        ld e, 0
+        ld a, 9
+        call AyWrite
+        ld e, 0
+        ld a, 10
+        jp AyWrite
+
+; The high-score table (score: 4 BCD bytes, low byte first; initials) and
+; the route of the last game (the stage played on each row; $FF: not reached)
+HI_ENTRIES      EQU 5
+HI_SIZE         EQU 7
+HiTable:
+        db $00, $00, $06, $00, "ACE"
+        db $00, $00, $05, $00, "SUN"
+        db $00, $00, $04, $00, "ZXR"
+        db $00, $00, $03, $00, "BOB"
+        db $00, $00, $02, $00, "DOT"
+Route:          ds 5, $FF
+
 ; Copy the front-end overlay into bank 7 (over the theme cache)
 LoadFrontEnd:
         call WaitFlip

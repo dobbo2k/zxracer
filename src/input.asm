@@ -1,33 +1,27 @@
 ; ---------------------------------------------------------------------------
-; Input: keys O/P steer, Q accelerate, A brake, SPACE fire; Kempston joystick
+; Input: the five controls through KeyMap (keyboard rows and keys, set on
+; the options screen: default Q / A / O / P / SPACE, Sinclair or Cursor
+; joystick, or keys of the player's choosing), plus a Kempston joystick.
+; Input bits (as the Kempston's): 0 right, 1 left, 2 down, 3 up, 4 fire.
 ; ---------------------------------------------------------------------------
 
 ReadInput:
+        ld hl, KeyMap
+        ld de, $0501            ; D: keys to read, E: the input bit
         ld c, 0
-        ld a, $DF               ; P O I U Y
+.key:   ld a, (hl)              ; keyboard row (port high byte)
+        inc hl
         in a, ($FE)
-        rra
-        jr c, .noP
-        set IN_RIGHT, c
-.noP:   rra
-        jr c, .noO
-        set IN_LEFT, c
-.noO:   ld a, $FB               ; T R E W Q
-        in a, ($FE)
-        rra
-        jr c, .noQ
-        set IN_UP, c
-.noQ:   ld a, $FD               ; G F D S A
-        in a, ($FE)
-        rra
-        jr c, .noA
-        set IN_DOWN, c
-.noA:   ld a, $7F               ; B N M SS SPACE
-        in a, ($FE)
-        rra
-        jr c, .noSp
-        set IN_FIRE, c
-.noSp:  in a, ($1F)             ; Kempston; ignore if the bus floats high
+        and (hl)                ; the key's bit (0: pressed)
+        inc hl
+        jr nz, .up
+        ld a, c
+        or e
+        ld c, a
+.up:    sla e
+        dec d
+        jr nz, .key
+        in a, ($1F)             ; Kempston; ignore if the bus floats high
         ld b, a
         and $E0
         jr nz, .noKemp

@@ -311,7 +311,8 @@ def title_screen(loading=False):
     else:
         text(d, 8 * 7, 168, "HI-SCORE", rgb(CYAN))
         text(d, 8 * 5, 176, "PRESS ANY KEY TO START", rgb(YELLOW))
-    text(d, 8 * 2, 184, "Q ACCEL A BRAKE O P STEER", rgb(WHITE, False))
+    if loading:                                     # (the game prints row 23)
+        text(d, 8 * 2, 184, "Q ACCEL A BRAKE O P STEER", rgb(WHITE, False))
     return to_zx(im, over)
 
 

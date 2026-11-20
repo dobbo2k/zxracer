@@ -177,7 +177,10 @@ ForkNK:         db 0
 ForkNC:         db 0
 ForkBL:         db 0
 ForkBH:         db 0
-HiScore:        db $00, $00, $02, $00   ; BCD, low byte first (20000 to beat)
+KeyMap:                         ; per input bit (right, left, down, up, fire):
+        db $DF, $01, $DF, $02   ; the keyboard row's port high byte and the
+        db $FD, $01, $FB, $01   ; key's bit: P, O, A, Q, SPACE
+        db $7F, $01
 Mute:           db 0            ; title / goal screens: the game's sound is off
 GoalPending:    db 0            ; the goal was reached: show its screen
 AttractTimer:   dw 0            ; game frames of demo left before the title

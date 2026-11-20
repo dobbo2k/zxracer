@@ -38,6 +38,7 @@ SHARED_TYPES = ["sign_r", "sign_l", "fork"]          # in every theme pack
 TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 4, 5
             "van": 6, "truck": 7}
 RESIDENT_TYPES = ["traffic", "van", "truck"]          # in bank 5
+MAP_PAPER = {"coast": 5, "desert": 6, "alpine": 7, "country": 4, "sunset": 3}   # route map boxes
 END_STRAIGHT = SPLIT_LEN            # the road forks along the final straight
 MAX_X = 127 * 4                     # object x is stored / 4 in a signed byte
 MAX_STAGE_LEN = 60000
@@ -417,6 +418,18 @@ def main(src="assets/stages.yaml", outdir="build"):
         line = "YOU REACHED " + make_screens.ENDINGS[st["theme"][6:]]
         assert len(line) <= 32, line
         sd.append(f'Ending{k}:   db {(32 - len(line)) // 2}, "{line}", 0')
+    # the route map: per stage its place in the pyramid and theme; per theme
+    # its box colour (paper) and name
+    tnames = list(themes)
+    sd += [f"NUM_THEMES EQU {len(tnames)}", "MapStages:                  ; per stage: row, column, theme"]
+    for st in stages:
+        sd.append(f"        db {st['row']}, {st['col']}, {tnames.index(st['theme'][6:])}")
+    sd.append("MapThemes:                  ; per theme: box attribute, name")
+    for t in tnames:
+        sd.append(f"        db ${0x40 | MAP_PAPER[t] << 3:02X}")
+        sd.append(f"        dw MapName_{t}")
+    for t in tnames:
+        sd.append(f'MapName_{t}: db "{themes[t]["name"]}", 0')
     open(os.path.join(outdir, "screens_data.asm"), "w").write("\n".join(sd) + "\n")
 
 

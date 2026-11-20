@@ -24,6 +24,7 @@ start:
 ; the screen, so it runs while the last frame still waits for its flip -
 ; then, once that buffer is on show, draw the other one and ask for a flip.
 MainLoop:
+        call CheckPause
         BORDER 1                ; blue: game logic
         call ReadInput
         call UpdatePlayer
@@ -131,6 +132,8 @@ FillBlock:
         inc l
         EDUP
         ret
+        INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
+        ASSERT $ <= ISR_JP
 
         ORG ISR_JP
         jp Isr

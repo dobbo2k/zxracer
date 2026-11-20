@@ -9,7 +9,7 @@ import subprocess, sys
 from PIL import Image
 
 zxsim, sna, outdir = sys.argv[1:4]
-T = 450                     # the title screen times out at frame ~400
+T = 760                     # the title (8 s) and the high-score table (6 s) end at ~720
 shots = {T + 149: "attract_1", T + 299: "attract_2",
          T + 369: "straight", T + 439: "steer_right", T + 509: "steer_left"}
 # title, attract mode (demo driver) until T + 300, then a game: accelerate, steer
@@ -21,7 +21,8 @@ for line in open(sna.replace(".sna", ".sym")):
         syms[name.strip()] = int(val, 16)
 keys = ["-k", f"{T + 300}:Q", "-k", f"{T + 370}:Q+P", "-k", f"{T + 390}:Q",
         "-k", f"{T + 440}:Q+O", "-k", f"{T + 460}:Q"]
-cmd = [zxsim, sna, "-n", str(T + 510), "-a", "-d", f"{syms['Pos']}:2", "-s", f"100:{outdir}/title.ppm"] + keys
+cmd = [zxsim, sna, "-n", str(T + 510), "-a", "-d", f"{syms['Pos']}:2", "-s", f"100:{outdir}/title.ppm",
+       "-s", f"560:{outdir}/hiscores.ppm"] + keys
 for f, name in shots.items():
     cmd += ["-s", f"{f}:{outdir}/{name}.ppm"]
 res = subprocess.run(cmd, capture_output=True, text=True)
@@ -67,6 +68,13 @@ tcol = {c for _, c in title.getcolors(1 << 16)}
 for name, v in {"sun": (255, 255, 0), "sunset": (255, 0, 255), "car red": (255, 0, 0)}.items():
     if v not in tcol:
         print(f"FAIL: title screen: missing {name}")
+        ok = False
+table = Image.open(f"{outdir}/hiscores.ppm").convert("RGB").crop((32, 48, 288, 240))
+table.save(f"{outdir}/hiscores.png")
+tcol = {c for _, c in table.getcolors(1 << 16)}
+for name, v in {"yellow": (255, 255, 0), "cyan": (0, 255, 255), "red": (255, 0, 0)}.items():
+    if v not in tcol:
+        print(f"FAIL: high-score table: missing {name}")
         ok = False
 print("smoke: " + ("passed" if ok else "FAILED"))
 sys.exit(0 if ok else 1)

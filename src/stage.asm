@@ -75,6 +75,12 @@ LoadPacks:
         inc hl
         ld a, (hl)
         ld (StageRow), a
+        ld e, a                 ; the route: this row's stage
+        ld d, 0
+        ld hl, Route - 1
+        add hl, de
+        ld a, (Stage)
+        ld (hl), a
         ret
 
 StageHeaders:
@@ -305,6 +311,11 @@ Restart:
 ; A = stage: from its start, standing still
 RestartAt:
         push af
+        ld hl, Route            ; a new run: no route yet
+        ld b, 5
+.rt:    ld (hl), $FF
+        inc hl
+        djnz .rt
         ld hl, START_POS
         ld (Pos), hl
         ld hl, 0

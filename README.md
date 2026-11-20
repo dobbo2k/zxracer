@@ -30,9 +30,11 @@ On a 48K Spectrum it stops with "128K ONLY"; if a block fails to load it says
 a snapshot.
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake, **SPACE** change gear
-(LOW / HIGH), or a Kempston joystick (fire changes gear).
-The game opens on the title screen, then alternates it with a self-driving
-demo; any of the game keys starts a game.
+(LOW / HIGH), **H** pause; or a Kempston joystick (fire changes gear). On the
+title screen **ENTER** opens the options: the keyboard, a Sinclair or Cursor
+joystick, or keys of your own choosing.
+The game opens on the title screen, then alternates it with the high-score
+table and a self-driving demo; any of the game keys starts a game.
 
 ## Layout
 
@@ -78,10 +80,15 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   add time; the last row ends at the GOAL.
 - **Game:** HUD with score, stage, big countdown timer and speed; game over,
   attract mode.
-- **Title and goal screens:** a title screen (logo, sunset, high score) between
-  demo runs, and five goal scenes, one for each route's last stage, that count
-  the time left into the score as a bonus (1000 points a second). All artwork is
-  drawn by `tools/make_screens.py` (previews in `assets/gfx/screen_*.png`).
+- **Title and goal screens:** a title screen (logo, sunset, high score) and the
+  high-score table between demo runs, and five goal scenes, one for each
+  route's last stage, that count the time left into the score as a bonus (1000
+  points a second). All artwork is drawn by `tools/make_screens.py` (previews
+  in `assets/gfx/screen_*.png`).
+- **After a game:** the route you drove through the stage pyramid (with the
+  stages' names), then, for a top-five score, your initials (steer to pick a
+  letter, accelerate to take it, brake to go back) and the table with your
+  entry flashing. The table lasts until the Spectrum is switched off.
 - **Traffic:** cars, vans and lorries in two lanes; now and then one changes
   lanes. Later rows bring more of them, more lorries and vans and more lane
   changes. Running into one from behind slows you right down; hit one that is

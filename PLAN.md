@@ -159,10 +159,22 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   over the overlay), prints the high score / results with the HUD font and runs
   the screen's own loop; the game's sound is muted and the screens beep
   themselves. Afterwards the stage's packs are copied in again (`LoadPacks`).
-- Flow: boot → title (8 s or a key) → demo (≈25 s, continuing where it left off)
-  → title … A game ends with the car rolling to a stop, then the goal screen for
-  the last-row stage reached (time bonus counted in), then the title with the
-  updated high score.
+- Flow: boot → title (8 s or a key; ENTER: options) → high-score table (6 s) →
+  demo (≈25 s, continuing where it left off) → title … A game ends with the car
+  rolling to a stop, then the goal screen for the last-row stage reached (time
+  bonus counted in), the route map (the pyramid with the stages driven lit up
+  in their theme's colour, numbered and linked, and their names), the
+  initials entry if the score made the top five, the table with the new entry
+  flashing, then the title.
+- The table (5 × score and initials) and the route (the stage played on each
+  row, recorded by `LoadPacks`) live in bank 5; the options screen sets
+  `KeyMap` (a keyboard row and key bit per control, read by `ReadInput`):
+  presets for Q/A/O/P/SPACE and the Sinclair and Cursor joysticks, or keys
+  picked one by one (H and ENTER are kept for pause and the options; a key
+  can't be used twice). A Kempston joystick always works.
+- H pauses (`src/pause.asm`, in a gap of bank 2): the last frame stays on show
+  with PAUSED on the message line and the sound off; no time passes in the
+  game.
 
 ### 3.2d Tape release (as built)
 
@@ -382,7 +394,7 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 - **Timer:** checkpoint extends time; run out = game over. Score from distance/speed,
   time bonus at goal.
 - **Radio:** before the race, choose one of 3 original tunes (or engine-only).
-- **High-score table** with initials entry; route map shown on results screen.
+- **High-score table** with initials entry; route map shown on results screen *(as built: §3.2c)*.
 
 ---
 
