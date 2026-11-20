@@ -5,12 +5,12 @@ cell the ink / paper pair (one brightness) that best fits its pixels, the
 pixels between them ordered-dithered. The bottom character row stays blank
 with LOADING in it: the loader's progress bar fills that row.
 
-usage: make_loading.py ART.png OUT.scr [PREVIEW.png]
+usage: make_loading.py ART.png OUT.scr [PREVIEW.png [STYLE]]   (STYLE: see STYLES)
 """
 import sys
 
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 import make_screens as ms           # noqa: E402
@@ -27,11 +27,34 @@ def palette(bright):
     return np.array([ms.rgb(c, bright) for c in range(8)], dtype=float) / 255.0
 
 
-def convert(art):
+# Styles: how much dithering, and where
+#   dither   blends 0, 1/4, 1/2, 3/4, 1 everywhere
+#   flat     no dithering: each pixel the nearer of its cell's two colours
+#   light    only 50 % checks, and only where they clearly help
+#   bands    the sky in solid stepped bands; light dithering below the horizon
+#   outline  flat, with the drawing's ink lines kept as black pixel lines
+STYLES = ("dither", "flat", "light", "bands", "outline")
+SKY_ROWS = 13                                   # character rows above the horizon (wide layout)
+
+
+def ink_lines(art):
+    """The drawing's dark ink lines at screen size: a pixel is ink if any of
+    the art's pixels under it is near-black."""
+    g = np.asarray(art.convert("L"), dtype=float)
+    dark = (g < 34).astype(np.uint8) * 255
+    m = Image.fromarray(dark).filter(ImageFilter.MaxFilter(3)).resize((256, 192), Image.BOX)
+    return np.asarray(m) > 70
+
+
+def convert(art, style="dither"):
+    assert style in STYLES, style
     im = art.convert("RGB").resize((256, 192), Image.LANCZOS)
     im = ImageEnhance.Color(im).enhance(1.5)
     im = ImageEnhance.Contrast(im).enhance(1.2)
     px = (np.asarray(im, dtype=float) / 255.0) ** 1.25      # darks towards black
+    if style == "outline":
+        px = px.copy()
+        px[ink_lines(art)] = 0.0
     # every ink / paper pair of one brightness (and plain cells)
     pairs = []
     for bright in (False, True):
@@ -51,9 +74,18 @@ def convert(art):
             # per pair and pixel: the mix between paper and ink that fits best
             diff = cell[None, :, :] - A[:, None, :]                       # (P, 64, 3)
             t = ((diff * D[:, None, :] * WEIGHT).sum(2) / np.maximum(DD[:, None], 1e-9)).clip(0, 1)
-            t = LEVELS[np.abs(t[:, :, None] - LEVELS).argmin(2)]          # five blends only
+            lv = LEVELS
+            penalty = 0.0
+            if style in ("flat", "outline") or (style == "bands" and cy < SKY_ROWS):
+                lv = np.array([0.0, 1.0])
+            elif style in ("light", "bands"):
+                lv = np.array([0.0, 0.5, 1.0])
+                penalty = 0.04                                        # per checked pixel
+            t = lv[np.abs(t[:, :, None] - lv).argmin(2)]
             mix = A[:, None, :] + t[:, :, None] * D[:, None, :]
             err = (((cell[None] - mix) ** 2) * WEIGHT).sum((1, 2))
+            if penalty:
+                err = err + penalty * ((t > 0) & (t < 1)).sum(1)
             k = int(err.argmin())
             bright, a, b, _, _ = pairs[k]
             lv = np.rint(t[k] * 4).astype(int).reshape(8, 8)
@@ -90,8 +122,8 @@ def convert(art):
     return bytes(bitmap + attrs)
 
 
-def main(art, out, preview=None):
-    scr = convert(Image.open(art))
+def main(art, out, preview=None, style="dither"):
+    scr = convert(Image.open(art), style)
     open(out, "wb").write(scr)
     if preview:
         ms.preview(scr).resize((512, 384), Image.NEAREST).save(preview)
