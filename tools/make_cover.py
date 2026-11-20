@@ -402,123 +402,312 @@ def palm(bx, by, tx, ty, s, lean):
     return "\n".join(out)
 
 
-def car():
-    out = []
-    cx, gy = VX, 1790
-    out.append(f'<ellipse cx="{cx}" cy="{gy + 8}" rx="420" ry="40" fill="#05020a" opacity="0.8" '
-               f'filter="url(#soft)"/>')
-    # tyres
-    for x0 in (300, 862):
-        q = [(x0, 1590), (x0 + 138, 1590), (x0 + 138, gy), (x0, gy)]
-        out.append(fill(q, "#120c18"))
-        cid = clip_of(q)
-        out.append(hatch(cid, x0, 1590, x0 + 138, gy, 0, 12, "#3a3048", 2.2, 0.8, 1.2))
-        out.append(sketch(q, 3, INK, 2, 1.4, closed=True))
-    # lower body / rear panel
-    panel = [(318, 1548), (982, 1548), (1006, 1700), (294, 1700)]
-    out.append(fill(panel, "url(#carred)", 'filter="url(#wash)"'))
-    cid = clip_of(panel)
-    out.append(hatch(cid, 290, 1600, 1010, 1700, 20, 9, "#5a0610", 1.6, 0.6))
-    # rear deck, catching the sunset
-    deck = [(372, 1432), (928, 1432), (982, 1548), (318, 1548)]
-    out.append(fill(deck, "url(#deck)", 'filter="url(#wash)"'))
-    cid2 = clip_of(deck)
-    out.append(hatch(cid2, 318, 1432, 982, 1548, -12, 14, "#ffcf8a", 1.4, 0.4))
-    # tail-light bar
-    bar = [(330, 1568), (970, 1568), (978, 1626), (322, 1626)]
-    out.append(fill(bar, "#1a0c14"))
-    for x0, x1 in ((338, 520), (780, 962)):
-        lamp = [(x0, 1576), (x1, 1576), (x1 + 4, 1618), (x0 - 4, 1618)]
-        out.append(f'<ellipse cx="{(x0 + x1) / 2}" cy="1597" rx="{(x1 - x0) / 2 + 40}" ry="46" '
-                   f'fill="#ff2a3a" opacity="0.55" filter="url(#glow)"/>')
-        out.append(fill(lamp, "url(#lamp)"))
-        for xx in range(x0 + 14, x1, 22):            # louvres
-            out.append(sketch([(xx, 1580), (xx + 2, 1614)], 1.6, "#7a0a14", 1, 0.5, overshoot=0))
-        out.append(sketch(lamp, 2, INK, 1, 0.8, closed=True))
-    out.append(sketch(bar, 2.6, INK, 2, 1.2, closed=True))
-    # number plate: hand-lettered
-    plate = [(570, 1636), (730, 1636), (730, 1688), (570, 1688)]
-    out.append(fill(plate, "#f6efd8"))
-    out.append(sketch(plate, 2.2, INK, 2, 0.8, closed=True))
-    txt, _ = lettering("128K", 586, 1645, 0.24, 20, slant=0.0, grad="inkg", gap=118, outline=INK,
-                       wob=0.6, stripes=False, shadow=False)
-    out.append(txt)
-    # exhausts
-    for x in (430, 870):
-        out.append(f'<ellipse cx="{x}" cy="1712" rx="34" ry="16" fill="#2a2430"/>')
-        out.append(f'<ellipse cx="{x}" cy="1712" rx="20" ry="8" fill="#060308"/>')
-        out.append(sketch([(x - 34 + 34 * math.cos(a / 12 * math.pi) + 34, 1712 + 16 * math.sin(a / 12 * math.pi))
-                           for a in range(25)], 2, INK, 1, 0.6, overshoot=0))
-    # smoke puffs
-    for k in range(5):
-        x = rnd.choice((400, 900)) + rnd.uniform(-60, 60)
-        y = 1760 + rnd.uniform(-20, 40)
-        r = rnd.uniform(30, 60)
-        out.append(f'<circle cx="{f(x)}" cy="{f(y)}" r="{f(r)}" fill="#cbb8e0" opacity="0.18" filter="url(#soft)"/>')
-    out.append(sketch(panel, 3.2, INK, 2, 1.6, closed=True))
-    out.append(sketch(deck, 3.0, INK, 2, 1.6, closed=True))
-    # highlight along the deck edge
-    out.append(sketch([(380, 1440), (920, 1440)], 3, "#fff1cf", 1, 1.6, opacity=0.8))
-    # windscreen frame behind the crew
-    ws = [(430, 1434), (462, 1318), (838, 1318), (870, 1434)]
-    out.append(sketch(ws, 4, "#2a2236", 2, 1.4))
-    out.append(f'<path d="{path_d(ws, True)}" fill="#8fd8ff" opacity="0.12"/>')
-    # mirrors
-    for x, d in ((436, -1), (864, 1)):
-        out.append(sketch([(x, 1416), (x + d * 14, 1410)], 3, INK, 1, 0.5, overshoot=0))
-        x += d * 12
-        m = [(x, 1396), (x + d * 50, 1388), (x + d * 54, 1416), (x + d * 4, 1422)]
-        out.append(fill(m, "#c41824"))
-        out.append(sketch(m, 2.2, INK, 1, 0.8, closed=True))
+# ---------------------------------------------------------------- the car, drawn "properly"
+def smooth_d(pts, closed=True):
+    """A smooth closed path through points (Catmull-Rom as cubic Beziers)."""
+    n = len(pts)
+    d = f"M{f(pts[0][0])},{f(pts[0][1])}"
+    rng = range(n) if closed else range(n - 1)
+    for i in rng:
+        p0 = pts[(i - 1) % n] if closed or i > 0 else pts[i]
+        p1, p2 = pts[i], pts[(i + 1) % n]
+        p3 = pts[(i + 2) % n] if closed or i + 2 < n else p2
+        c1 = (p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6)
+        c2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
+        d += f" C{f(c1[0])},{f(c1[1])} {f(c2[0])},{f(c2[1])} {f(p2[0])},{f(p2[1])}"
+    return d + (" Z" if closed else "")
+
+
+def mirror_d(d, cx=650):
+    """A path string mirrored about x = cx (absolute M / L / C / Q / Z only)."""
+    out, toks = [], d.replace(",", " ").split()
+    i = 0
+    while i < len(toks):
+        t = toks[i]
+        if t[0] in "MLCQZ" and not t[1:]:
+            out.append(t)
+            i += 1
+            continue
+        if t[0] in "MLCQ":
+            out.append(t[0])
+            toks[i] = t[1:]
+            continue
+        x, y = float(toks[i]), float(toks[i + 1])
+        out.append(f"{f(2 * cx - x)},{f(y)}")
+        i += 2
+    return " ".join(out)
+
+
+def lock(p0, p1, p2, p3, w0, colour, n=20):
+    """A tapering lock of hair along a Bezier spine."""
+    spine = bez(p0, p1, p2, p3, n)
+    left, right = [], []
+    for i, (x, y) in enumerate(spine):
+        w = w0 * (1 - i / n) ** 0.9 + 0.6
+        x2, y2 = spine[min(i + 1, n)]
+        x1, y1 = spine[max(i - 1, 0)]
+        dx, dy = x2 - x1, y2 - y1
+        L = math.hypot(dx, dy) or 1
+        nx, ny = -dy / L, dx / L
+        left.append((x + nx * w, y + ny * w))
+        right.append((x - nx * w, y - ny * w))
+    return f'<path d="{smooth_d(left + right[::-1])}" fill="{colour}"/>', spine
+
+
+def detailed_defs():
+    return """
+  <linearGradient id="cbody" x1="0" y1="1438" x2="0" y2="1716" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ff5a3c"/><stop offset="0.12" stop-color="#f02a2a"/>
+    <stop offset="0.5" stop-color="#d41420"/><stop offset="1" stop-color="#7a0610"/>
+  </linearGradient>
+  <linearGradient id="cside" x1="296" y1="0" x2="1004" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#2a0010" stop-opacity="0.75"/><stop offset="0.16" stop-color="#2a0010" stop-opacity="0"/>
+    <stop offset="0.84" stop-color="#2a0010" stop-opacity="0"/><stop offset="1" stop-color="#2a0010" stop-opacity="0.75"/>
+  </linearGradient>
+  <linearGradient id="cdeck" x1="0" y1="1438" x2="0" y2="1522" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ffb07a"/><stop offset="0.35" stop-color="#ff6a50"/><stop offset="1" stop-color="#e3242b"/>
+  </linearGradient>
+  <linearGradient id="clens" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ff8a8a"/><stop offset="0.35" stop-color="#ff2030"/>
+    <stop offset="0.75" stop-color="#c00818"/><stop offset="1" stop-color="#6a0410"/>
+  </linearGradient>
+  <linearGradient id="camber" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffd08a"/><stop offset="0.5" stop-color="#ff9a1a"/><stop offset="1" stop-color="#a04a00"/>
+  </linearGradient>
+  <linearGradient id="crev" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#d8dce8"/><stop offset="1" stop-color="#8a8ea0"/>
+  </linearGradient>
+  <linearGradient id="cchrome" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff"/><stop offset="0.45" stop-color="#b8bcc8"/>
+    <stop offset="0.55" stop-color="#5a5e6a"/><stop offset="1" stop-color="#d8dce4"/>
+  </linearGradient>
+  <linearGradient id="ctyre" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#2c2a34"/><stop offset="0.3" stop-color="#16141c"/><stop offset="1" stop-color="#060509"/>
+  </linearGradient>
+  <linearGradient id="cleather" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#5a2a26"/><stop offset="0.5" stop-color="#3a1614"/><stop offset="1" stop-color="#1e0a0a"/>
+  </linearGradient>
+  <linearGradient id="cglass" x1="0" y1="1320" x2="0" y2="1440" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ffd0a0" stop-opacity="0.35"/><stop offset="1" stop-color="#8fd8ff" stop-opacity="0.12"/>
+  </linearGradient>
+  <radialGradient id="hdark" cx="0.38" cy="0.3" r="0.8">
+    <stop offset="0" stop-color="#6a4630"/><stop offset="0.45" stop-color="#3a2216"/><stop offset="1" stop-color="#160a06"/>
+  </radialGradient>
+  <radialGradient id="hblonde" cx="0.4" cy="0.3" r="0.85">
+    <stop offset="0" stop-color="#fff6c0"/><stop offset="0.4" stop-color="#ffd650"/><stop offset="1" stop-color="#b8801a"/>
+  </radialGradient>
+  <linearGradient id="hlock" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#e8b030"/><stop offset="0.5" stop-color="#ffd860"/><stop offset="1" stop-color="#fff0a8"/>
+  </linearGradient>
+  <linearGradient id="hlock2" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#a06a10"/><stop offset="1" stop-color="#e0a830"/>
+  </linearGradient>
+  <linearGradient id="cskin" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#c87a52"/><stop offset="0.5" stop-color="#f0b088"/><stop offset="1" stop-color="#b86a44"/>
+  </linearGradient>
+  <linearGradient id="cshade" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+  </linearGradient>
+  <linearGradient id="cpink" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ff8ab4"/><stop offset="1" stop-color="#d23a78"/>
+  </linearGradient>
+  <pattern id="cstripe" width="16" height="40" patternUnits="userSpaceOnUse">
+    <rect width="16" height="40" fill="#f4f2ec"/><rect x="5" width="5" height="40" fill="#2f55c8"/>
+  </pattern>
+  <filter id="cblur"><feGaussianBlur stdDeviation="6"/></filter>
+"""
+
+
+def car_detailed():
+    o = []
+    cx = 650
+    # shadow on the road
+    o.append(f'<ellipse cx="{cx}" cy="1796" rx="430" ry="34" fill="#030106" opacity="0.85" filter="url(#soft)"/>')
+    # ---- the crew (behind the seats), the windscreen in front of them
+    ws = "M436,1440 L466,1322 Q468,1314 476,1314 L824,1314 Q832,1314 834,1322 L864,1440 Z"
+    o.append(f'<path d="{ws}" fill="url(#cglass)"/>')
     # him: dark hair, striped shirt
-    out.append(crew(560, 1360, "#2b1a12", "#f2f0e8", "#3050c8", False))
-    # her: blonde hair streaming in the wind
-    out.append(crew(745, 1362, "#ffd23a", "#ff6a9a", None, True))
-    return "\n".join(out)
+    o.append(person_him(560, 1316))
+    # her: blonde, pink top, hair blown back
+    o.append(person_her(742, 1318))
+    o.append(f'<path d="{ws}" fill="none" stroke="#1a1420" stroke-width="7" stroke-linejoin="round"/>')
+    o.append('<path d="M470,1318 L830,1318" stroke="#8a90a0" stroke-width="2" opacity="0.7"/>')
+    # seats and headrests (in front of the crew, from here)
+    for x in (560, 742):
+        o.append(f'<path d="M{x - 82},1446 L{x - 80},1416 Q{x - 78},1398 {x - 58},1396 L{x + 58},1396 '
+                 f'Q{x + 78},1398 {x + 80},1416 L{x + 82},1446 Z" fill="url(#cleather)" stroke="{INK}" stroke-width="2.5"/>')
+        o.append(f'<path d="M{x - 66},1446 L{x - 64},1414 Q{x - 62},1406 {x - 48},1405 L{x + 48},1405 '
+                 f'Q{x + 62},1406 {x + 64},1414 L{x + 66},1446" fill="none" stroke="#a0624a" stroke-width="1.6" '
+                 f'stroke-dasharray="5 4" opacity="0.8"/>')
+        for sx in (x - 24, x + 24):
+            o.append(f'<rect x="{sx - 4}" y="1384" width="8" height="14" fill="url(#cchrome)"/>')
+        o.append(f'<rect x="{x - 56}" y="1342" width="112" height="46" rx="20" fill="url(#cleather)" '
+                 f'stroke="{INK}" stroke-width="2.5"/>')
+        o.append(f'<rect x="{x - 46}" y="1349" width="92" height="32" rx="14" fill="none" stroke="#a0624a" '
+                 f'stroke-width="1.4" stroke-dasharray="5 4" opacity="0.8"/>')
+        o.append(f'<path d="M{x - 40},1348 Q{x},1342 {x + 40},1348" stroke="#c08a70" stroke-width="3" '
+                 f'fill="none" opacity="0.6" stroke-linecap="round"/>')
+    # her hair over her headrest, streaming back
+    o.append(hair_stream(742, 1318, front=True))
+    # door mirrors
+    for side in (-1, 1):
+        x = cx + side * 214
+        o.append(f'<path d="M{x},1430 L{x + side * 14},1412" stroke="#1a1420" stroke-width="6" stroke-linecap="round"/>')
+        mx = x + side * 14
+        o.append(f'<path d="M{mx},1414 Q{mx + side * 4},1392 {mx + side * 30},1390 L{mx + side * 56},1392 '
+                 f'Q{mx + side * 66},1396 {mx + side * 64},1410 Q{mx + side * 60},1424 {mx + side * 44},1424 '
+                 f'L{mx + side * 10},1424 Q{mx},1422 {mx},1414 Z" fill="url(#cbody)" stroke="{INK}" stroke-width="2.5"/>')
+        o.append(f'<path d="M{mx + side * 10},1398 L{mx + side * 54},1398" stroke="#ffb08a" stroke-width="3" '
+                 f'stroke-linecap="round" opacity="0.8"/>')
+    # ---- tyres
+    for x0 in (300, 862):
+        o.append(f'<rect x="{x0}" y="1596" width="138" height="198" rx="26" fill="url(#ctyre)" '
+                 f'stroke="{INK}" stroke-width="3"/>')
+        for y in range(1640, 1790, 16):
+            o.append(f'<path d="M{x0 + 10},{y} L{x0 + 128},{y}" stroke="#040306" stroke-width="5"/>')
+            o.append(f'<path d="M{x0 + 12},{y + 3} L{x0 + 126},{y + 3}" stroke="#3a3844" stroke-width="1.2" opacity="0.6"/>')
+    # ---- body
+    body = ("M330,1714 C305,1702 296,1652 296,1600 C296,1540 312,1482 352,1452 C364,1444 376,1440 392,1438 "
+            "L908,1438 C924,1440 936,1444 948,1452 C988,1482 1004,1540 1004,1600 C1004,1652 995,1702 970,1714 Z")
+    o.append(f'<path d="{body}" fill="url(#cbody)"/>')
+    o.append(f'<path d="{body}" fill="url(#cside)"/>')
+    # rear deck (seen from a little above), with the sunset in it
+    deck = "M392,1438 L908,1438 C938,1442 958,1470 966,1522 L334,1522 C342,1470 362,1442 392,1438 Z"
+    o.append(f'<path d="{deck}" fill="url(#cdeck)"/>')
+    o.append(f'<path d="{deck}" fill="url(#cside)" opacity="0.6"/>')
+    o.append('<path d="M446,1452 L854,1452 Q874,1453 878,1468 L886,1510 L414,1510 L422,1468 Q426,1453 446,1452 Z" '
+             'fill="none" stroke="#8a1018" stroke-width="2" opacity="0.75"/>')
+    o.append('<path d="M450,1456 L850,1456" stroke="#fff0d0" stroke-width="2" opacity="0.6"/>')
+    # the crease to the rear panel: light above, shadow below
+    o.append('<path d="M336,1522 L964,1522" stroke="#ffd0a8" stroke-width="3" opacity="0.85"/>')
+    o.append('<rect x="330" y="1524" width="640" height="16" fill="url(#cshade)" transform="rotate(180 650 1532)"/>')
+    # rim light along the shoulders
+    rim = "M298,1596 C298,1536 316,1480 354,1452 C366,1444 378,1440 394,1438"
+    o.append(f'<path d="{rim}" fill="none" stroke="#ffb890" stroke-width="5" stroke-linecap="round" opacity="0.85"/>')
+    o.append(f'<path d="{mirror_d(rim)}" fill="none" stroke="#ffb890" stroke-width="5" stroke-linecap="round" opacity="0.85"/>')
+    # the magenta grid's glow along the lower sides
+    o.append('<path d="M300,1640 C302,1680 312,1700 330,1712" stroke="#ff5ae8" stroke-width="4" fill="none" opacity="0.55"/>')
+    o.append('<path d="M1000,1640 C998,1680 988,1700 970,1712" stroke="#ff5ae8" stroke-width="4" fill="none" opacity="0.55"/>')
+    # ---- the tail-light band
+    o.append('<rect x="322" y="1548" width="656" height="58" rx="12" fill="#140608" stroke="#1a0a10" stroke-width="3"/>')
+    for x0, x1, amber_left in ((336, 568, True), (732, 964, False)):
+        o.append(f'<ellipse cx="{(x0 + x1) / 2}" cy="1577" rx="{(x1 - x0) / 2 + 30}" ry="40" fill="#ff1a2a" '
+                 f'opacity="0.45" filter="url(#glow)"/>')
+        o.append(f'<rect x="{x0}" y="1556" width="{x1 - x0}" height="42" rx="8" fill="url(#clens)"/>')
+        ax = x0 if amber_left else x1 - 50
+        o.append(f'<rect x="{ax}" y="1556" width="50" height="42" rx="8" fill="url(#camber)"/>')
+        rx = x1 - 40 if amber_left else x0
+        o.append(f'<rect x="{rx}" y="1556" width="40" height="42" rx="8" fill="url(#crev)"/>')
+        for y in range(1562, 1596, 7):
+            o.append(f'<path d="M{x0 + 4},{y} L{x1 - 4},{y}" stroke="#ffffff" stroke-width="1" opacity="0.18"/>')
+        o.append(f'<path d="M{x0 + 8},1560 L{x1 - 8},1560" stroke="#ffffff" stroke-width="2.5" opacity="0.55" '
+                 f'stroke-linecap="round"/>')
+        o.append(f'<rect x="{x0}" y="1556" width="{x1 - x0}" height="42" rx="8" fill="none" stroke="#0a0204" '
+                 f'stroke-width="2.5"/>')
+    o.append('<text x="650" y="1583" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" '
+             'font-style="italic" font-size="17" letter-spacing="3" fill="url(#cchrome)">SPEED RUN</text>')
+    # ---- number plate and its recess
+    o.append('<rect x="566" y="1612" width="168" height="62" rx="6" fill="#4a0810" opacity="0.7"/>')
+    o.append('<rect x="574" y="1618" width="152" height="50" rx="4" fill="#f6f2e2" stroke="#222" stroke-width="2"/>')
+    o.append('<text x="650" y="1656" text-anchor="middle" font-family="DejaVu Sans Mono" font-weight="bold" '
+             'font-size="38" fill="#141414">128K</text>')
+    o.append('<path d="M578,1622 L722,1622" stroke="#ffffff" stroke-width="2" opacity="0.8"/>')
+    # ---- lower valance, diffuser and the exhausts
+    o.append('<path d="M372,1688 L928,1688 L950,1716 L350,1716 Z" fill="#100a12" stroke="#05030a" stroke-width="2"/>')
+    for x in range(420, 900, 40):
+        o.append(f'<path d="M{x},1690 L{x - (x - 650) * 0.06},1714" stroke="#2a2430" stroke-width="3"/>')
+    for x in (456, 844):
+        o.append(f'<ellipse cx="{x}" cy="1706" rx="34" ry="17" fill="url(#cchrome)" stroke="#111" stroke-width="2"/>')
+        o.append(f'<ellipse cx="{x}" cy="1707" rx="23" ry="10" fill="#050305"/>')
+        o.append(f'<path d="M{x - 26},1700 Q{x},1690 {x + 26},1700" stroke="#fff" stroke-width="2" fill="none" opacity="0.8"/>')
+    # a soft highlight on the bodywork's flanks
+    o.append('<path d="M318,1610 C316,1570 324,1530 340,1508" stroke="#ff8a7a" stroke-width="10" fill="none" '
+             'opacity="0.35" stroke-linecap="round" filter="url(#cblur)"/>')
+    o.append('<path d="M982,1610 C984,1570 976,1530 960,1508" stroke="#ff8a7a" stroke-width="10" fill="none" '
+             'opacity="0.35" stroke-linecap="round" filter="url(#cblur)"/>')
+    # a clean ink outline to sit with the drawing around it
+    o.append(f'<path d="{body}" fill="none" stroke="{INK}" stroke-width="3.5" stroke-linejoin="round"/>')
+    o.append(f'<path d="{deck}" fill="none" stroke="{INK}" stroke-width="2" opacity="0.8"/>')
+    return "\n".join(o)
 
 
-def crew(x, y, hair, shirt, stripe, long_hair):
-    out = []
-    # shoulders
-    sh = [(x - 80, 1436), (x - 70, y + 48), (x + 70, y + 48), (x + 80, 1436)]
-    out.append(fill(sh, shirt))
-    if stripe:
-        cid = clip_of(sh)
-        out.append(hatch(cid, x - 80, y + 40, x + 80, 1436, 90, 16, stripe, 6, 0.85, 0.6))
-    out.append(sketch(sh[:3] + [sh[3]], 2.4, INK, 1, 1.0))
-    # neck and head (from behind: hair)
-    out.append(fill([(x - 16, y + 50), (x - 14, y + 20), (x + 14, y + 20), (x + 16, y + 50)], "#e8a87a"))
-    head = [(x + 52 * math.cos(a / 20 * math.pi), y + 58 * math.sin(a / 20 * math.pi)) for a in range(40)]
-    if long_hair:
-        # hair blown back and to the right: an irregular mass of locks
-        mass = []
-        for a in range(0, 40):
-            t = a / 20 * math.pi
-            r = 1.0 + 0.12 * math.sin(5 * t + 1) + rnd.uniform(-0.04, 0.06)
-            mass.append((x + 54 * r * math.cos(t), y + 60 * r * math.sin(t)))
-        tail = [(x + 50, y + 30), (x + 120, y + 58), (x + 175, y + 70), (x + 215, y + 42),
-                (x + 180, y + 18), (x + 205, y - 6), (x + 140, y - 4), (x + 60, y - 30)]
-        out.append(fill(mass, hair))
-        out.append(fill(tail, hair))
-        for k in range(26):                         # strands, on the head and streaming off it
-            sy = y + rnd.uniform(-45, 45)
-            sx = x + rnd.uniform(-40, 10)
-            pts = bez((sx, sy), (sx + 60, sy - 25 + rnd.uniform(-10, 10)),
-                      (sx + 130, sy + rnd.uniform(0, 35)), (sx + rnd.uniform(170, 240), sy + rnd.uniform(-15, 40)), 16)
-            out.append(sketch(pts, rnd.uniform(1.2, 2.4), rnd.choice(("#b07a10", "#fff3a8", "#e0a020", "#c88a18")),
-                              1, 1.0, opacity=0.9))
-        out.append(sketch(mass[22:] + mass[:12], 2.4, INK, 1, 1.0, overshoot=0))
-        out.append(sketch(tail[1:6], 2.0, INK, 1, 1.0))
-        return "\n".join(out)
-    else:
-        out.append(fill(head, hair))
-        for k in range(10):
-            a = rnd.uniform(-math.pi, 0)
-            out.append(sketch([(x + 40 * math.cos(a), y + 46 * math.sin(a)),
-                               (x + 48 * math.cos(a + 0.4), y + 56 * math.sin(a + 0.4))],
-                              1.6, "#6a4a30", 1, 0.6, opacity=0.8, overshoot=0))
-    out.append(sketch(head + head[:1], 2.4, INK, 2, 1.0, overshoot=0))
-    return "\n".join(out)
+def head_shape(x, y, rx=48, ry=56):
+    return (f"M{x},{y - ry} C{x + rx * 0.62},{y - ry} {x + rx},{y - ry * 0.55} {x + rx},{y} "
+            f"C{x + rx},{y + ry * 0.62} {x + rx * 0.55},{y + ry} {x},{y + ry} "
+            f"C{x - rx * 0.55},{y + ry} {x - rx},{y + ry * 0.62} {x - rx},{y} "
+            f"C{x - rx},{y - ry * 0.55} {x - rx * 0.62},{y - ry} {x},{y - ry} Z")
+
+
+def person_him(x, y):
+    o = []
+    # shoulders and back in a striped shirt
+    sh = f"M{x - 92},1446 C{x - 90},1404 {x - 66},1384 {x - 30},1380 L{x + 30},1380 C{x + 66},1384 {x + 90},1404 {x + 92},1446 Z"
+    o.append(f'<path d="{sh}" fill="url(#cstripe)" stroke="{INK}" stroke-width="2.5"/>')
+    o.append(f'<path d="{sh}" fill="url(#cshade)"/>')
+    # neck and ears
+    o.append(f'<path d="M{x - 18},1384 L{x - 16},{y + 30} L{x + 16},{y + 30} L{x + 18},1384 Z" fill="url(#cskin)"/>')
+    for s in (-1, 1):
+        o.append(f'<ellipse cx="{x + s * 47}" cy="{y + 6}" rx="9" ry="17" fill="#e8a07a" stroke="#8a4a30" stroke-width="1.6"/>')
+    # short dark hair
+    o.append(f'<path d="{head_shape(x, y)}" fill="url(#hdark)" stroke="{INK}" stroke-width="2.5"/>')
+    for k in range(16):
+        a = -math.pi * (0.1 + 0.8 * k / 15)
+        x0, y0 = x + 8 * math.cos(a), y - 46 + 8 * math.sin(a)
+        x1, y1 = x + 46 * math.cos(a * 0.9 + 0.15), y + 10 + 52 * math.sin(-a * 0.5) * 0.9
+        c = "#7a5238" if k % 3 == 0 else "#120804"
+        o.append(f'<path d="M{f(x0)},{f(y0)} Q{f((x0 + x1) / 2 + 6)},{f((y0 + y1) / 2 - 4)} {f(x1)},{f(y1)}" '
+                 f'stroke="{c}" stroke-width="1.6" fill="none" opacity="0.7" stroke-linecap="round"/>')
+    o.append(f'<path d="M{x - 30},{y - 40} Q{x - 10},{y - 54} {x + 14},{y - 50}" stroke="#a07a5a" stroke-width="4" '
+             f'fill="none" opacity="0.6" stroke-linecap="round"/>')
+    return "\n".join(o)
+
+
+def person_her(x, y):
+    o = []
+    sh = f"M{x - 88},1446 C{x - 86},1406 {x - 62},1388 {x - 28},1384 L{x + 28},1384 C{x + 62},1388 {x + 86},1406 {x + 88},1446 Z"
+    o.append(f'<path d="{sh}" fill="url(#cpink)" stroke="{INK}" stroke-width="2.5"/>')
+    o.append(f'<path d="{sh}" fill="url(#cshade)"/>')
+    o.append(f'<path d="M{x - 16},1388 L{x - 14},{y + 30} L{x + 14},{y + 30} L{x + 16},1388 Z" fill="url(#cskin)"/>')
+    # hair: the head, then locks blown back to the right
+    o.append(hair_stream(x, y, front=False))
+    o.append(f'<path d="{head_shape(x, y, 50, 57)}" fill="url(#hblonde)" stroke="#6a4a10" stroke-width="2.2"/>')
+    for k in range(18):
+        a = -math.pi * (0.05 + 0.9 * k / 17)
+        x0, y0 = x - 6 + 6 * math.cos(a), y - 48
+        x1 = x + 50 * math.cos(a)
+        y1 = y + 30 + 20 * math.sin(a * 0.3)
+        c = ("#fff6c8", "#c8901e", "#e8b440")[k % 3]
+        o.append(f'<path d="M{f(x0)},{f(y0)} Q{f(x1 * 0.6 + x0 * 0.4 + 10)},{f(y - 20)} {f(x1 + 14)},{f(y1)}" '
+                 f'stroke="{c}" stroke-width="1.8" fill="none" opacity="0.85" stroke-linecap="round"/>')
+    return "\n".join(o)
+
+
+def hair_stream(x, y, front):
+    """Her hair blown back: locks behind the headrest, or over it."""
+    r = random.Random(7 if front else 5)
+    o = []
+    n = 6 if front else 9
+    for k in range(n):
+        t = k / max(1, n - 1)
+        if front:
+            p0 = (x + 26 + r.uniform(-6, 6), y + 10 + t * 26)
+            p3 = (x + 150 + t * 60 + r.uniform(-10, 10), y + 50 + t * 40 + r.uniform(-8, 8))
+            p1 = (x + 70, y + 4 + t * 20)
+            p2 = (x + 110 + t * 30, y + 60 + t * 20)
+            w = r.uniform(8, 13)
+        else:
+            p0 = (x + 20 + r.uniform(-8, 8), y - 30 + t * 60)
+            p3 = (x + 170 + t * 50 + r.uniform(-15, 15), y - 10 + t * 70 + r.uniform(-10, 10))
+            p1 = (x + 80, y - 40 + t * 40)
+            p2 = (x + 130, y + t * 40 - 10)
+            w = r.uniform(12, 18)
+        shape, spine = lock(p0, p1, p2, p3, w, "url(#hlock2)" if k % 3 == 0 else "url(#hlock)")
+        o.append(shape)
+        o.append(f'<path d="{smooth_d(spine[2:-2], False)}" stroke="#fff6c8" stroke-width="1.6" fill="none" '
+                 f'opacity="0.75" stroke-linecap="round"/>')
+        o.append(f'<path d="{smooth_d([(px, py + w * 0.5) for px, py in spine[2:-4]], False)}" stroke="#8a5a10" '
+                 f'stroke-width="1.2" fill="none" opacity="0.6" stroke-linecap="round"/>')
+    return "\n".join(o)
 
 
 def speed_lines():
@@ -541,7 +730,7 @@ def title_and_tag():
     txt2, end2 = lettering("RUN", 470, 290, 1.12, 30, slant=0.3)
     out.append(txt2)
     # swoosh under the title
-    sw = bez((90, 480), (500, 430), (900, 470), (1220, 400), 30)
+    sw = bez((90, 545), (500, 515), (900, 530), (1220, 480), 30)
     out.append(sketch(sw, 9, "#ffd23a", 1, 1.4, opacity=0.9))
     out.append(sketch([(x, y + 14) for x, y in sw], 4, "#ff3d7f", 1, 1.4, opacity=0.9))
     # bottom tag
@@ -614,6 +803,7 @@ def defs():
   <radialGradient id="vignette" cx="0.5" cy="0.5" r="0.75">
     <stop offset="0.6" stop-color="black" stop-opacity="0"/><stop offset="1" stop-color="black" stop-opacity="0.55"/>
   </radialGradient>
+  {detailed_defs()}
   {"".join(clips)}
 </defs>"""
 
@@ -628,7 +818,7 @@ def build():
         f'<g filter="url(#rough)">{palm(900, 1086, 880, 890, 0.36, 1)}{palm(400, 1086, 420, 880, 0.34, -1)}</g>',
         f'<g filter="url(#rough)">{palm(1230, 1420, 1010, 610, 1.0, -1)}{palm(70, 1400, 290, 640, 1.0, 1)}</g>',
         f'<g filter="url(#rough)">{speed_lines()}</g>',
-        f'<g filter="url(#rough)">{car()}</g>',
+        car_detailed(),
         f'<g filter="url(#rough)">{title_and_tag()}</g>',
         f'<rect width="{W}" height="{H}" filter="url(#blotch)" style="mix-blend-mode:soft-light" opacity="0.55"/>',
         f'<rect width="{W}" height="{H}" filter="url(#paper)" style="mix-blend-mode:multiply" opacity="0.35"/>',
