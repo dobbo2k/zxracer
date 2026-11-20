@@ -75,6 +75,9 @@ OvRestartAt:
 OvCheckpoint:
         ld a, 1                 ; the interrupt's sound off while it loads (StageOvE
         ld (Mute), a            ; turns it on again); with music, a drum fill meanwhile
+        ld a, 3                 ; the colour sweep, from row 3, as it loads
+        ld (OvSweep), a
+        ld (OvSwept), a
         ld a, (OvMusic)
         ld (OvFill), a
         or a
@@ -149,7 +152,7 @@ OvCheckpoint:
         pop af
         call LoadStage
         call FillEnd            ; the fill's last hit; the next tune will swell in
-        call Sweep              ; the new stage's colours down the screen
+        call Sweep              ; (the rest of the colour sweep)
         ld hl, (StageClock)     ; (the time, for the message)
         push hl
         ld hl, 0
@@ -429,12 +432,32 @@ ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40
 ; so that is the last thing done.
 OvResetDisplay:
         call WaitFlip
-        ; screen B: bitmap clear; sky rows get the sky attribute, road rows grass
+        ; screen B: bitmap clear (after a sweep only the HUD's rows: the rest
+        ; is clear); sky rows get the sky attribute, road rows grass
+        ld a, (OvSwept)
+        or a
         ld hl, $C000
-        ld de, $C001
+        jr z, .all
+        ld b, 8
+.hud:   push bc
+        push hl
+        ld d, h
+        ld e, l
+        inc de
+        ld (hl), 0
+        ld bc, 3 * 32 - 1
+        ldir
+        pop hl
+        pop bc
+        inc h
+        djnz .hud
+        ld de, $D800            ; (as the full clear leaves it)
+        jr .attrs
+.all:   ld de, $C001
         ld (hl), 0
         ld bc, 6143
         ldir
+.attrs:
         ld h, d
         ld l, e
         inc de
@@ -459,10 +482,14 @@ OvResetDisplay:
         ld h, d
         ld l, e
         inc de
+        ld a, (OvSwept)         ; (after a sweep its grass bands stay)
+        or a
+        jr nz, .hudText
         ld a, (PalGrassL)
         ld (hl), a
         ld bc, 32 * (24 - ROAD_ROW0) - 1
         ldir
+.hudText:
         call InitHud
         ; road state pages (per buffer: St1 D/E = 0, St2 lane = $FF,
         ; St3 row ranges = 0 / row band = $FF)
@@ -600,53 +627,96 @@ CopyToCache:
         ld de, (LdDst)
         ldir                    ; bounce -> theme cache (bank 7 is paged again)
         ld (LdDst), de
+        call SweepStep          ; (a checkpoint: the screen changes meanwhile)
         jr .chunk
 
 ; ---------------------------------------------------------------------------
-; The change of stage on screen: once the new stage is loaded, its colours
-; sweep down the frozen last frame (screen B, on show), two character rows a
-; frame - sky, the backdrop's band, grass in light and dark bands - the old
-; picture's pixels hidden (ink the paper's colour). The display reset after
-; it clears the screen and the game draws the new stage.
-Sweep:
-        ld hl, $D800 + 3 * 32
-        ld c, 3                 ; row
-.row:   ld a, c
+; The change of stage on screen: while the new theme is copied in, its
+; colours sweep down the frozen last frame (screen B, on show) - two
+; character rows after each chunk (SweepStep, from CopyToCache), from the
+; palette in the theme's header as soon as it has arrived: sky, the
+; backdrop's band, grass in light and dark bands, ink the paper's colour -
+; and each swept row's old pixels are cleared, out of sight, so the display
+; reset needs to clear only the HUD's rows. Sweep finishes whatever is left.
+SweepStep:
+        ld a, (OvSweep)         ; (0: no sweep; else the next row)
+        or a
+        ret z
+        call .row
+        ld a, (OvSweep)
+        or a
+        ret z
+.row:   ld c, a
+        ld hl, THEME_CACHE + 6  ; the new palette: sky, backdrop, ..
         cp PANO_ROW0
-        ld a, (PalSky)
         jr c, .col
-        ld a, c
+        inc hl
         cp ROAD_ROW0
-        ld a, (PalPano)
         jr c, .col
-        bit 1, c                ; (bands of two rows)
-        ld a, (PalGrassL)
+        inc hl                  ; (grass: +10, light, and +11, dark)
+        inc hl
+        inc hl
+        bit 1, c
         jr z, .col
-        ld a, (PalGrassD)
-.col:   and $78                 ; bright and paper; the ink the same
+        inc hl
+.col:   ld a, (hl)
+        and $78                 ; bright and paper; the ink the same
         ld b, a
         rrca
         rrca
         rrca
         and 7
         or b
+        ld l, c                 ; the row's attributes
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld de, $D800
+        add hl, de
         ld b, 32
-.fill:  ld (hl), a
+.a:     ld (hl), a
         inc hl
-        djnz .fill
-        bit 0, c                ; every second row: the next frame
-        call nz, .frame
-        inc c
+        djnz .a
+        ld a, c                 ; its pixels: 8 lines of 32 bytes
+        and 7
+        rrca
+        rrca
+        rrca
+        ld l, a
         ld a, c
+        and $18
+        or $C0
+        ld h, a
+        ld b, 8
+.p:     push bc
+        push hl
+        ld d, h
+        ld e, l
+        inc de
+        ld (hl), 0
+        ld bc, 31
+        ldir
+        pop hl
+        pop bc
+        inc h
+        djnz .p
+        ld a, c                 ; the next row (24: done)
+        inc a
         cp 24
-        jr c, .row
+        jr c, .n
+        xor a
+.n:     ld (OvSweep), a
         ret
-.frame: ld a, (FrameCount)
-        ld b, a
-.w:     ld a, (FrameCount)
-        cp b
-        jr z, .w
-        ret
+Sweep:  ld a, (OvSweep)
+        or a
+        ret z
+        call SweepStep
+        jr Sweep
+OvSweep:        db 0
+OvSwept:        db 0                ; (a checkpoint: the sweep cleared rows 3-23)
 
 ; ---------------------------------------------------------------------------
 ; The drum fill between stages, while this loads (the next tune then swells
