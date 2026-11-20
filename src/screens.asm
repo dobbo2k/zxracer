@@ -36,16 +36,7 @@ EndGame:
         call Restart
         jr Attract
 
-Silence:
-        ld e, 0
-        ld a, 8
-        call AyPut
-        ld e, 0
-        ld a, 9
-        call AyPut
-        ld e, 0
-        ld a, 10
-        jp AyPut
+
 
 
 

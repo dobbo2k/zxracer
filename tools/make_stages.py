@@ -49,6 +49,8 @@ MAP_PAPER = {"coast": 5, "desert": 6, "alpine": 7, "country": 4, "sunset": 3}   
 END_STRAIGHT = SPLIT_LEN            # the road forks along the final straight
 MAX_X = 127 * 4                     # object x is stored / 4 in a signed byte
 MAX_STAGE_LEN = 60000
+TUNNEL_FROM = 5000                  # tunnels: not before this far into a stage
+TUNNEL_MIN, TUNNEL_MAX = 3500, 6000
 
 
 # ---------------------------------------------------------------- horizon
@@ -134,8 +136,21 @@ def panorama_lines(im):
 
 
 # ---------------------------------------------------------------- tracks
+def tunnel_for(row, seed, theme, stage_len):
+    """A tunnel (start, end) for themes with them, or None: clear of the
+    stage's start and of its end (the fork, or the run-in to the goal)."""
+    if not theme.get("tunnels"):
+        return None
+    r = random.Random(seed * 131 + row * 7 + 1)      # (its own: the track stays as it was)
+    length = r.randint(TUNNEL_MIN, TUNNEL_MAX)
+    last = stage_len - SPLIT_LEN - 3000 - length if row < 4 else stage_len - 6000 - length
+    start = r.randint(TUNNEL_FROM, max(TUNNEL_FROM, last))
+    return start, start + length
+
+
 def make_track(row, seed, theme):
-    """Segments (length, curve, hill) and objects (z, x, type id) for a stage."""
+    """Segments (length, curve, hill), objects (z, x, type id) and the tunnel
+    (start, end, or None) for a stage."""
     rnd = random.Random(seed * 7919 + row)
     maxc = 8 + 2 * row
     target = 26000 + 2000 * row
@@ -207,9 +222,12 @@ def make_track(row, seed, theme):
         objs.append((zs + 3600, 0, TYPE_IDS["fork"]))   # in the median once it opens
         for d in (4200, 4700):
             objs.append((zs + d, 0, tid[big]))
+    tunnel = tunnel_for(row, seed, theme, stage_len)
+    if tunnel:                                       # nothing at the roadside in the tunnel
+        objs = [o for o in objs if not tunnel[0] - 600 <= o[0] <= tunnel[1] + 200]
     # no scenery right on the road edge near curve signs etc.: keep sorted, unique z
     objs.sort()
-    return merge_hills(segs, hills), objs, stage_len
+    return merge_hills(segs, hills), objs, stage_len, tunnel
 
 
 def hill_profile(rnd, stage_len, amp):
@@ -278,9 +296,10 @@ def par_time(segs, stage_len):
     return round(t)
 
 
-def track_pack(name, segs, objs, stage_len):
+def track_pack(name, segs, objs, stage_len, tunnel=None):
+    ts, te = tunnel or (0, 0)
     out = [f"        MODULE {name}",
-           "        dw Track, Objects, " + str(stage_len),
+           f"        dw Track, Objects, {stage_len}, {ts}, {te}",     # (tunnel: start, end; 0: none)
            "Track:"]
     for length, curve, hill in segs:
         out.append(f"        dw {length}")
@@ -290,7 +309,7 @@ def track_pack(name, segs, objs, stage_len):
         out.append(f"        dw {z}")
         out.append(f"        db {(x // 4) & 0xFF}, {t}")
     out += ["        dw 0", "        db 0, $FF", "        ENDMODULE"]
-    size = 6 + 4 * len(segs) + 2 + 4 * len(objs) + 4
+    size = 10 + 4 * len(segs) + 2 + 4 * len(objs) + 4
     return out, size
 
 
@@ -355,8 +374,8 @@ def main(src="assets/stages.yaml", outdir="build"):
     for r, row in enumerate(cfg["rows"]):
         for k, st in enumerate(row):
             label = f"track_{len(stages)}"
-            segs, objs, stage_len = make_track(r, st["seed"], themes[st["theme"]])
-            lines, size = track_pack(label, segs, objs, stage_len)
+            segs, objs, stage_len, tunnel = make_track(r, st["seed"], themes[st["theme"]])
+            lines, size = track_pack(label, segs, objs, stage_len, tunnel)
             if size > TRACK_CACHE_SIZE:
                 raise SystemExit(f"{label}: {size} bytes, the cache holds {TRACK_CACHE_SIZE}")
             packs.append((label, lines, size, TRACK_CACHE))

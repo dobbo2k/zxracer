@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Build the HUD font: 5x7 glyphs in 8x8 cells for ASCII 32-90, plus 16x16
-big digits (the 5x7 digits doubled). Original glyph designs.
+"""Build the HUD font: 5x7 glyphs in 8x8 cells for ASCII 32-90 (the timer's
+big digits are these doubled, by PrintBig). Original glyph designs.
 usage: make_font.py out.asm
 """
 import sys
@@ -68,17 +68,6 @@ def main(out):
         g = rows(chr(code))
         data = [sum(0x40 >> x for x in range(5) if r[x] == "#") for r in g] + [0]
         lines.append("        db " + ", ".join(f"${v:02X}" for v in data) + f"   ; {chr(code)!r}")
-    lines.append("BigDigits: ; 16x16, 2 bytes per line")
-    for d in "0123456789":
-        out_rows = []
-        for r in rows(d):
-            bits = 0
-            for x in range(5):
-                if r[x] == "#":
-                    bits |= 0b11 << (14 - 2 * x - 1)
-            out_rows += [bits, bits]
-        out_rows += [0, 0]
-        lines.append("        db " + ", ".join(f"${v >> 8:02X}, ${v & 0xFF:02X}" for v in out_rows) + f"   ; {d}")
     open(out, "w").write("\n".join(lines) + "\n")
 
 

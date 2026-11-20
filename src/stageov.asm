@@ -380,6 +380,13 @@ StageHeaders:
         ld hl, (TRACK_CACHE + 2)
         ld (StObjects), hl
         ld (ObjFirst), hl
+        ld hl, (TRACK_CACHE + 6)
+        ld (TunStart), hl
+        ld hl, (TRACK_CACHE + 8)
+        ld (TunEnd), hl
+        xor a
+        ld (TunInside), a
+        ld (TunJN), a
         ld hl, (TRACK_CACHE + 4)
         ld (StageLen), hl
         ld de, -SPLIT_LEN

@@ -376,7 +376,7 @@ DrawForkRow:
         ld l, a
         ld h, high Band
         ld a, (hl)
-        or a
+        and STRIPE_BIT
         ld a, (PalGrassL)
         ld b, a
         ld a, (PalKerbL)

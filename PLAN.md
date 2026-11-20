@@ -474,6 +474,24 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   in 256 by row, so from row 2 one or two swerve into your path each stage.
   With longer stages and sharper bends (`make_track`) and the traffic mix,
   that is the difficulty curve across the rows.
+- **Tunnels** *(as built)*: the alpine theme has `tunnels: 1`; `make_stages.py`
+  places one 3500-6000 units long on each of its stages (clear of the start
+  and the fork or goal, with its own random generator so the track is
+  otherwise unchanged) and keeps scenery out of it; the track pack's header
+  holds its start and end. Each game frame `UpdateTunnel` finds the depth
+  lines inside it (`ObjLine`, the scenery's depth-to-line lookup) and
+  `RoadBands` sets bit 7 of their band: `RowAttrs` gives such rows the
+  tunnel's walls and kerbs, and the road's per-row cache (which compares the
+  band) repaints them by itself. In the tunnel the sky and backdrop rows take
+  the ceiling's colours, the backdrop's pixels are cleared and it is not
+  drawn. After the road, `DrawPortal` finds the screen line where the road
+  meets the tunnel and paints, in attributes, five runs per row sized from
+  the road's edges there: approaching, a rock face, a yellow arch and the
+  dark mouth; inside, the sky round the far road and the ceiling round that.
+  Road rows it paints are marked (their cached band set to 1) so the road
+  redraws them. About 7% off the frame rate while a tunnel is in view. Room
+  came from drawing the timer's big digits from the font (`PrintBig`,
+  -250 bytes of bank 5) and moving small routines into bank 2's gaps.
 - **Hills** *(as built)*: the hill value under the car changes the speed every
   frame (2/256 per unit: climbs slow it, descents help).
 - **Stages:** 15 original stages (coast, desert, alpine pass, forest, city night,

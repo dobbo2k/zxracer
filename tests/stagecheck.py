@@ -64,6 +64,16 @@ if goal:                                   # stage times: rows 1-4 recorded at t
     if not all(1000 < t < 5000 for t in times):
         print("FAIL: the stage times were not recorded")
         ok = False
+if goal:                                   # the route goes through stage 8's tunnel
+    s = syms(video.replace(".sna", ".sym"))
+    r = subprocess.run([zxsim, video, "-n", str(goal[0]), "-q", "-w", f"{s['Ceiling.clear']}:1"] + keys,
+                       capture_output=True, text=True, check=True)
+    w = [l for l in r.stdout.splitlines() if l.startswith("watch")]
+    if w:
+        print(f"tunnel: the autopilot drove into it at frame {w[0].split('f=')[1].split()[0]}")
+    else:
+        print("FAIL: the autopilot never went into a tunnel")
+        ok = False
 v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 16000) + 4500, keys,   # (goal, route, initials, table, title, table)
         ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):

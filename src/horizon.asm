@@ -12,6 +12,9 @@ PANO_Y          EQU 80                  ; first line (character row 10)
 ; distant band and catching up a frame later is invisible. Further behind
 ; always redraws.
 DrawHorizonIfTime:
+        ld a, (TunInside)       ; (in a tunnel: hidden)
+        or a
+        ret nz
         ld a, (HorizonX + 1)
         and $FC
         ld hl, (PanoLast)

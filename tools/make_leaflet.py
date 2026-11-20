@@ -64,7 +64,7 @@ def stages():
     for r, row in enumerate(cfg["rows"]):
         for k, st in enumerate(row):
             th = themes[st["theme"]]
-            segs, objs, L = make_stages.make_track(r, st["seed"], th)
+            segs, objs, L, tunnel = make_stages.make_track(r, st["seed"], th)
             out.append(dict(row=r, col=k, theme=st["theme"], name=th["name"],
                             landmark=th["types"][2], par=make_stages.par_time(segs, L)))
     return out, len(cfg["rows"])

@@ -29,7 +29,7 @@ RowA:           db 0            ; RowA..RowD must stay consecutive
 RowB:           db 0
 RowC:           db 0
 RowD:           db 0
-RowBand:        db 0
+RowBand:        db 0            ; bit 6: dark band, bit 7: in a tunnel
 RowForced:      db 0
 RowMerged:      db 0
 RowStaleCar:    db 0            ; stale kerb cells under the car (car rows)
@@ -99,6 +99,11 @@ GameState:      db ST_ATTRACT
 Time:           db START_TIME   ; BCD seconds
 SecTick:        db 0
 StateTimer:     db 0
+TunStart:       dw 0            ; this stage's tunnel (0: none), src/tunnel.asm
+TunEnd:         dw 0
+TunInside:      db 0            ; the car is in it (the sky is its ceiling)
+TunJ0:          db 0            ; road lines in it this frame: TunJ0 .. TunJ0 + TunJN - 1
+TunJN:          db 0
 ; (cleared together at a new run)
 MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
 StageClock:     dw 0            ; 50 Hz frames on this stage

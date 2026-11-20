@@ -26,6 +26,7 @@ themes:
   alpine:
     name: ALPINE PASS
     hills: 6                        # hill strength (0: flat)
+    tunnels: 1                      # a tunnel through the mountain on each stage
     types: [pine, rock, chalet, snowman]
     horizon: {style: peaks, seed: 11}
     palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,

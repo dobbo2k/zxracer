@@ -203,46 +203,6 @@ PrintChar:
         pop de
         ret
 
-; A = digit, HL = top-left cell (preserved): 16x16 digit over two cell rows
-PrintBig:
-        push de
-        push bc
-        ld e, a
-        ld d, 0
-        ex de, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        ld bc, BigDigits
-        add hl, bc
-        ex de, hl
-        push hl
-        call .half
-        pop hl
-        push hl
-        ld a, l
-        add a, 32
-        ld l, a
-        call .half
-        pop hl
-        pop bc
-        pop de
-        ret
-.half:  ld b, 8
-.bl:    ld a, (de)
-        ld (hl), a
-        inc de
-        inc l
-        ld a, (de)
-        ld (hl), a
-        inc de
-        dec l
-        inc h
-        djnz .bl
-        ret
-
 TxtLow:         db "LOW ", 0
 TxtHigh:        db "HIGH", 0
 MsgGoal:        db "  GOAL! WELL DONE!  ", 0

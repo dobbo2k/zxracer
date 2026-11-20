@@ -88,10 +88,6 @@ WeaveTo:
         scf
         ret
 
-; The checkpoint's messages (filled in by OvCheckpoint)
-MsgTime:        db " STAGE TIME 0'00", $22, "00 ", 0
-MsgBonus:       ds MSG_LEN + 1
-
 ; ---------------------------------------------------------------------------
 ; Difficulty (the options screen): 0 easy, 1 normal, 2 hard. The overlay
 ; reads it for the starting time, the checkpoint bonus, the par times and
@@ -99,63 +95,60 @@ MsgBonus:       ds MSG_LEN + 1
 Difficulty:     db 1
 
 ; ---------------------------------------------------------------------------
-; The last 10 seconds (GameUpdate, each second): the big timer's cells
-; FLASH in both screens (the next display reset clears it), and a pip.
-BEEP_WARN       EQU 110
-TimeWarn:
-        ld a, (PalTime)
-        or $80
-        ld hl, $5800 + 32 + 14
-        call .cells
-        ld hl, $D800 + 32 + 14
-        call .cells
-        ld a, (Time)
-        or a
-        ret z
-        ld de, BEEP_WARN
-        jp StartBeep
-.cells: ld c, 2
-.row:   ld b, 4
-.c:     ld (hl), a
+; A = digit, HL = top-left cell (preserved): the timer's big digit - the
+; font's digit at double size, 16 x 16 over two cell rows (drawn once a
+; second, so it is worked out here rather than stored)
+PrintBig:
+        push de
+        push bc
+        push hl
+        add a, "0" - 32
+        ld e, a
+        ld d, 0
+        ex de, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld bc, Font
+        add hl, bc
+        ex de, hl               ; DE -> the glyph, HL = the screen
+        ld c, 2                 ; two cell rows ...
+.cell:  push hl
+        ld b, 4                 ; ... of four font rows, each twice
+.row:   push bc
+        ld a, (de)
+        inc de
+        push de
+        ld c, a                 ; every bit twice: C -> DE
+        ld b, 8
+.sp:    sla c
+        rl e
+        rl d
+        ld a, e
+        rra
+        rl e
+        rl d
+        djnz .sp
+        sla e                   ; (the font's pixels are bits 6-2)
+        rl d
+        ld (hl), d
         inc l
-        djnz .c
-        ld de, 32 - 4
-        add hl, de
+        ld (hl), e
+        inc h
+        ld (hl), e
+        dec l
+        ld (hl), d
+        inc h
+        pop de
+        pop bc
+        djnz .row
+        pop hl
+        ld a, l
+        add a, 32
+        ld l, a
         dec c
-        jr nz, .row
+        jr nz, .cell
+        pop hl
+        pop bc
+        pop de
         ret
-
-; Each interrupt in a game (SoundTick): a jingle's next note on channel C
-; once the one before is nearly over
-JingleTick:
-        ld hl, (JinglePtr)
-        ld a, h
-        or l
-        ret z
-        ld a, (BeepTime)
-        cp 2
-        ret nc
-        ld e, (hl)
-        inc hl
-        ld d, (hl)
-        inc hl
-        ld a, d
-        or e
-        jr z, .end
-        ld a, (hl)
-        inc hl
-        ld (JinglePtr), hl
-        jp BeepOn
-.end:   ld (JinglePtr), de
-        ret
-; Extended play: tone period, length (interrupts); 0 ends it
-JingleExt:
-        dw 212
-        db 5                    ; C
-        dw 168
-        db 5                    ; E
-        dw 141
-        db 5                    ; G
-        dw 106
-        db 20                   ; C, an octave up
-        dw 0

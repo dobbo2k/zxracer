@@ -40,6 +40,7 @@ MainLoop:
         call DrawRoad
         BORDER 4                ; green: horizon
         call DrawHorizonIfTime
+        call DrawPortal         ; (a tunnel's mouth or way out)
         BORDER 3                ; magenta: sprites
         call DrawSprites
         call DrawCar
@@ -64,6 +65,7 @@ MainLoop:
         INCLUDE "traffic.asm"
         INCLUDE "fork.asm"
         INCLUDE "hills.asm"
+        INCLUDE "tunnelb2.asm"
         INCLUDE "vars.asm"
 CodeEnd:
         ASSERT CodeEnd <= TABLES
@@ -140,6 +142,7 @@ FillBlock:
         ret
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
         INCLUDE "beep.asm"
+        INCLUDE "gap4.asm"
         ASSERT $ <= ISR_JP
 
         ORG ISR_JP
@@ -161,6 +164,7 @@ FillBlock:
         INCLUDE "pics.asm"      ; the front end's picture unpacker
         INCLUDE "music.asm"     ; the music player
         INCLUDE "extend.asm"    ; stage times, extended play, weaving traffic
+        INCLUDE "tunnel.asm"    ; tunnels
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 

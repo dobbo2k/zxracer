@@ -60,6 +60,7 @@ DrawRoad:
 ; player moved sideways, or curves, hills or the fork are in view (this
 ; frame or the last).
 RoadPrepare:
+        call UpdateTunnel
         call BuildCurveList
         call ForkFrame
         ld a, (RoadStraight)
@@ -382,19 +383,32 @@ RoadPass1:
         jp .go
 
 ; Light/dark band per line: bit STRIPE_BIT of (z + position), z of the
-; depth line the screen line shows
+; depth line the screen line shows; bit 7: that depth line is in a tunnel
 RoadBands:
         ld a, (Pos)
         ld (.p + 1), a
         ld (.q + 1), a
+        ld a, (TunJ0)
+        ld (.t0 + 1), a
+        ld (.t2 + 1), a
+        ld a, (TunJN)
+        ld (.t1 + 1), a
+        ld (.t3 + 1), a
         ld a, (P1Hill)
         or a
         jr nz, .hills
         ld hl, ZLo              ; no hills: screen line = depth line
         ld de, Band
-.flat:  ld a, (hl)
+.flat:  ld a, l
+.t0:    sub 0
+.t1:    cp 0
+        sbc a, a
+        and $80
+        ld b, a
+        ld a, (hl)
 .q:     add a, 0
         and STRIPE_BIT
+        or b
         ld (de), a
         inc l
         inc l
@@ -410,10 +424,18 @@ RoadBands:
         ld h, high ZLo
 .band:  ld a, (bc)
         ld l, a
+.t2:    sub 0
+.t3:    cp 0
+        sbc a, a
+        and $80
+        ld (de), a
         ld a, (hl)
 .p:     add a, 0
         and STRIPE_BIT
-        ld (de), a
+        ex de, hl
+        or (hl)
+        ld (hl), a
+        ex de, hl
         inc c
         inc c
         inc e
@@ -785,10 +807,13 @@ RowAttrs:
         add a, h
         ld h, a
         ld a, (RowBand)
-        or a
         ld bc, (PalGrassL)      ; C = light grass, B = dark grass
         ld de, (PalKerbL)       ; E = light kerb, D = dark kerb
-        jr z, .gl
+        add a, a                ; carry: in a tunnel; zero: a light band
+        jr nc, .open
+        ld bc, (TunWall)        ; (src/tunnel.asm)
+        ld de, (TunKerbs)
+.open:  jr z, .gl
         ld c, b
         ld e, d
 .gl:    ld d, c                 ; D = grass, E = kerb
@@ -1144,7 +1169,7 @@ DrawRoadLine:
         set 7, l
         ld h, high Band
         ld a, (hl)
-        or a
+        and STRIPE_BIT          ; (not the tunnel bit)
         jr nz, .laneNew
         res 7, l
         ld h, high LaneX

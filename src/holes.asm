@@ -229,6 +229,9 @@ EngineSounds:
 .mx:    ld e, %00101110
 .mw:    ld a, 7
         jp AyWrite
+; (a checkpoint message: moved here from bank 5 for room)
+; The checkpoint's messages (filled in by OvCheckpoint)
+MsgTime:        db " STAGE TIME 0'00", $22, "00 ", 0
         ASSERT $ <= StateA2 + 256
         ORG StateB2 + $60
         ASSERT StBLane_end <= StateB2 + $60
@@ -289,6 +292,32 @@ DemoTraffic:
         ld hl, DEMO_SIDE
 .aim:   ld (DemoAim), hl
         ret
+; (the last ten seconds: moved here from bank 5 for room)
+; The last 10 seconds (GameUpdate, each second): the big timer's cells
+; FLASH in both screens (the next display reset clears it), and a pip.
+BEEP_WARN       EQU 110
+TimeWarn:
+        ld a, (PalTime)
+        or $80
+        ld hl, $5800 + 32 + 14
+        call .cells
+        ld hl, $D800 + 32 + 14
+        call .cells
+        ld a, (Time)
+        or a
+        ret z
+        ld de, BEEP_WARN
+        jp StartBeep
+.cells: ld c, 2
+.row:   ld b, 4
+.c:     ld (hl), a
+        inc l
+        djnz .c
+        ld de, 32 - 4
+        add hl, de
+        dec c
+        jr nz, .row
+        ret
         ASSERT $ <= StateB2 + 256
         ORG StateA3 + $8C
         ASSERT RowABand_end <= StateA3 + $8C
@@ -340,6 +369,8 @@ CrashTick:
         ld e, 0
         ld a, 10
         jp AyWrite
+; (a checkpoint message: moved here from bank 5 for room)
+MsgBonus:       ds MSG_LEN + 1
         ASSERT $ <= StateA3 + 256
         ORG StateB3 + $8C
         ASSERT RowBBand_end <= StateB3 + $8C
@@ -383,6 +414,30 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
 .avol:  ld a, 8
         call AyWrite
         jp CrashTickC
+; (the jingle player: moved here from bank 5 for room)
+; Each interrupt in a game (SoundTick): a jingle's next note on channel C
+; once the one before is nearly over
+JingleTick:
+        ld hl, (JinglePtr)
+        ld a, h
+        or l
+        ret z
+        ld a, (BeepTime)
+        cp 2
+        ret nc
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        inc hl
+        ld a, d
+        or e
+        jr z, .end
+        ld a, (hl)
+        inc hl
+        ld (JinglePtr), hl
+        jp BeepOn
+.end:   ld (JinglePtr), de
+        ret
         ASSERT $ <= StateB3 + 256
         ORG StateA1 + $E0
         ASSERT StAE_end <= StateA1 + $E0
@@ -452,4 +507,56 @@ CrashTickC:                     ; C: debris, a clatter of high notes
 .c:     ld a, 10
         call AyWrite
         jp CrashMix
+; (tunnels: moved here from bank 5 for room)
+; Tunnels (src/tunnel.asm): each game frame, which road lines are in this
+; stage's tunnel and whether the car is in it
+UpdateTunnel:
+        ld hl, (TunEnd)
+        ld a, h
+        or l
+        jr z, .none
+        ld de, (Pos)
+        sbc hl, de              ; (no carry after the OR) -> to its end
+        jr c, .none             ; behind us
+        jr z, .none
+        push hl
+        ld hl, (TunStart)
+        or a
+        sbc hl, de              ; to its start
+        ld a, ROAD_LINES        ; in it: down to the bottom line
+        ld c, 1
+        jr c, .in
+        jr z, .in
+        dec c
+        ld a, h
+        cp high 4096
+        jr nc, .far             ; beyond the furthest road line
+        ex de, hl
+        call ObjLine            ; the last line at or beyond its start ...
+        inc a                   ; ... the next is nearer: out of it
+.in:    ld b, a                 ; B: the first line out of it (nearer), C: in it
+        pop de                  ; to its end
+        xor a
+        ld h, a
+        ld a, d
+        cp high 4096
+        ld a, h
+        jr nc, .j0              ; (its end beyond the furthest line: from line 0)
+        push bc
+        call ObjLine
+        pop bc
+        inc a                   ; the first line nearer than its end
+.j0:    ld (TunJ0), a
+        ld e, a
+        ld a, b
+        sub e
+        jr nc, .jn
+        xor a
+.jn:    ld (TunJN), a
+        ld a, c
+        jp Ceiling
+.far:   pop hl
+.none:  xor a
+        ld (TunJN), a
+        jp Ceiling
         ASSERT $ <= FILL_END - 64
