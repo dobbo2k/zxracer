@@ -15,8 +15,7 @@ GoTitle:
         or a
         jp nz, StartGame
         ld a, (Stage)
-        call LoadPacks          ; (the overlay is over the theme)
-        call ResetDisplay
+        call ReloadStage        ; (the overlay is over the theme)
 Attract:
         ld hl, ATTRACT_LOOPS
         ld (AttractTimer), hl
@@ -49,19 +48,4 @@ Silence:
         jp AyWrite
 
 
-; Copy the front-end overlay into bank 7 (over the theme cache)
-LoadFrontEnd:
-        call WaitFlip
-        ld hl, FrontEndPack
-        ld a, (hl)
-        inc hl
-        ld e, (hl)
-        inc hl
-        ld d, (hl)
-        inc hl
-        ld c, (hl)
-        inc hl
-        ld b, (hl)
-        ld hl, THEME_CACHE
-        jp CopyToCache
 

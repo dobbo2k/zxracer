@@ -41,8 +41,9 @@ any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displa
 
 ```
 $4000-$5AFF  Bank 5: screen buffer A
-$5B00-$7D7F  Bank 5: resident graphics (car, van and lorry sprites, font,
-             player car, crew close-ups), stage loading, the front end's way in
+$5B00-$788E  Bank 5: resident graphics (car, van and lorry sprites, font,
+             player car, crew close-ups), the checkpoint, the ways into the
+             stage loader and the front end; 1.2 KB free up to the track cache
 $7D80-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
              (640 bytes; also the bounce buffer while a theme or the front end
              is loaded)
@@ -53,6 +54,30 @@ $DB00-$FFFF  Bank 7: THEME CACHE: the current theme's sprites (scenery types,
              curve and fork signs), mountain backdrop, palette, name; or, while
              the front end runs, the front-end overlay
 ```
+
+Freeing memory *(as built)*:
+
+- **Between-stages overlay** (`src/stageov.asm`, 650 bytes): stage loading
+  (packs, track state, traffic set-up) and the stage table only run at a stage
+  change, at power-on and between games, and each time the screen is about to
+  be cleared or replaced by the front end. So they are stored in a pack bank
+  and run from screen A: `StageOv` (`src/stage.asm`) shows screen B (blanked
+  first, except at a checkpoint, where the last game frame stays on show),
+  copies the overlay to `$4000`, calls it, and shows what was on show before.
+  The checkpoint itself stays resident (it needs `StageNext`, 2 bytes a stage).
+- **Table-page holes** (`src/holes.asm`): most lookup tables fill 96 or 192
+  bytes of their page. `zxsim -u` (a map of what a run reads, writes and
+  executes) showed nothing touches the rest over whole games, apart from one
+  byte after `ScrLo` / `ScrHi` and the state pages (cleared whole by
+  `ResetDisplay`) and two tables read a little past their end. The crew's
+  lines, the high-score table, the route and the lamp graphic live there;
+  `gen_tables.py` marks each table's end and the build asserts nothing grows
+  into them. About 400 bytes of holes are still free (the biggest: 160 bytes
+  after `ZHi` minus 142 used, 150 after the strips).
+- **Car frames** as shared top and bottom parts: the drift frames' two smoke
+  puffs differ only in the bottom cell row (`png2zx.py` split mode).
+
+Together: bank 5 went from 4 bytes free to 1265.
 
 Bank 7 stays paged at `$C000` all the time. While buffer A is drawn, bank 7 is
 the screen being shown, but paging it in only for memory access doesn't change

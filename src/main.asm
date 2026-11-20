@@ -155,7 +155,6 @@ FillBlock:
         INCLUDE "car_data.asm"
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
-        INCLUDE "stages.asm"
         INCLUDE "crew.asm"      ; the crew's crash close-ups
         INCLUDE "lampdraw.asm"  ; the starting lights' lamps
 ScnEnd:
