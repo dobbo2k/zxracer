@@ -11,13 +11,12 @@ CAR_COL         EQU 12
 CAR_ROW         EQU 20
 CAR_W           EQU 8               ; bytes (must match the car_data.asm built from car.png)
 CAR_H           EQU 32
-CAR_FRAME       EQU CAR_W * CAR_H + CAR_W * CAR_H / 8
+CAR_TOP_PX      EQU CAR_W * 24          ; a frame's top part: 3 cell rows of bitmap, then attributes
+CAR_BOT_PX      EQU CAR_W * 8           ; its bottom part: 1 cell row, likewise
 ; Frames (assets/gfx/car.png): 0 straight, 1 left, 2 right, 3-4 drifting
-; left with tyre smoke (two puffs), 5-6 drifting right
-CarFrames:
-        DUP 7, k
-        dw CarGfx + k * CAR_FRAME
-        EDUP
+; left with tyre smoke (two puffs), 5-6 drifting right. Each frame is a top
+; and a bottom part (CarGfxFrames): the two puffs differ only in the bottom
+; row, so they share their top part.
 
 ; -> C = the frame to show: spinning after a crash, else the steering; on a
 ; fast bend without steering the car yaws into it, and near the grip limit
@@ -92,14 +91,22 @@ DrawCar:
         call CarFrame           ; C = frame
         ld a, c
         add a, a
+        add a, a
         ld l, a
         ld h, 0
-        ld de, CarFrames
+        ld de, CarGfxFrames
         add hl, de
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        inc hl
+        ld (CarTopSrc), de
         ld a, (hl)
         inc hl
         ld h, (hl)
-        ld l, a                 ; HL = its graphics
+        ld l, a
+        ld (CarBotSrc), hl
+        ex de, hl               ; HL = its top part
 .notR:  ; skip the redraw if this buffer already shows this frame and nothing
         ; has written into the car's block since
         ld de, (CarShown)
@@ -115,7 +122,7 @@ DrawCar:
         ld a, (CarAttrDirty)
         or a
         ret z
-        ld bc, CAR_W * CAR_H
+        ld bc, CAR_TOP_PX
         add hl, bc              ; bitmap unchanged: attributes only
         jp .attrs
 .draw:  ld a, c
@@ -144,7 +151,16 @@ DrawCar:
         add a, 32
         ld e, a
         dec ixl
+        jp z, .pxDone
+        ld a, ixl
+        dec a
         jp nz, .row
+        ld hl, (CarBotSrc)      ; the last cell row: from the bottom part
+        jp .row
+.pxDone:
+        ld hl, (CarTopSrc)
+        ld bc, CAR_TOP_PX
+        add hl, bc
 .attrs: xor a
         ld (CarAttrDirty), a
         ; attributes. The top cell row is the open cockpit: its paper is
@@ -194,5 +210,11 @@ DrawCar:
         add a, 32 - CAR_W
         ld e, a
         dec ixl
+        ret z
+        ld a, ixl
+        dec a
         jr nz, .attr
-        ret
+        ld hl, (CarBotSrc)      ; the last row: from the bottom part
+        ld bc, CAR_BOT_PX
+        add hl, bc
+        jr .attr

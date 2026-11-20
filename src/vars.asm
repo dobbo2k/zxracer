@@ -126,6 +126,8 @@ CarAttrDirty:   db 1
 CarShown:       dw CarShownA
 CarShownA:      db $FF          ; car frame each buffer shows
 CarShownB:      db $FF
+CarTopSrc:      dw 0            ; the frame being drawn: its top part
+CarBotSrc:      dw 0            ; and its bottom part
 DemoNear:       dw 0
 DemoAim:        dw 0
 DemoAny:        dw 0

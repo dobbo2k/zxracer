@@ -17,7 +17,7 @@ build/tables.asm: tools/gen_tables.py | build
 	$(PYTHON) tools/gen_tables.py $@
 
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
-	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32
+	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32 3
 
 build/stages.asm: tools/make_stages.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
 	$(PYTHON) tools/make_stages.py assets/stages.yaml build

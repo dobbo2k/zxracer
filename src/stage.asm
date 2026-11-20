@@ -365,3 +365,49 @@ StageMessage:
         ld hl, MsgBuf
         ld (Message), hl
         ret
+
+; The traffic at a stage start (its moves: src/traffic.asm, bank 2)
+InitTraffic:
+        ld hl, TrafficInit
+        ld de, Traffic
+        ld bc, N_TRAFFIC * CAR_SIZE
+        ldir
+        ld a, (StageRow)        ; this row's mix
+        dec a
+        add a, a
+        add a, a
+        ld l, a
+        ld h, 0
+        ld de, TrafficRows
+        add hl, de
+        ld de, NTraffic
+        ld bc, 4
+        ldir
+        ret
+
+TrafficInit:
+        IFDEF SPIN_TEST
+        dw 1300                 ; (testing: a slow lorry in the middle of the road)
+        db 0, 3, 2, 0
+        ELSE
+        dw 1500
+        db LANE_X, 10, 0, LANE_X
+        ENDIF
+        dw 2700
+        db -LANE_X, 13, 0, -LANE_X
+        dw 3900
+        db LANE_X, 7, 2, LANE_X
+        dw 5100
+        db -LANE_X, 8, 1, -LANE_X
+        dw 6300
+        db LANE_X, 12, 0, LANE_X
+
+; Per row: how many vehicles, then a random 0-7 at or above the first
+; number is a van, at or above the second a lorry; the chance (/256 per
+; game frame) of a lane change
+TrafficRows:
+        db 3, 6, 7, 2
+        db 3, 5, 7, 3
+        db 4, 5, 6, 4
+        db 4, 4, 6, 6
+        db 5, 4, 6, 8
