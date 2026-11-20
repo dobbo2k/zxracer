@@ -1,25 +1,21 @@
 ; ---------------------------------------------------------------------------
 ; Tape loader for zxracer.tap (assembled on its own by tools/make_tap.py).
 ;
-; The BASIC loader shows the loading screen, loads this to $BF00 and calls
-; it. It checks for 128K paging, then loads the headerless data blocks with
-; the ROM's LD-BYTES ($0556; under 128 BASIC the 48K BASIC ROM is paged in
-; during USR): the loading screen, then the compressed pack banks (each
-; loaded to $8000 and unpacked to $C000 in its bank), bank 2 (loaded into
-; bank 7, unpacked to $8000) and last the resident part of bank 5 (likewise,
-; to $5B00), which overwrites BASIC itself - so it never returns, but jumps
-; into the game.
-;
-; While loading, interrupts (the ROM loader re-enables them) go through an
-; IM2 table at $BE00 to a bare EI / RETI at $BFBF, so nothing writes to the
-; BASIC system variables that the last block replaces. The table's 257th
-; byte is this loader's first byte, $BF (CP A).
+; The BASIC loader loads this to $BE00 and calls it. It checks for 128K
+; paging (if there is none it returns, and BASIC says "128K ONLY"), then
+; reads the rest of the tape itself - standard ROM-format blocks at the
+; normal speed, but with its own loading routine, so it does not depend on
+; which ROM is paged in (128K, +2, +2A, +3 alike) and keeps interrupts off
+; throughout. The blocks: the loading screen, then the compressed pack
+; banks (each loaded to $8000 and unpacked to $C000 in its bank), bank 2
+; (loaded into bank 7, unpacked to $8000) and last the resident part of
+; bank 5 (likewise, to $5B00), which overwrites BASIC itself - so it never
+; returns, but jumps into the game. A tape error resets the machine.
 ; ---------------------------------------------------------------------------
-        ORG $BF00
+        ORG $BE00
 Loader:
-        cp a                    ; ($BF: last byte of the IM2 vector table)
-        ; 128K? page bank 1 and bank 3 in turn and see if they differ; if
-        ; not, back to BASIC, which says why
+        di
+        ; 128K? page bank 1 and bank 3 in turn and see if they differ
         ld bc, $7FFD
         ld a, $11
         out (c), a
@@ -33,17 +29,10 @@ Loader:
         out (c), a
         ld a, ($C000)
         cp $55
-        ret nz
-        di
-        ld sp, $C000
-        ld hl, $BE00            ; IM2 table -> $BFBF: EI, RETI
-        ld de, $BE01
-        ld bc, 256
-        ld (hl), $BF
-        ldir
-        ld a, $BE
-        ld i, a
-        im 2
+        jr z, .is128
+        ei
+        ret                     ; (BASIC prints "128K ONLY")
+.is128: ld sp, $C000
         ld hl, Blocks
 .blk:   ld a, (hl)              ; $7FFD value while loading ($FF: end)
         inc a
@@ -64,9 +53,7 @@ Loader:
         push bc
         push bc
         pop ix
-        ld a, $FF               ; data block
-        scf                     ; load (not verify)
-        call $0556              ; LD-BYTES
+        call LoadBlock
         pop bc
         pop hl
         jp nc, 0                ; tape error: start again
@@ -87,18 +74,105 @@ Loader:
         call UnLZ
         pop hl
         jr .blk
-.go:    di
+.go:    xor a
+        out ($FE), a            ; black border
         jp GAME_START
 
-; GAME_START; Blocks: per block the $7FFD value while loading, the length,
-; the load address, the $7FFD value while unpacking ($FF: stored as it is)
-; and where to unpack it; $FF ends
-        INCLUDE "loader_table.asm"
+; IX = address, DE = length: load the next standard data block (flag $FF,
+; then the data, then a checksum making the XOR of all of them 0). Carry
+; set if it loaded correctly. Keeps waiting while there is no signal.
+LoadBlock:
+        ld a, $7F
+        in a, ($FE)
+        rra
+        and $20
+        or $02                  ; C: bit 5 = last EAR level, bits 0-2 = border
+        ld c, a
+.wait:  ld h, 0                 ; leader: 256 cycles of the pilot tone in a row
+.lead:  ld b, $9C
+        call Edge2
+        jr nc, .wait
+        ld a, $C6
+        cp b
+        jr nc, .wait            ; too short for the pilot tone
+        inc h
+        jr nz, .lead
+.sync:  ld b, $C9               ; then the short sync pulse
+        call Edge1
+        jr nc, .wait
+        ld a, b
+        cp $D4
+        jr nc, .sync            ; still the pilot tone
+        call Edge1
+        ret nc
+        ld a, c
+        xor $03                 ; blue / yellow stripes from now on
+        ld c, a
+        ld h, 0                 ; H: XOR of the bytes so far
+        call ReadByte           ; the flag
+        ret nc
+        ld a, l
+        inc a
+        jr z, .data
+        and a                   ; not a data block: carry clear
+        ret
+.data:  call ReadByte
+        ret nc
+        ld (ix + 0), l
+        inc ix
+        dec de
+        ld a, d
+        or e
+        jr nz, .data
+        call ReadByte           ; the checksum
+        ret nc
+        ld a, h
+        cp 1                    ; carry: the XOR is 0
+        ret
 
-        ASSERT $ <= $BFBF
-        ORG $BFBF
-        ei
-        reti
+; -> L = the next byte (H ^= it), carry set; carry clear on a timeout
+ReadByte:
+        ld l, 1                 ; marker bit: shifts out after 8 bits
+        ld b, $B2               ; (a little time was spent since the last bit)
+.bit:   call Edge2              ; a full cycle: 855 T pulses for 0, 1710 T for 1
+        ret nc
+        ld a, $CB
+        cp b                    ; carry if it took longer than the threshold
+        rl l
+        ld b, $B0
+        jr nc, .bit
+        ld a, h
+        xor l
+        ld h, a
+        scf
+        ret
+
+; Wait for two edges / one edge of the EAR signal, counting B up once per
+; 59 T after a short settling delay; carry clear if B wraps (no edge in
+; time) or SPACE is held. Each edge flips the border stripe colour.
+Edge2:  call Edge1
+        ret nc
+Edge1:  ld a, 22
+.d:     dec a
+        jr nz, .d
+        and a
+.lp:    inc b
+        ret z
+        ld a, $7F
+        in a, ($FE)             ; bit 6: EAR; bit 0: SPACE
+        rra
+        ret nc
+        xor c
+        and $20
+        jr z, .lp
+        ld a, c                 ; an edge: note the new level
+        cpl
+        ld c, a
+        and 7
+        or 8
+        out ($FE), a
+        scf
+        ret
 
 ; HL = packed data (tools/make_screens.py format), DE = destination
 UnLZ:   ld a, (hl)
@@ -129,5 +203,10 @@ UnLZ:   ld a, (hl)
         pop hl
         inc hl
         jr UnLZ
+
+; GAME_START; Blocks: per block the $7FFD value while loading, the length,
+; the load address, the $7FFD value while unpacking ($FF: stored as it is)
+; and where to unpack it; $FF ends
+        INCLUDE "loader_table.asm"
 LoaderEnd:
-        ASSERT $ <= $BFEC               ; (the stack is above: at most ~14 bytes deep)
+        ASSERT $ <= $BFE0               ; (the stack is above, from $BFFF)

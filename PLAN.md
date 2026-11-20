@@ -165,21 +165,24 @@ bars) with `tools/make_tap.py`:
 
 1. BASIC `ZX RACER` (autostart 10): `BORDER 0: PAPER 0: INK 7: CLEAR 32767`,
    `LOAD "" CODE`, `RANDOMIZE USR 48896: PRINT "128K ONLY"`.
-2. CODE `loader` at `$BF00` (`src/loader.asm`, 233 bytes): checks that banks 1 and 3
-   differ (else returns to BASIC, which prints the message), points IM2 at a bare
-   `EI / RETI` (the ROM loader re-enables interrupts, and the last block replaces
-   BASIC's system variables), then loads headerless blocks with the ROM's LD-BYTES
-   (`$0556`, the 48K BASIC ROM, paged by `$7FFD` bit 4):
+2. CODE `loader` at `$BE00` (`src/loader.asm`): checks that banks 1 and 3 differ
+   (else returns to BASIC, which prints the message), then reads the rest of the
+   tape with **its own loading routine** - standard ROM-format blocks at the
+   normal speed, but no ROM calls and interrupts off throughout, so it does not
+   matter which ROM is paged (128K, +2, +2A, +3). (A first version called the
+   ROM's LD-BYTES at `$0556`; it crashed back to BASIC in an emulator, most likely
+   because the ROM paged in during `USR` was not the 48K BASIC ROM.) The blocks:
    the loading screen (raw, so it appears line by line), then the pack banks 0, 1,
    3, 4, 6 (each loaded to `$8000` and unpacked to `$C000` in its bank), bank 2
    (loaded into bank 7, unpacked to `$8000`) and the resident part of bank 5
-   (likewise, to `$5B00`), and jumps to the game. LZ compression (the screens'
-   format) saves 30%: 67 KB, about 6½ minutes.
+   (likewise, to `$5B00`), and it jumps to the game. LZ compression (the screens'
+   format) saves 30%: 67 KB, about 6½ minutes. A tape error resets the machine.
 
 `tests/tapecheck.py` boots the tape in zxsim (`-T`: does what `LOAD "" CODE: RANDOMIZE
-USR` would, then serves LD-BYTES from the tape with real tape timing - no ROM image
-needed) and checks that the game starts and shows its title. Not yet done: loading
-under the real ROMs (BASIC, LD-BYTES itself) and on +2A/+3 hardware.
+USR` would, then plays the tape into the EAR input - no ROM image needed) and checks
+that the game starts and shows its title, also with the tape 8% slow or fast and
+with random bytes in memory. Not yet done: the BASIC
+part under the real ROMs, and real hardware.
 
 ### 3.2b The road fork (as built)
 

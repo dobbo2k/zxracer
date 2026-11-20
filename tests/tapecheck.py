@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Tape: zxsim boots build/zxracer.tap as BASIC's LOAD "" CODE: RANDOMIZE USR
-would, serving the ROM's LD-BYTES from the tape with real tape timing. The
-loader must load every block and start the game (within 7 minutes), which
-must then show its title screen (no timing bars: a release build).
+would and plays the rest of the tape into the EAR input. The loader's own
+tape routine must load every block and start the game (within 7 minutes) -
+also with the tape 8% slow or fast and with random leftovers in memory -
+and the game must then show its title screen (no timing bars: a release
+build).
 usage: tapecheck.py ZXSIM TAP RELEASE.sym OUTDIR
 """
 import subprocess
@@ -12,16 +14,28 @@ from PIL import Image
 
 zxsim, tap, sym, outdir = sys.argv[1:5]
 start = next(int(l.split("0x")[1], 16) for l in open(sym) if l.startswith("start:"))
-LIMIT = 7 * 60 * 50
-out = subprocess.run([zxsim, "-T", tap, "-n", str(LIMIT), "-q", "-w", f"{start}:1"],
-                     capture_output=True, text=True).stdout
-w = [l for l in out.splitlines() if l.startswith("watch")]
 ok = True
-if not w:
+
+
+def started(extra, limit):
+    """frame the game started at, or None"""
+    out = subprocess.run([zxsim, "-T", tap, "-n", str(limit), "-q", "-w", f"{start}:1"] + extra,
+                         capture_output=True, text=True).stdout
+    w = [l for l in out.splitlines() if l.startswith("watch")]
+    return int(w[0].split("f=")[1].split()[0]) if w else None
+
+
+LIMIT = 7 * 60 * 50
+f0 = started([], LIMIT)
+if f0 is None:
     print(f"FAIL: the game did not start within {LIMIT // 50} s of loading")
     sys.exit(1)
-f0 = int(w[0].split("f=")[1].split()[0])
 print(f"tapecheck: game started after {f0 // 50 // 60} min {f0 // 50 % 60} s of loading")
+for extra, what in ((["-x", "92"], "the tape 8% slow"), (["-x", "108"], "the tape 8% fast"),
+                    (["-R", "7"], "random leftovers in memory")):
+    if started(extra, LIMIT + LIMIT // 10) is None:
+        print(f"FAIL: the game did not start with {what}")
+        ok = False
 shot = f"{outdir}/tape_title.ppm"
 r = subprocess.run([zxsim, "-T", tap, "-n", str(f0 + 300), "-q", "-s", f"{f0 + 250}:{shot}"],
                    capture_output=True, text=True)

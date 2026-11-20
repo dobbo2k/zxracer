@@ -21,9 +21,12 @@ make video    # build/gameplay.mp4: 48 s of autopilot gameplay with synthesised 
 
 **Loading the tape:** on a 128K / +2 / +2A / +3 choose *Tape Loader* (or type
 `LOAD ""`) and play `build/zxracer.tap`. A BASIC loader loads a small machine-code
-loader, which shows the loading screen and loads the game's memory banks
-(compressed) with the ROM's tape routine: about 6½ minutes at normal speed. On a
-48K Spectrum it stops with "128K ONLY".
+loader, which reads the rest with its own tape routine (standard blocks at the
+normal speed, no ROM calls): the loading screen, then the game's memory banks,
+compressed - about 6½ minutes. Emulators' instant "flash load" only speeds up the
+first two blocks; use the emulator's fast-forward / turbo tape option for the rest.
+On a 48K Spectrum it stops with "128K ONLY". `build/release.sna` is the same game as
+a snapshot.
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake (or a Kempston joystick).
 The game opens on the title screen, then alternates it with a self-driving

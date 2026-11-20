@@ -22,11 +22,14 @@
  *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture)
  *   -y FILE         write the 14 AY registers at the end of every frame to FILE
  *   -q              quiet summary
+ *   -R SEED         fill RAM and the (absent) ROM with random bytes first, as
+ *                   a real machine's leftovers would be (robustness testing)
  *   -T file.tap     tape boot instead of a snapshot: does what the BASIC loader
  *                   would (loads the first CODE block to its address and calls
- *                   it, 48K BASIC ROM paged, bank 0 at $C000), then serves the
- *                   ROM's LD-BYTES ($0556) from the following blocks with real
- *                   tape timing (no ROM image is needed)
+ *                   it, 48K BASIC ROM paged, bank 0 at $C000), then plays the
+ *                   following blocks into the EAR input (port $FE bit 6) with
+ *                   the ROM's timings (no ROM image is needed)
+ *   -x PERCENT      play the tape at PERCENT of its speed (default 100)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -100,13 +103,16 @@ static void set_keys(const char *spec) {
     }
 }
 
+static uint8_t *tape;          /* (tape boot, see below) */
+static int tape_ear(void);
+
 static uint8_t port_in(uint16_t port) {
     if ((port & 0xff) == 0x1f) return kempston;
     if (!(port & 1)) {
         uint8_t v = 0x1f;
         for (int r = 0; r < 8; r++)
             if (!(port & (0x100 << r))) v &= ~keyrows[r];
-        return v | 0xa0;
+        return v | 0xa0 | (tape && tape_ear() ? 0x40 : 0);
     }
     return 0xff;
 }
@@ -571,9 +577,12 @@ static void interrupt(void) {
 }
 
 /* ------------------------------------------------------------------ tape */
-static uint8_t *tape;          /* TAP file */
 static long tape_len, tape_pos;
-static long long tape_free;    /* absolute T when the next block's pilot may start */
+/* the signal: pulse lengths in T; a negative length is a gap (no edge) */
+static long *pulses;
+static long npulses, pulse_i;
+static long long pulse_end;    /* absolute T when pulse pulse_i ends */
+static int ear;
 
 static long long now_t(void) { return (long long)frame * FRAME_T + T; }
 
@@ -586,31 +595,41 @@ static uint8_t *tape_next(long *len) {
     return tape_pos <= tape_len ? b : NULL;
 }
 
-/* LD-BYTES ($0556): A = flag, carry = load, IX = address, DE = length.
-   Loads the next block if it matches, as long as the tape would take. */
-static void tape_trap(void) {
+static long tape_speed = 100;
+static void add_pulse(long t) {
+    static long cap;
+    t = t * 100 / tape_speed;
+    if (npulses == cap) { cap = cap ? cap * 2 : 1 << 16; pulses = realloc(pulses, cap * sizeof *pulses); }
+    pulses[npulses++] = t;
+}
+
+/* the rest of the tape as a signal: pilot (2168 T pulses), sync (667, 735),
+   two 855 / 1710 T pulses per 0 / 1 bit, then a second of silence */
+static void tape_signal(void) {
     long len;
-    uint8_t *b = tape_next(&len);
-    int ok = 0;
-    if (b && len >= 2 && b[0] == A && len - 2 == de.w) {
-        uint8_t x = 0;
-        for (long i = 0; i < len - 1; i++) x ^= b[i];
-        if (x == b[len - 1]) {
-            for (long i = 0; i < de.w; i++) wr((uint16_t)(ix.w + i), b[1 + i]);
-            ok = 1;
-        }
-    }
-    if (b) {
-        long long dur = (long long)(b[0] < 128 ? 8063 : 3223) * 2168 + 667 + 735;
+    uint8_t *b;
+    add_pulse(-3500000);                        /* (the gap after the loader) */
+    while ((b = tape_next(&len))) {
+        for (int i = b[0] < 128 ? 8063 : 3223; i > 0; i--) add_pulse(2168);
+        add_pulse(667); add_pulse(735);
         for (long i = 0; i < len; i++)
-            for (int k = 7; k >= 0; k--) dur += (b[i] >> k & 1) ? 2 * 1710 : 2 * 855;
-        long long start = now_t() > tape_free ? now_t() : tape_free;
-        T += (long)(start + dur - now_t());
-        tape_free = start + dur + 3500000;      /* a second's gap */
+            for (int k = 7; k >= 0; k--) {
+                long p = (b[i] >> k & 1) ? 1710 : 855;
+                add_pulse(p); add_pulse(p);
+            }
+        add_pulse(-3500000);
     }
-    if (ok) { ix.w += de.w; de.w = 0; F |= FC; } else F &= ~FC;
-    iff1 = iff2 = 1;                            /* the ROM loader ends with EI */
-    pc = pop16();
+    pulse_end = pulses[0] < 0 ? -pulses[0] : pulses[0];
+}
+
+/* EAR level now: step through the pulses that have ended */
+static int tape_ear(void) {
+    long long t = now_t();
+    while (pulse_i < npulses && t >= pulse_end) {
+        if (pulses[pulse_i] > 0) ear ^= 1;      /* a pulse ends with an edge */
+        if (++pulse_i < npulses) pulse_end += pulses[pulse_i] < 0 ? -pulses[pulse_i] : pulses[pulse_i];
+    }
+    return ear;
 }
 
 /* do what 10 ...: LOAD "" CODE: RANDOMIZE USR n would: the loader block */
@@ -632,9 +651,9 @@ static int tape_boot(const char *fn) {
             memset(ram[5] + 0x1800, 0x07, 768);   /* CLS with INK 7, PAPER 0 */
             for (long i = 0; i < len - 2; i++) wr((uint16_t)(addr + i), d[1 + i]);
             sp = 0x7FF0; push16(0);              /* (returning would go back to BASIC) */
-            pc = addr; im = 1; iff1 = iff2 = 0;
-            tape_free = (long long)(len + 2) * 8 * 2565 + 3500000;
+            pc = addr; im = 1; iff1 = iff2 = 0;  /* (the ROM would take the interrupt) */
             T = 0;
+            tape_signal();
             return 0;
         }
     }
@@ -691,7 +710,7 @@ int main(int argc, char **argv) {
     static event shots[MAX_EVENTS], keys[MAX_EVENTS], joys[MAX_EVENTS];
     int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
     FILE *vid = NULL, *aylog = NULL;
-    long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1;
+    long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1, rand_seed = -1;
     const char *prof_file = NULL;
     static unsigned long long prof[65536];
     for (int i = 1; i < argc; i++) {
@@ -729,12 +748,19 @@ int main(int argc, char **argv) {
             if (*v == ':') dump_len = strtol(v + 1, NULL, 0);
         }
         else if (!strcmp(a, "-T") && i + 1 < argc) sna = argv[++i], tape = (uint8_t *)1;
+        else if (!strcmp(a, "-R") && i + 1 < argc) rand_seed = atol(argv[++i]);
+        else if (!strcmp(a, "-x") && i + 1 < argc) tape_speed = atol(argv[++i]);
         else if (a[0] != '-') sna = a;
         else { fprintf(stderr, "zxsim: unknown option %s\n", a); return 2; }
     }
     if (!sna) { fprintf(stderr, "usage: zxsim game.sna [-n frames] [-s F:shot.ppm] [-k F:KEYS] [-j F:BITS] [-b F] [-q]\n"); return 2; }
     init_tables();
     memset(rom, 0xff, sizeof rom);
+    if (rand_seed >= 0) {
+        srand((unsigned)rand_seed);
+        for (int i = 0; i < 16384; i++) rom[i] = (uint8_t)rand();
+        for (int b = 0; b < 8; b++) for (int i = 0; i < 16384; i++) ram[b][i] = (uint8_t)rand();
+    }
     if (tape) { if (tape_boot(sna)) return 1; }
     else if (load_sna(sna)) return 1;
 
@@ -752,10 +778,9 @@ int main(int argc, char **argv) {
                        frame, T, pc, af.w, bc.w, de.w, hl.w, ix.w, iy.w, sp);
             }
             uint16_t pc0 = pc; long t0 = T;
-            if (tape && pc == 0x0556) { tape_trap(); continue; }
             exec();
             if (prof_file && frame >= prof_from) prof[pc0] += (unsigned long long)(T - t0);
-            if (pc < 0x4000 && !rom_warn && !(tape && pc == 0x0556)) {
+            if (pc < 0x4000 && !rom_warn) {
                 rom_warn = 1;
                 fprintf(stderr, "zxsim: warning: execution entered ROM at %04X (frame %ld)\n", pc, frame);
             }

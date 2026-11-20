@@ -28,16 +28,18 @@ zxsim game.sna [options]
   -y FILE         write the 14 AY registers at the end of every frame
   -q              no summary line
   -T file.tap     tape boot instead of a snapshot (see below)
+  -x PERCENT      tape speed for -T (default 100)
+  -R SEED         fill RAM and the ROM area with random bytes first
 ```
 
 **Tape boot (`-T`).** zxsim has no ROM, so it does what the tape's BASIC loader
 would: it loads the first CODE block to its address and calls it with the 48K BASIC
-ROM's paging (bank 0 at `$C000`, `$7FFD` = `$10`). From then on a call to the ROM's
-LD-BYTES (`$0556`) is served from the next tape block - flag, length and checksum
-checked, carry set on success, interrupts re-enabled as the ROM does - and takes as
-long as the block would take to play (pilot, sync, 855 / 1710 T pulses per bit, a
-second's gap between blocks). `tests/tapecheck.py` uses it to load
-`build/zxracer.tap` end to end.
+ROM's paging (bank 0 at `$C000`, `$7FFD` = `$10`). The rest of the tape is then
+played into the EAR input (port `$FE` bit 6) with the ROM's timings - pilot tone,
+sync, 855 / 1710 T pulses per bit, a second's silence between blocks - for the
+game's own loader to read. `-x PERCENT` plays the tape slower or faster, `-R SEED`
+fills memory (and the absent ROM) with random bytes first. `tests/tapecheck.py`
+uses these to load `build/zxracer.tap` end to end.
 
 The summary line reports `flips` (writes to `$7FFD` that change the displayed
 screen), so `fps = flips × 50 / frames`.

@@ -6,9 +6,10 @@ Blocks:
   1. BASIC "ZX RACER" (autostart line 10):
        10 BORDER 0: PAPER 0: INK 7: CLEAR 32767
        20 LOAD "" CODE
-       30 RANDOMIZE USR 48896: PRINT "128K ONLY"   (the loader returns on a 48K)
-  2. CODE "loader" at $BF00 (src/loader.asm)
-  3. headerless data blocks, loaded by the loader with the ROM's LD-BYTES:
+       30 RANDOMIZE USR 48640: PRINT "128K ONLY"   (the loader returns on a 48K)
+  2. CODE "loader" at $BE00 (src/loader.asm)
+  3. headerless standard data blocks, read by the loader's own tape routine
+     (no ROM calls, interrupts off):
      the loading screen ($4000), then compressed (make_screens.lz) the pack
      banks 0, 1, 3, 4, 6 (unpacked to $C000), bank 2 ($8000-$BDBF: code,
      tables, chains) and the resident part of bank 5 ($5B00 up to ScnEnd),
@@ -23,7 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 import make_screens                 # noqa: E402
 
-LOADER_ORG = 0xBF00
+LOADER_ORG = 0xBE00
 BANK2_END = 0xBDC0                  # after ISR_JP; the IM2 table and stack are built at run time
 
 
