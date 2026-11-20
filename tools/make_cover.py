@@ -520,6 +520,7 @@ def detailed_defs():
   <linearGradient id="hlockv" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#ffeaa0"/><stop offset="0.45" stop-color="#f2c444"/><stop offset="1" stop-color="#b07a18"/>
   </linearGradient>
+  <filter id="hsheen"><feGaussianBlur stdDeviation="3"/></filter>
   <pattern id="cstripe" width="16" height="40" patternUnits="userSpaceOnUse">
     <rect width="16" height="40" fill="#f4f2ec"/><rect x="5" width="5" height="40" fill="#2f55c8"/>
   </pattern>
@@ -723,38 +724,46 @@ def strands_along(spine, w, colours, count, r, width=1.3, start=0.0, end=0.92):
 
 
 def her_hair_back(x, y):
-    """The mass of her hair from behind: crown, parting, falling behind the
-    headrest and swept to the right by the wind."""
+    """Her hair from behind: round over the skull, falling behind the headrest
+    and swept a little right by the wind; strands follow the head's curve."""
     r = random.Random(31)
     o = []
-    sil = [(x - 2, y - 61), (x + 30, y - 58), (x + 52, y - 40), (x + 62, y - 10), (x + 70, y + 22),
-           (x + 84, y + 46), (x + 98, y + 66), (x + 92, y + 80), (x + 60, y + 86), (x, y + 88),
-           (x - 52, y + 84), (x - 64, y + 50), (x - 62, y + 10), (x - 56, y - 30), (x - 34, y - 56)]
+    sil = [(x, y - 62), (x + 28, y - 57), (x + 48, y - 40), (x + 58, y - 12), (x + 64, y + 24),
+           (x + 78, y + 54), (x + 94, y + 78), (x + 72, y + 92), (x, y + 94), (x - 58, y + 90),
+           (x - 62, y + 48), (x - 58, y + 6), (x - 50, y - 34), (x - 30, y - 56)]
     d = smooth_d(sil)
     o.append(f'<path d="{d}" fill="url(#hmass)"/>')
-    # strands from the parting at the crown, combed back and swept right
-    for k in range(46):
-        t = k / 45
-        sx = x - 4 + r.uniform(-3, 3)
-        sy = y - 58 + abs(t - 0.5) * 6
-        ang = math.pi * (1.05 - 1.1 * t)          # from the left side round to the right
-        ex = x + 62 * math.cos(ang) + 26 * t + r.uniform(-4, 4)
-        ey = y + 30 + 52 * (1 - abs(math.cos(ang))) * 0.6 + 30 * t + r.uniform(-6, 10)
-        c1 = (sx + (ex - sx) * 0.15 + 28 * math.cos(ang) * 0.6, sy + 12)
-        c2 = (ex - 10 * math.cos(ang), ey - 40)
-        col = r.choice(("#fff4c0", "#ffe080", "#e8b440", "#c8901e", "#a87010"))
-        pts = bez((sx, sy), c1, c2, (ex, ey), 18)
-        o.append(f'<path d="{smooth_d(pts, False)}" stroke="{col}" stroke-width="{f(r.uniform(1.0, 2.2))}" '
-                 f'fill="none" opacity="{r.uniform(0.5, 0.9):.2f}" stroke-linecap="round"/>')
-    # shadow in the hollows towards the bottom, light along the crown
-    o.append(f'<path d="{d}" fill="url(#hshadow)"/>')
-    rim = sil[13:] + sil[:5]
-    o.append(f'<path d="{smooth_d(rim, False)}" stroke="#fff3c8" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/>')
+    clip = clip_of_d(d)
+    strokes = []
+    for k in range(70):
+        phi = math.radians(r.uniform(-168, -12))       # where on the crown it starts
+        rad = r.uniform(0.78, 1.0)
+        sx, sy = x + 52 * rad * math.cos(phi), y - 2 + 58 * rad * math.sin(phi)
+        side = math.cos(phi)                          # -1 left .. 1 right
+        ex = x + 62 * side + 8 + 14 * max(0, side) + r.uniform(-5, 5)
+        ey = y + r.uniform(70, 95)
+        c1 = (sx + side * 22, sy + 30)               # round the skull ...
+        c2 = (ex - side * 4, ey - 45)                # ... then falling
+        col = r.choice(("#fff4c0", "#ffe080", "#ffe080", "#e8b440", "#c8901e", "#a87010"))
+        pts = bez((sx, sy), c1, c2, (ex, ey), 20)
+        strokes.append(f'<path d="{smooth_d(pts, False)}" stroke="{col}" stroke-width="{f(r.uniform(1.0, 2.4))}" '
+                       f'fill="none" opacity="{r.uniform(0.45, 0.85):.2f}" stroke-linecap="round"/>')
+    o.append(f'<g clip-path="url(#{clip})">' + "".join(strokes))
+    # a soft band of shine across the crown, shadow lower down
+    o.append(f'<path d="M{x - 50},{y - 22} Q{x},{y - 44} {x + 50},{y - 22}" stroke="#fff6d0" stroke-width="12" '
+             f'fill="none" opacity="0.35" filter="url(#hsheen)"/>')
+    o.append(f'<path d="{d}" fill="url(#hshadow)"/></g>')
+    rim = sil[12:] + sil[:4]
+    o.append(f'<path d="{smooth_d(rim, False)}" stroke="#fff3c8" stroke-width="3" fill="none" opacity="0.8" '
+             f'stroke-linecap="round"/>')
     o.append(f'<path d="{d}" fill="none" stroke="#7a5212" stroke-width="2"/>')
-    # the parting
-    o.append(f'<path d="M{x - 4},{y - 60} Q{x - 6},{y - 44} {x - 3},{y - 30}" stroke="#9a6a14" stroke-width="1.6" '
-             f'fill="none" opacity="0.7"/>')
     return "\n".join(o)
+
+
+def clip_of_d(d):
+    cid = f"c{len(clips)}"
+    clips.append(f'<clipPath id="{cid}"><path d="{d}"/></clipPath>')
+    return cid
 
 
 def her_hair_front(x, y):
