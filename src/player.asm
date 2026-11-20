@@ -5,8 +5,10 @@ STEER_ACC       EQU 64          ; sideways acceleration (1/256 px per frame per 
                                 ; 4 pixels a frame once it has built up
 GRIP            EQU 200         ; |curvature * speed| the tyres hold
 PX_MAX          EQU 300         ; from the middle of the road (or the branch)
-MAX_SPEED       EQU 20          ; depth units per 50 Hz frame
-ACCEL           EQU 1
+MAX_SPEED       EQU 20          ; depth units per 50 Hz frame (HIGH gear: 280 km/h)
+LOW_MAX         EQU 13          ; LOW gear's top speed (182 km/h)
+DEMO_UP         EQU 13          ; the demo driver changes up at this speed...
+DEMO_DOWN       EQU 8           ; ... and down below this one
 DECEL           EQU 1
 BRAKE           EQU 2
 OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
@@ -31,6 +33,20 @@ UpdatePlayer:
         ld a, 4
 .el:    ld (Elapsed), a
         call ForkPlayer         ; past the split: carried along the branch
+        ; gear: fire (SPACE) changes between LOW and HIGH
+        ld a, (Input)
+        and 1 << IN_FIRE
+        ld hl, FireWas
+        ld b, (hl)
+        ld (hl), a
+        jr z, .noShift          ; not pressed
+        ld a, b
+        or a
+        jr nz, .noShift         ; still held from before
+        ld a, (Gear)
+        xor 1
+        ld (Gear), a
+.noShift:
 
         ; ---- sideways handling. Per 50 Hz frame the car's sideways speed
         ; LatVX (1/256 pixel per frame) gets the bend's outward push
@@ -98,14 +114,6 @@ UpdatePlayer:
 .sl1:   ld (LatAcc), hl
         ld a, 1
 .grip:  ld (Sliding), a
-        ld hl, (LatF)           ; tyres squealing: near the grip limit
-        call AbsHL
-        ld de, SMOKE_AT
-        or a
-        sbc hl, de
-        sbc a, a
-        inc a
-        ld (Squeal), a
         ; steering
         ld a, (Input)
         ld c, a
@@ -223,10 +231,7 @@ UpdatePlayer:
         jr .coast
 .grips: bit IN_UP, c
         jr z, .coast
-        add a, ACCEL
-        cp MAX_SPEED + 1
-        jr c, .spd
-        ld a, MAX_SPEED
+        call Throttle
         jr .spd
 .coast: sub DECEL
         jr nc, .spd
@@ -278,6 +283,43 @@ UpdatePlayer:
         call UpdateTraffic
         jp UpdateObjects
 
+; A = speed, accelerating -> A = the new speed. Two gears, as on a real
+; arcade racer's shifter: LOW pulls hard but tops out at LOW_MAX (above it,
+; after changing down at speed, the engine brakes the car to it); HIGH
+; reaches MAX_SPEED but pulls weakly from low speeds (HighPull: 1/256ths of a
+; speed unit per update).
+Throttle:
+        ld b, a
+        ld a, (Gear)
+        or a
+        ld a, b
+        jr nz, .high
+        cp LOW_MAX
+        jr c, .inc
+        ret z                   ; at the limiter
+        dec a
+        ret
+.inc:   inc a
+        ret
+.high:  cp MAX_SPEED
+        ret nc
+        ld e, a
+        ld d, 0
+        ld hl, HighPull
+        add hl, de
+        ld a, (SpeedFrac)
+        add a, (hl)
+        ld (SpeedFrac), a
+        ld a, b
+        ret nc
+        inc a
+        ret
+HighPull:
+        db 48, 48, 48, 48, 48, 48           ; 0-5: it bogs down
+        db 96, 96, 96, 96                   ; 6-9
+        db 192, 192, 192, 192, 192, 192     ; 10-15
+        db 160, 160, 160, 160               ; 16-19
+
 ; Demo / attract mode: until a steering key is pressed, drive automatically
 ; (accelerate, steer back towards the middle of the road).
 DEMO_DEADBAND   EQU 6
@@ -286,6 +328,16 @@ DemoDriver:
         ld a, (DemoMode)
         or a
         ret z
+        ld a, (Speed)           ; its own gear changes
+        ld hl, Gear
+        cp DEMO_UP
+        jr c, .low
+        ld (hl), 1
+        jr .geared
+.low:   cp DEMO_DOWN
+        jr nc, .geared
+        ld (hl), 0
+.geared:
         call DemoTarget         ; HL = PlayerX the driver aims for
         push hl
         ld hl, (LatVX)          ; where the car will be in 16 frames

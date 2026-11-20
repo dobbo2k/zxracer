@@ -85,7 +85,7 @@ def car(lean, smoke=None):
 
 
 def tyre_smoke(im, d, lean, phase):
-    """White smoke billowing from the rear tyres (drifting at the limit).
+    """Light white smoke from both rear tyres (drifting at the limit).
     It takes over the tyre cells of the bottom row: their red turns white,
     the smoke is white, the tyres stay black."""
     rnd = [(2, 30, 3), (9, 31, 3), (14, 28, 2), (5, 26, 2), (12, 25, 1)] if phase == 0 else \
@@ -94,22 +94,21 @@ def tyre_smoke(im, d, lean, phase):
              [(2, 24), (9, 26), (15, 25), (5, 29)]
     puffs = Image.new("L", im.size, 0)
     pd = ImageDraw.Draw(puffs)
-    for side, x0 in ((-1, 0), (1, 48)):
-        big = (side == -lean)
+    for side, x0 in ((-1, 0), (1, 48)):              # the same, light, from both tyres
         for x, y, r in rnd:
             if side > 0:
                 x = 15 - x
-            r = r + 1 if big else max(1, r - 1)
+            r = max(1, r - 1)
             pd.ellipse([x0 + x - r, y - r, x0 + x + r, y + r], fill=255)
         for x, y in specks:
             pd.point((x0 + (15 - x if side > 0 else x), y), 255)
     pd.rectangle([0, 0, 63, 23], fill=0)               # (bottom row only)
     im.paste(Image.new("RGB", im.size, W), (0, 0), puffs)
-    for cx in (0, 1, 6, 7):                            # the smoky cells: red -> white
-        for y in range(24, 32):
+    for cx in (0, 1, 6, 7):                            # the smoky cells: no red there:
+        for y in range(24, 32):                        # bumper black, tyre outline white
             for x in range(cx * 8, cx * 8 + 8):
                 if im.getpixel((x, y)) == R:
-                    im.putpixel((x, y), W)
+                    im.putpixel((x, y), K if y < 26 else W)
     for y in range(24, 32):                            # (smoke stays in those cells)
         for x in range(16, 48):
             if im.getpixel((x, y)) == W:

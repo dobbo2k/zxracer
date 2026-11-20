@@ -53,7 +53,9 @@ LatVX:          dw 0            ; sideways speed, 1/256 pixel per 50 Hz frame
 LatAcc:         dw 0            ; its change per frame this update
 LatF:           dw 0            ; curvature * speed
 Sliding:        db 0            ; past the grip limit
-Squeal:         db 0            ; near it: the tyres squeal
+Gear:           db 0            ; 0 LOW, 1 HIGH
+SpeedFrac:      db 0            ; (HIGH gear's slow pull)
+FireWas:        db 0            ; fire held last update (gear changes on a press)
 CrewHerLine:    dw MsgNone      ; what they say after this crash
 CrewHisLine:    dw MsgNone
 CrewShownA:     db 0            ; the close-ups are on buffer A / B
@@ -101,8 +103,8 @@ MsgLastA:       dw 0            ; message each buffer shows
 MsgLastB:       dw 0
 HudOr:          db 0
 HudCache:       dw HudCacheA
-HudCacheA:      db $FF, $FF, $FF, $FF, $FF, $FF     ; score, time, speed shown
-HudCacheB:      db $FF, $FF, $FF, $FF, $FF, $FF
+HudCacheA:      db $FF, $FF, $FF, $FF, $FF, $FF, $FF    ; score, time, speed, gear shown
+HudCacheB:      db $FF, $FF, $FF, $FF, $FF, $FF, $FF
 
 ; traffic and collisions
 Traffic:        ds N_TRAFFIC * CAR_SIZE

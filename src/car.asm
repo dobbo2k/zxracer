@@ -71,7 +71,7 @@ CarFrame:
 
 
 DRIFT_LOOK      EQU 80              ; |curvature * speed|: the car yaws into the bend
-SMOKE_AT        EQU 160             ; ... and its rear tyres smoke and squeal
+SMOKE_AT        EQU 160             ; ... and its rear tyres smoke
 
 DrawCar:
         call CarFrame           ; C = frame

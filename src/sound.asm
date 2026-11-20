@@ -1,9 +1,9 @@
 ; ---------------------------------------------------------------------------
 ; AY-3-8912 sound effects, updated from the 50 Hz interrupt.
-;   A: engine - square wave, pitch rising with speed, with a small wobble
+;   A: engine - square wave, pitch rising with the revs (speed and gear:
+;      it drops when you change up), with a small wobble
 ;      every interrupt so it sounds like a motor rather than a beep
 ;   B: gravel noise while off the road
-;   C: tyre squeal in hard bends at speed
 ; (Music will take A/B later, with the engine moving to C.)
 ; ---------------------------------------------------------------------------
 AY_SEL          EQU $FFFD
@@ -23,8 +23,15 @@ AyWrite:
 ; Engine tone period for the current speed, once per game frame (not in
 ; the interrupt): IDLE - speed * STEP.
 EngineUpdate:
-        ld a, (Speed)
-        ld e, a
+        ld a, (Speed)           ; revs: speed in HIGH, 1.5 x speed in LOW
+        ld b, a
+        ld a, (Gear)
+        or a
+        ld a, b
+        jr nz, .revs
+        srl b
+        add a, b
+.revs:  ld e, a
         ld d, 0
         ld hl, 0
         ld b, ENGINE_STEP
@@ -78,7 +85,7 @@ SoundTick:
         ld e, a                 ; noise period: low = rumble
         ld a, 6
         call AyWrite
-        jr .squeal
+        jr .mix
 .noSfx:
         ; gravel: noise on B while off the road and moving
         ld e, 0
@@ -94,26 +101,9 @@ SoundTick:
         ld e, 12                ; noise period
         ld a, 6
         call AyWrite
-.squeal:
-        ; squeal: high tone on C while the tyres smoke (near the grip limit)
-        ld e, 0
-        ld a, (Squeal)
-        or a
-        jr z, .sq
-        ld a, (FrameCount)
-        and 6
-        add a, 40               ; wavering high pitch
-        ld e, a
-        ld a, 4
-        call AyWrite
-        ld e, 0
-        ld a, 5
-        call AyWrite
-        ld e, 8
-.sq:    ld a, 10
-        call AyWrite
-        ; mixer: tone A, tone C, noise B (0 bits enable)
-        ld e, %00101010
+.mix:
+        ; mixer: tone A, noise B (0 bits enable)
+        ld e, %00101110
         ld a, 7
         jp AyWrite
 

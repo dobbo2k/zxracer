@@ -334,11 +334,19 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
   quarter of the excess, half the steering and grip, a tyre squeal, and holding
   the throttle no longer adds speed (it scrubs off until the tyres grip again).
+- **Gears** *(as built)*: LOW / HIGH, changed with SPACE or fire (on a press).
+  LOW: +1 speed per update up to 13 (182 km/h); above it (changed down at speed)
+  the engine brakes the car to 13. HIGH: up to 20 (280 km/h), pulling 48/256 per
+  update below 6, 96 to 10, 192 to 16, 160 above - from a standstill in HIGH the
+  car takes twice as long to get going. Engine revs: speed in HIGH, 1.5 × speed in
+  LOW. HUD: LOW / HIGH under the speed. The demo driver changes up at 13 and down
+  below 8.
 - **Drift you can see** *(as built)*: the car sprite has 7 frames - straight,
   left, right, and drifting left / right with tyre smoke (two puffs each, swung
   further round). On a bend with |curvature × speed| ≥ 80 and no steering the car
   yaws into the bend; from 160 (near the grip limit, and while sliding) it shows
-  the smoke frames, animated, and the tyres squeal.
+  the smoke frames (light smoke from both rear tyres), animated. (There was a
+  tyre squeal too; it was removed as annoying.)
 - **Crew** *(as built)*: the car sprite's open cockpit row shows his head
   (white ink) and hers (yellow) over whatever lies under the car (ink turns
   black where it matches); his striped shirt and her hair sit on the rear deck.

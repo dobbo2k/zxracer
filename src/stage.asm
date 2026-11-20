@@ -174,7 +174,7 @@ ResetDisplay:
         ; caches
         ld hl, HudCacheA
         ld de, HudCacheA + 1
-        ld bc, 11
+        ld bc, 13
         ld (hl), $FF
         ldir                    ; HudCacheA + HudCacheB
         ld hl, 0
@@ -296,6 +296,10 @@ Restart:
         ld (LatVX), hl
         xor a
         ld (StageDone), a
+        ld (Gear), a            ; LOW
+        ld (SpeedFrac), a
+        ld a, 1 << IN_FIRE      ; (a fire press that started the game is no gear change)
+        ld (FireWas), a
         ld a, FIRST_STAGE
         jp LoadStage
 

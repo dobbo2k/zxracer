@@ -1,5 +1,5 @@
 ; ---------------------------------------------------------------------------
-; HUD in the sky rows: SCORE (left), big TIME (centre), SPEED (right), and a
+; HUD in the sky rows: SCORE (left), big TIME (centre), SPEED and GEAR (right), and a
 ; message line. Static labels are printed into both buffers once; numbers
 ; are redrawn into the back buffer every frame; messages only when the
 ; message this buffer shows changes.
@@ -127,7 +127,18 @@ DrawHud:
         call .digit
         ld a, e
         call PrintDigit
-.v0:
+.v0:    ; ---- gear: LOW / HIGH
+        ld a, (Gear)
+        cp (ix + 6)
+        jr z, .g0
+        ld (ix + 6), a
+        ld de, TxtLow
+        or a
+        jr z, .gl
+        ld de, TxtHigh
+.gl:    ld bc, $021A
+        call PrintAt
+.g0:
         ; ---- message line, only if it changed for this buffer
         ld hl, (MsgLast)
         ld de, (Message)
@@ -275,6 +286,8 @@ TxtScore:       db "SCORE", 0
 TxtTime:        db "TIME", 0
 TxtSpeed:       db "SPEED", 0
 TxtKmh:         db "KM", 0
+TxtLow:         db "LOW ", 0
+TxtHigh:        db "HIGH", 0
 TxtStage:       db "STAGE ", 0
 MsgGoal:        db "  GOAL! WELL DONE!  ", 0
 MsgFork:        db " << CHOOSE A ROAD >>", 0
