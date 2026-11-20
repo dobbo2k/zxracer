@@ -240,12 +240,12 @@ def build():
     <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="5" result="g"/>
     <feColorMatrix in="g" type="matrix" values="0 0 0 0 0.45  0 0 0 0 0.38  0 0 0 0 0.28  0 0 0 -1.3 1.0"/>
   </filter>
-  <filter id="worn" x="0" y="0" width="100%" height="100%">
+  <filter id="worn" filterUnits="userSpaceOnUse" x="0" y="0" width="{W}" height="{H}">
     <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="9" result="n"/>
     <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -3.0 2.55" result="m"/>
     <feComposite in="SourceGraphic" in2="m" operator="in"/>
   </filter>
-  <filter id="inkspread" x="0" y="0" width="100%" height="100%">
+  <filter id="inkspread" filterUnits="userSpaceOnUse" x="0" y="0" width="{W}" height="{H}">
     <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="2" result="n"/>
     <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
