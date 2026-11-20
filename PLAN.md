@@ -525,17 +525,14 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 - **Between stages** *(as built)*: at the checkpoint the stage overlay mutes
   the interrupt's sound and plays a drum fill while it loads - a hit every 3
   frames of noise through channel A's hardware envelope (the AY decays it,
-  so no interrupt code is needed), and a longer, deeper last one - and the next tune starts at full volume.
-  The new stage's colours sweep down the frozen last frame two rows at a
-  time as it loads (`SweepStep` after each chunk of the theme copy, `Sweep`
-  for any rows left: sky, backdrop band, grass bands, the old pixels
-  cleared), so the display reset then clears only the HUD's rows and keeps
-  the sweep's grass bands. The freeze between stages is about 18 frames
-  (0.36 s), all under the drum fill. (A fade-out over the stage's last stretch
-  and a fade-in of the next tune were tried and taken out after play
+  so no interrupt code is needed), and a longer, deeper last one - and the
+  next tune starts at full volume. The last frame stays on show meanwhile
+  (about 18 frames, 0.36 s), then the display reset. (A fade-out over the
+  stage's last stretch, a fade-in of the next tune and a sweep of the new
+  stage's colours down the screen were tried and taken out after play
   testing.) The video tools model the AY's envelope: zxsim's `-y` log sets
-  bit 7 of register 13 in a frame that wrote it (a restart). Room: small variables
-  and tables moved from bank 5 into the table pages' holes, the track cache
+  bit 7 of register 13 in a frame that wrote it (a restart). Room: small
+  variables and tables moved from bank 5 into the table pages' holes, the track cache
   shrank to 608 bytes (the two longest stages lose a little small scenery
   to fit).
 - **Hills** *(as built)*: the hill value under the car changes the speed every
