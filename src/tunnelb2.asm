@@ -51,8 +51,8 @@ Ceiling:
         ret
 
 ; ---------------------------------------------------------------------------
-; Gantries: a chequered beam on two red posts over the road where it forks
-; (the checkpoint) and at the goal (GateZ, set at a stage start), drawn in
+; The goal's gantry: a chequered beam on two red posts over the road at the
+; end of the last stage (GateZ, set at a stage start: $FFFF elsewhere), drawn in
 ; attributes like a tunnel's mouth (src/tunnel.asm DrawPortal, PortalRow)
 ; when no tunnel is in view. Once it has gone past, the sky rows are painted
 ; afresh (the road rows it used were marked to be redrawn as it went).
@@ -60,6 +60,8 @@ Ceiling:
 GATE_POST       EQU $52             ; bright red (red ink: nothing shows through)
 GATE_BEAM       EQU $7F             ; bright white, chequered with black
 GATE_NEAR       EQU 240             ; nearer than this: gone past
+GATE_FAR        EQU 1264            ; further than this: not drawn yet (its posts would
+                                    ; not show: the road is under ARCH_MIN wide there)
 
 Gate:
         ld hl, (GateZ)
@@ -70,7 +72,7 @@ Gate:
         add hl, de
         jr nc, .gone            ; (behind, or about to be)
         ld a, h
-        cp high (4096 - GATE_NEAR)
+        cp high (GATE_FAR - GATE_NEAR)
         jr nc, .gone
         ld de, GATE_NEAR
         add hl, de

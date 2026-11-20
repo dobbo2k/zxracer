@@ -508,10 +508,12 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   redraws them. About 7% off the frame rate while a tunnel is in view. Room
   came from drawing the timer's big digits from the font (`PrintBig`,
   -250 bytes of bank 5) and moving small routines into bank 2's gaps.
-- **Gantries, tunnel signs, lamps and echo** *(as built)*: `GateZ` (set at a
-  stage start: 200 units before the fork's split, or 150 before the goal)
-  is drawn by the tunnel's mouth painter when no tunnel is in view
-  (`Gate`, `GateKind`: posts and a beam in the row runs; `Chequer`
+- **The goal's gantry, tunnel signs, lamps and echo** *(as built)*: `GateZ`
+  (set at a stage start: 150 units before the goal on the last row, $FFFF -
+  none - elsewhere; the forks had gantries too, taken out after play
+  testing) is drawn by the tunnel's mouth painter when no tunnel is in view
+  and it is nearer than 1264 units, where the road is wide enough for its
+  posts (`Gate`, `GateKind`: posts and a beam in the row runs; `Chequer`
   alternates the beam's cells); once past, the sky rows are painted afresh.
   The alpine theme has an extra scenery type (id 10, `sign_tunnel`), placed
   1700 and 1000 units before each tunnel. In a tunnel's light bands
