@@ -523,15 +523,16 @@ def car_detailed():
     cx = 650
     # shadow on the road
     o.append(f'<ellipse cx="{cx}" cy="1796" rx="430" ry="34" fill="#030106" opacity="0.85" filter="url(#soft)"/>')
-    # ---- the crew (behind the seats), the windscreen in front of them
+    # ---- the windscreen, then the crew in front of it (and behind their seats)
     ws = "M436,1440 L466,1322 Q468,1314 476,1314 L824,1314 Q832,1314 834,1322 L864,1440 Z"
     o.append(f'<path d="{ws}" fill="url(#cglass)"/>')
+    o.append(f'<path d="{ws}" fill="none" stroke="#1a1420" stroke-width="7" stroke-linejoin="round"/>')
+    o.append('<path d="M470,1318 L830,1318" stroke="#8a90a0" stroke-width="2" opacity="0.7"/>')
+    # (the crew sit nearer to us than the windscreen)
     # him: dark hair, striped shirt
     o.append(person_him(560, 1316))
     # her: blonde, pink top, hair blown back
     o.append(person_her(742, 1318))
-    o.append(f'<path d="{ws}" fill="none" stroke="#1a1420" stroke-width="7" stroke-linejoin="round"/>')
-    o.append('<path d="M470,1318 L830,1318" stroke="#8a90a0" stroke-width="2" opacity="0.7"/>')
     # seats and headrests (in front of the crew, from here)
     for x in (560, 742):
         o.append(f'<path d="M{x - 82},1446 L{x - 80},1416 Q{x - 78},1398 {x - 58},1396 L{x + 58},1396 '
