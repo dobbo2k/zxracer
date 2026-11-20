@@ -22,6 +22,12 @@ NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 ; A = stage index: load its theme and track, reset the track state and
 ; the display.
 LoadStage:
+        call LoadPacks
+        jr StageHeaders
+
+; A = stage index: copy its theme and track packs into the caches (and
+; nothing else: the demo carries on after the front end with this).
+LoadPacks:
         push af
         call WaitFlip           ; (no flip may happen while banks are paged)
         pop af
@@ -46,37 +52,8 @@ LoadStage:
         ld b, (hl)
         inc hl
         push hl
-        ld (LdBank), a
-        ld (LdSrc), de
-        ld (LdLen), bc
         ld hl, THEME_CACHE
-        ld (LdDst), hl
-.chunk: ld hl, (LdLen)
-        ld a, h
-        or l
-        jr z, .themeDone
-        ld bc, TRACK_CACHE_SIZE
-        or a
-        sbc hl, bc
-        jr nc, .full            ; a full chunk, HL = what remains after it
-        add hl, bc
-        ld b, h
-        ld c, l                 ; the last, shorter chunk
-        ld hl, 0
-.full:  ld (LdLen), hl
-        push bc
-        ld a, (LdBank)
-        ld hl, (LdSrc)
-        ld de, TRACK_CACHE
-        call CopyFromBank
-        ld (LdSrc), hl
-        pop bc
-        ld hl, TRACK_CACHE
-        ld de, (LdDst)
-        ldir                    ; bounce -> theme cache (bank 7 is paged again)
-        ld (LdDst), de
-        jr .chunk
-.themeDone:
+        call CopyToCache
         pop hl                  ; stage table pointer
         ; ---- track pack -> TRACK_CACHE
         ld a, (hl)
@@ -98,7 +75,9 @@ LoadStage:
         inc hl
         ld a, (hl)
         ld (StageRow), a
-        ; ---- headers
+        ret
+
+StageHeaders:
         ld hl, (THEME_CACHE)
         ld (StTypeDir), hl
         ld hl, (THEME_CACHE + 2)
@@ -131,6 +110,39 @@ LoadStage:
         ld (SegStart), hl
         call InitTraffic
         jp ResetDisplay
+
+; A = bank, DE = source, BC = length, HL = destination in bank 7 (the
+; theme cache): copy through TRACK_CACHE in chunks (which it overwrites).
+CopyToCache:
+        ld (LdBank), a
+        ld (LdSrc), de
+        ld (LdLen), bc
+        ld (LdDst), hl
+.chunk: ld hl, (LdLen)
+        ld a, h
+        or l
+        ret z
+        ld bc, TRACK_CACHE_SIZE
+        or a
+        sbc hl, bc
+        jr nc, .full            ; a full chunk, HL = what remains after it
+        add hl, bc
+        ld b, h
+        ld c, l                 ; the last, shorter chunk
+        ld hl, 0
+.full:  ld (LdLen), hl
+        push bc
+        ld a, (LdBank)
+        ld hl, (LdSrc)
+        ld de, TRACK_CACHE
+        call CopyFromBank
+        ld (LdSrc), hl
+        pop bc
+        ld hl, TRACK_CACHE
+        ld de, (LdDst)
+        ldir                    ; bounce -> theme cache (bank 7 is paged again)
+        ld (LdDst), de
+        jr .chunk
 
 ; A = bank, HL = source (in $C000-$FFFF), DE = destination, BC = length:
 ; copy with the bank paged at $C000, then page bank 7 back. HL advances.
@@ -289,6 +301,10 @@ Checkpoint:
 
 ; Back to the first stage (new game, or attract mode).
 Restart:
+        ld a, FIRST_STAGE
+; A = stage: from its start, standing still
+RestartAt:
+        push af
         ld hl, START_POS
         ld (Pos), hl
         ld hl, 0
@@ -297,10 +313,13 @@ Restart:
         xor a
         ld (StageDone), a
         ld (Gear), a            ; LOW
-        ld (SpeedFrac), a
+        ld (SpeedFrac), hl      ; (and Speed)
+        ld (LatAcc), hl
+        ld (Sliding), a
+        ld (CrashTimer), a
         ld a, 1 << IN_FIRE      ; (a fire press that started the game is no gear change)
         ld (FireWas), a
-        ld a, FIRST_STAGE
+        pop af
         jp LoadStage
 
 ; Message line: the new stage's name, centred.

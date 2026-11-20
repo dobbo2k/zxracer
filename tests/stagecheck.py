@@ -54,7 +54,7 @@ if goal:
 if not (goal and v["StageRow"] == 5 and v["Stage"] == 12 and v["Time"] > 0):
     print(f"FAIL: the autopilot did not reach the goal in time by the expected branches")
     ok = False
-v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 11000) + 1300, keys,
+v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 11000) + 1800, keys,
         ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):
     print(f"FAIL: no return to attract mode on stage 1 after the goal ({v})")

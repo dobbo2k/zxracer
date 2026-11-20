@@ -28,7 +28,8 @@ import make_screens                         # noqa: E402
 
 THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
-TRACK_CACHE = 0x7800                # bank 5, after the resident data and code
+TRACK_CACHE = 0x7D80                # bank 5, after the resident data and code
+FRONTEND_RESERVE = 7168             # room kept in a pack bank for the front-end overlay
 TRACK_CACHE_SIZE = 0x8000 - TRACK_CACHE
 PACK_BANKS = [0, 1, 3, 4, 6]
 BANK_SIZE = 0x4000
@@ -335,6 +336,9 @@ def main(src="assets/stages.yaml", outdir="build"):
                  for i in range(0, len(packed), 32)]
         packs.append((f"scr_{name}", lines, len(packed), None))
 
+    # the front-end overlay (src/frontend.asm), copied over the theme cache
+    packs.append(("frontend", ['        INCLUDE "../src/frontend.asm"'], FRONTEND_RESERVE, THEME_CACHE))
+
     # first-fit into the free banks
     fill = {b: 0 for b in PACK_BANKS}
     where = {}
@@ -359,7 +363,7 @@ def main(src="assets/stages.yaml", outdir="build"):
                 continue
             out += [f"Pack_{label}:", f"        DISP ${cache:04X}"] + lines + \
                    ["        ENT", f"Pack_{label}_end:",
-                    f"        ASSERT Pack_{label}_end - Pack_{label} <= ${0x10000 - cache:04X}"]
+                    f"        ASSERT Pack_{label}_end - Pack_{label} <= ${size if label == 'frontend' else 0x10000 - cache:04X}"]
         out.append(f"        ASSERT $ <= $10000")
     out += ["        PAGE 7"]
     open(os.path.join(outdir, "packs.asm"), "w").write("\n".join(out) + "\n")
@@ -383,6 +387,8 @@ def main(src="assets/stages.yaml", outdir="build"):
         tab.append(f"        db {where[tr]}")
         tab.append(f"        dw Pack_{tr}, Pack_{tr}_end - Pack_{tr}")
         tab.append(f"        db {left}, {right}, {r + 1}, 0, 0, 0")   # 16 bytes
+    tab += ["FrontEndPack:", f"        db {where['frontend']}",
+            "        dw Pack_frontend, Pack_frontend_end - Pack_frontend"]
     open(os.path.join(outdir, "stages.asm"), "w").write("\n".join(tab) + "\n")
     for b in PACK_BANKS:
         print(f"bank {b}: {fill[b]} bytes of packs and pictures")

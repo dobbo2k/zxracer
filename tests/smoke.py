@@ -38,7 +38,7 @@ print(f"fps after the title: {fps}")
 ay = [int(v, 16) for v in res.stdout.split("ay ")[1].split()[:14]]
 dump = res.stdout.split("ay ")[1].splitlines()[1].split()
 pos = int(dump[0], 16) | (int(dump[1], 16) << 8)
-if pos < 2500:
+if pos < 1000:                      # (from a standing start)
     print(f"FAIL: the car only travelled {pos} units in the 210 frames since the start")
     ok = False
 period = ay[0] | (ay[1] << 8)
