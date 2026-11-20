@@ -66,7 +66,8 @@ def stages():
             th = themes[st["theme"]]
             segs, objs, L, tunnel = make_stages.make_track(r, st["seed"], th)
             out.append(dict(row=r, col=k, theme=st["theme"], name=th["name"],
-                            landmark=th["types"][2], par=make_stages.par_time(segs, L)))
+                            landmark=th["types"][2], par=make_stages.par_time(segs, L),
+                            tunnel=bool(tunnel)))
     return out, len(cfg["rows"])
 
 
@@ -203,6 +204,11 @@ def build():
         for j, w in enumerate(words):
             black.append(text(tx, y + 58 + j * (size + 4), w, mc.f(size), INK, 900, family="Inter Display"))
         red.append(text(x0 + BOX_W - 14, y + 34, str(n), 30, RED, 900, "end", style="italic"))
+        if s["tunnel"]:                 # a tab sitting on the box's top edge
+            red.append(f'<rect x="{mc.f(x0 + 2)}" y="{mc.f(y - 28)}" width="94" height="26" fill="{RED}"/>')
+            red.append(text(x0 + 49, y - 9, "TUNNEL", 17, PAPER, 900, "middle", spacing=2))
+            black.append(f'<rect x="{mc.f(x0 + 2)}" y="{mc.f(y - 28)}" width="94" height="26" fill="none" '
+                         f'stroke="{INK}" stroke-width="3"/>')
         black.append(text(tx, y + BOX_H - 18, "PAR " + fmt_par(s["par"]), 21, INK, 700, family="Inter",
                           spacing=1))
 
@@ -218,12 +224,13 @@ def build():
 
     # ---- tips panel
     py = 2172
-    red.append(f'<rect x="100" y="{py}" width="{W - 200}" height="196" fill="url(#redtone)" opacity="0.6"/>')
-    black.append(f'<rect x="100" y="{py}" width="{W - 200}" height="196" fill="none" stroke="{INK}" stroke-width="4"/>')
+    red.append(f'<rect x="100" y="{py}" width="{W - 200}" height="226" fill="url(#redtone)" opacity="0.6"/>')
+    black.append(f'<rect x="100" y="{py}" width="{W - 200}" height="226" fill="none" stroke="{INK}" stroke-width="4"/>')
     red.append(text(130, py + 46, "DRIVER'S NOTES", 32, RED, 900, spacing=5, style="italic"))
     notes = [("CHECKPOINTS", "Every stage you finish adds time: 48 seconds on NORMAL."),
              ("EXTENDED PLAY", "Finish a stage inside its PAR time for ten seconds more."),
              ("THE FORK", "Signs warn you before the split - pick a side early, the kerbs are hard."),
+             ("TUNNELS", "The ALPINE PASS stages run through the mountain - make for the light."),
              ("THE GOAL", "Every second left on the clock is worth 1000 points.")]
     for j, (h_, body) in enumerate(notes):
         black.append(text(130, py + 86 + j * 30, h_, 23, INK, 900, spacing=2))
