@@ -158,6 +158,29 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   the last-row stage reached (time bonus counted in), then the title with the
   updated high score.
 
+### 3.2d Tape release (as built)
+
+`make tap` builds `build/zxracer.tap` from a release snapshot (`-DRELEASE`, no timing
+bars) with `tools/make_tap.py`:
+
+1. BASIC `ZX RACER` (autostart 10): `BORDER 0: PAPER 0: INK 7: CLEAR 32767`,
+   `LOAD "" CODE`, `RANDOMIZE USR 48896: PRINT "128K ONLY"`.
+2. CODE `loader` at `$BF00` (`src/loader.asm`, 233 bytes): checks that banks 1 and 3
+   differ (else returns to BASIC, which prints the message), points IM2 at a bare
+   `EI / RETI` (the ROM loader re-enables interrupts, and the last block replaces
+   BASIC's system variables), then loads headerless blocks with the ROM's LD-BYTES
+   (`$0556`, the 48K BASIC ROM, paged by `$7FFD` bit 4):
+   the loading screen (raw, so it appears line by line), then the pack banks 0, 1,
+   3, 4, 6 (each loaded to `$8000` and unpacked to `$C000` in its bank), bank 2
+   (loaded into bank 7, unpacked to `$8000`) and the resident part of bank 5
+   (likewise, to `$5B00`), and jumps to the game. LZ compression (the screens'
+   format) saves 30%: 67 KB, about 6½ minutes.
+
+`tests/tapecheck.py` boots the tape in zxsim (`-T`: does what `LOAD "" CODE: RANDOMIZE
+USR` would, then serves LD-BYTES from the tape with real tape timing - no ROM image
+needed) and checks that the game starts and shows its title. Not yet done: loading
+under the real ROMs (BASIC, LD-BYTES itself) and on +2A/+3 hardware.
+
 ### 3.2b The road fork (as built)
 
 - From `SPLIT_LEN` (5000) before the end of a stage, each branch's centre moves out
@@ -375,7 +398,7 @@ docs/       Technical notes, profiling results
 | **M8** | Game structure | Timer, checkpoints, 15 stages, branching forks, HUD, goal scenes | 🟡 15 stages in 5 rows, real road forks (the road splits in two), 5 themes, checkpoints with time bonus, GOAL; goal scenes to do |
 | **M9** | Audio | IM2 PT3 player, 3 radio tunes, engine note, SFX, radio-select screen | 🟡 engine note, gravel noise, tyre squeal; music to do |
 | **M10** | Front end | Loading screen, title, attract/demo mode, options, redefine keys, high scores | 🟡 title screen with high score, title/demo cycle, 5 goal screens with time bonus; loading screen, options, key redefinition to do |
-| **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | |
+| **M11** | Polish & release | Optimisation pass, border split, playtesting/difficulty tuning, `.tap`/`.tzx` release | 🟡 speed pass (overlapped pipeline: 15.6 fps average over a whole game), `.tap` release with loading screen and compressed banks (tested in zxsim with ROM-routine emulation; still to test on a real ROM / hardware) |
 
 **Risk-first ordering:** M1 is the make-or-break milestone — if the road plus a
 representative sprite load can't hit 25 fps, we fall back to (a) narrower play area

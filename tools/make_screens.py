@@ -234,7 +234,8 @@ HISCORE_AT = (21, 17)       # row, column of the hi-score digits (printed by the
 PRESS_ROW = 22
 
 
-def title_screen():
+def title_screen(loading=False):
+    """The title screen, or (loading) the tape's loading screen."""
     im = Image.new("RGB", (W, H), (0, 0, 0))
     d = ImageDraw.Draw(im)
     rnd = random.Random(42)
@@ -302,10 +303,15 @@ def title_screen():
     im.paste(car_frame(), (96, 136))
     # text panel
     d.rectangle([0, 168, W - 1, H - 1], fill=(0, 0, 0))
-    text(d, 8 * 7, 168, "HI-SCORE", rgb(CYAN))
-    text(d, 8 * 5, 176, "PRESS ANY KEY TO START", rgb(YELLOW))
-    text(d, 8 * 2, 184, "Q ACCEL A BRAKE O P STEER", rgb(WHITE, False))
     over = [(21, 0, 32, 0x45), (22, 0, 32, 0x46), (23, 0, 32, 0x07)]
+    if loading:
+        text(d, 8 * 7, 168, "FOR THE 128K SPECTRUM", rgb(CYAN))
+        text(d, 8 * 12, 176, "LOADING", rgb(YELLOW))
+        over[1] = (22, 0, 32, 0xC6)                  # flashing
+    else:
+        text(d, 8 * 7, 168, "HI-SCORE", rgb(CYAN))
+        text(d, 8 * 5, 176, "PRESS ANY KEY TO START", rgb(YELLOW))
+    text(d, 8 * 2, 184, "Q ACCEL A BRAKE O P STEER", rgb(WHITE, False))
     return to_zx(im, over)
 
 

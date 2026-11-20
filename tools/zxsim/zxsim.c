@@ -22,6 +22,11 @@
  *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture)
  *   -y FILE         write the 14 AY registers at the end of every frame to FILE
  *   -q              quiet summary
+ *   -T file.tap     tape boot instead of a snapshot: does what the BASIC loader
+ *                   would (loads the first CODE block to its address and calls
+ *                   it, 48K BASIC ROM paged, bank 0 at $C000), then serves the
+ *                   ROM's LD-BYTES ($0556) from the following blocks with real
+ *                   tape timing (no ROM image is needed)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -565,6 +570,78 @@ static void interrupt(void) {
     }
 }
 
+/* ------------------------------------------------------------------ tape */
+static uint8_t *tape;          /* TAP file */
+static long tape_len, tape_pos;
+static long long tape_free;    /* absolute T when the next block's pilot may start */
+
+static long long now_t(void) { return (long long)frame * FRAME_T + T; }
+
+/* the next TAP block: returns its body (flag, data, checksum) and length */
+static uint8_t *tape_next(long *len) {
+    if (tape_pos + 2 > tape_len) return NULL;
+    *len = tape[tape_pos] | tape[tape_pos + 1] << 8;
+    uint8_t *b = tape + tape_pos + 2;
+    tape_pos += 2 + *len;
+    return tape_pos <= tape_len ? b : NULL;
+}
+
+/* LD-BYTES ($0556): A = flag, carry = load, IX = address, DE = length.
+   Loads the next block if it matches, as long as the tape would take. */
+static void tape_trap(void) {
+    long len;
+    uint8_t *b = tape_next(&len);
+    int ok = 0;
+    if (b && len >= 2 && b[0] == A && len - 2 == de.w) {
+        uint8_t x = 0;
+        for (long i = 0; i < len - 1; i++) x ^= b[i];
+        if (x == b[len - 1]) {
+            for (long i = 0; i < de.w; i++) wr((uint16_t)(ix.w + i), b[1 + i]);
+            ok = 1;
+        }
+    }
+    if (b) {
+        long long dur = (long long)(b[0] < 128 ? 8063 : 3223) * 2168 + 667 + 735;
+        for (long i = 0; i < len; i++)
+            for (int k = 7; k >= 0; k--) dur += (b[i] >> k & 1) ? 2 * 1710 : 2 * 855;
+        long long start = now_t() > tape_free ? now_t() : tape_free;
+        T += (long)(start + dur - now_t());
+        tape_free = start + dur + 3500000;      /* a second's gap */
+    }
+    if (ok) { ix.w += de.w; de.w = 0; F |= FC; } else F &= ~FC;
+    iff1 = iff2 = 1;                            /* the ROM loader ends with EI */
+    pc = pop16();
+}
+
+/* do what 10 ...: LOAD "" CODE: RANDOMIZE USR n would: the loader block */
+static int tape_boot(const char *fn) {
+    FILE *f = fopen(fn, "rb");
+    if (!f) { perror(fn); return -1; }
+    fseek(f, 0, SEEK_END); tape_len = ftell(f); fseek(f, 0, SEEK_SET);
+    tape = malloc(tape_len);
+    if (fread(tape, 1, tape_len, f) != (size_t)tape_len) { fclose(f); return -1; }
+    fclose(f);
+    long len;
+    uint8_t *b;
+    while ((b = tape_next(&len))) {
+        if (b[0] == 0 && b[1] == 3) {            /* CODE header: its data follows */
+            uint16_t addr = b[14] | b[15] << 8;
+            uint8_t *d = tape_next(&len);
+            if (!d) break;
+            p7ffd = 0x10; update_paging();
+            memset(ram[5] + 0x1800, 0x07, 768);   /* CLS with INK 7, PAPER 0 */
+            for (long i = 0; i < len - 2; i++) wr((uint16_t)(addr + i), d[1 + i]);
+            sp = 0x7FF0; push16(0);              /* (returning would go back to BASIC) */
+            pc = addr; im = 1; iff1 = iff2 = 0;
+            tape_free = (long long)(len + 2) * 8 * 2565 + 3500000;
+            T = 0;
+            return 0;
+        }
+    }
+    fprintf(stderr, "zxsim: no CODE block in %s\n", fn);
+    return -1;
+}
+
 /* ------------------------------------------------------------------ snapshot */
 static int load_sna(const char *fn) {
     FILE *f = fopen(fn, "rb");
@@ -651,13 +728,15 @@ int main(int argc, char **argv) {
             dump_addr = strtol(v, &v, 0);
             if (*v == ':') dump_len = strtol(v + 1, NULL, 0);
         }
+        else if (!strcmp(a, "-T") && i + 1 < argc) sna = argv[++i], tape = (uint8_t *)1;
         else if (a[0] != '-') sna = a;
         else { fprintf(stderr, "zxsim: unknown option %s\n", a); return 2; }
     }
     if (!sna) { fprintf(stderr, "usage: zxsim game.sna [-n frames] [-s F:shot.ppm] [-k F:KEYS] [-j F:BITS] [-b F] [-q]\n"); return 2; }
     init_tables();
     memset(rom, 0xff, sizeof rom);
-    if (load_sna(sna)) return 1;
+    if (tape) { if (tape_boot(sna)) return 1; }
+    else if (load_sna(sna)) return 1;
 
     long rom_warn = 0;
     for (frame = 0; frame < nframes; frame++) {
@@ -673,9 +752,10 @@ int main(int argc, char **argv) {
                        frame, T, pc, af.w, bc.w, de.w, hl.w, ix.w, iy.w, sp);
             }
             uint16_t pc0 = pc; long t0 = T;
+            if (tape && pc == 0x0556) { tape_trap(); continue; }
             exec();
             if (prof_file && frame >= prof_from) prof[pc0] += (unsigned long long)(T - t0);
-            if (pc < 0x4000 && !rom_warn) {
+            if (pc < 0x4000 && !rom_warn && !(tape && pc == 0x0556)) {
                 rom_warn = 1;
                 fprintf(stderr, "zxsim: warning: execution entered ROM at %04X (frame %ld)\n", pc, frame);
             }

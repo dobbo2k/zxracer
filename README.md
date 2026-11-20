@@ -11,12 +11,19 @@ Requires [sjasmplus](https://github.com/z00m128/sjasmplus) (1.20+) on your `PATH
 Python 3 with Pillow, and a C compiler (for the test emulator).
 
 ```sh
-make          # -> build/zxracer.sna (128K snapshot)
-make test     # Z80 core self-test + headless smoke run with screenshots in build/
+make          # -> build/zxracer.sna (128K snapshot, with border timing bars)
+make tap      # -> build/zxracer.tap: the tape release (no timing bars)
+make test     # Z80 core self-test, headless runs with screenshots in build/, tape load
 make profile  # T-states per phase per game frame (border timing bars)
 make run      # launches Fuse in 128K mode
 make video    # build/gameplay.mp4: 48 s of autopilot gameplay with synthesised AY sound
 ```
+
+**Loading the tape:** on a 128K / +2 / +2A / +3 choose *Tape Loader* (or type
+`LOAD ""`) and play `build/zxracer.tap`. A BASIC loader loads a small machine-code
+loader, which shows the loading screen and loads the game's memory banks
+(compressed) with the ROM's tape routine: about 6½ minutes at normal speed. On a
+48K Spectrum it stops with "128K ONLY".
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake (or a Kempston joystick).
 The game opens on the title screen, then alternates it with a self-driving

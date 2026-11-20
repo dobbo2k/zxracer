@@ -7,7 +7,7 @@ ASMFLAGS ?= --nologo --msg=war --fullpath -Ibuild --lst=build/zxracer.lst --sym=
 SRC   := $(wildcard src/*.asm)
 ZXSIM := build/zxsim
 
-.PHONY: all clean run test shots profile video
+.PHONY: all clean run test shots profile video tap
 all: build/zxracer.sna
 
 build:
@@ -38,17 +38,27 @@ build/cputest.sna: tests/cputest.asm | build
 	$(ASM) --nologo --msg=war tests/cputest.asm
 
 # CPU core self-test, then a smoke run of the game with screenshots
-test: $(ZXSIM) build/cputest.sna build/zxracer.sna build/video.sna
+test: $(ZXSIM) build/cputest.sna build/zxracer.sna build/video.sna build/zxracer.tap
 	$(PYTHON) tests/run_cputest.py $(ZXSIM) build/cputest.sna
 	$(PYTHON) tests/smoke.py $(ZXSIM) build/zxracer.sna build
 	$(PYTHON) tests/carcheck.py $(ZXSIM) build/zxracer.sna build
 	$(PYTHON) tests/stagecheck.py $(ZXSIM) build/zxracer.sna build/video.sna
+	$(PYTHON) tests/tapecheck.py $(ZXSIM) build/zxracer.tap build/release.sym build
 
 # Border-bar profile: T-states per phase per game frame
 profile: $(ZXSIM) build/zxracer.sna
 	$(PYTHON) tools/profile.py $(ZXSIM) build/zxracer.sna
 
 # Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
+# Release build (no timing bars) and the tape image made from it
+build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build
+	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 src/main.asm
+
+build/zxracer.tap: build/release.sna tools/make_tap.py tools/make_screens.py src/loader.asm | build
+	$(PYTHON) tools/make_tap.py build/release.sna build/release.sym $@
+
+tap: build/zxracer.tap
+
 build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
 

@@ -154,5 +154,9 @@ ScnEnd:
         IF AUTOPLAY
         SAVESNA "build/video.sna", start
         ELSE
+        IFDEF RELEASE
+        SAVESNA "build/release.sna", start     ; (no timing bars: the tape is made from this)
+        ELSE
         SAVESNA "build/zxracer.sna", start
+        ENDIF
         ENDIF
