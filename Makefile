@@ -19,16 +19,19 @@ build/tables.asm: tools/gen_tables.py | build
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
 	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32 3
 
-build/stages.asm: tools/make_stages.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
+build/stages.asm: tools/make_stages.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
 	$(PYTHON) tools/make_stages.py assets/stages.yaml build
 
 build/crew_data.asm: tools/make_crew.py tools/make_screens.py | build
 	$(PYTHON) tools/make_crew.py $@
 
+build/music_title.asm: tools/make_music.py | build
+	$(PYTHON) tools/make_music.py $@
+
 build/font_data.asm: tools/make_font.py | build
 	$(PYTHON) tools/make_font.py $@
 
-build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build
+build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) $(ASMFLAGS) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build
@@ -51,7 +54,7 @@ profile: $(ZXSIM) build/zxracer.sna
 
 # Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
 # Release build (no timing bars) and the tape image made from it
-build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build
+build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 src/main.asm
 
 build/zxracer.tap: build/release.sna tools/make_tap.py tools/make_screens.py src/loader.asm | build
@@ -59,7 +62,7 @@ build/zxracer.tap: build/release.sna tools/make_tap.py tools/make_screens.py src
 
 tap: build/zxracer.tap
 
-build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build
+build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
 
 video: $(ZXSIM) build/video.sna

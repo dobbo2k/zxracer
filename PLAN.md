@@ -449,6 +449,22 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 
 ---
 
+
+*(As built:)* `src/music.asm` plays two channels from the interrupt: bass on
+B, melody on C (the engine keeps A). Tunes are written in `tools/make_music.py`
+(per bar a chord, which the bass pattern follows, and the melody in sixteenths)
+and encoded as byte streams (note, rest, tie, length, loop): 120-350 bytes
+each. Each theme's tune is in its theme pack (header +15; room made by
+storing the horizon panorama in 2 pre-shifted copies instead of 4, so it
+scrolls in 4-pixel steps), the title tune in the front-end overlay. A note
+starts at volume 13 (melody) / 12 (bass), fades to 9 / 8 and is silent for its
+last interrupt (not when tied on). Effects keep priority: a bump, crash or
+gravel takes channel B and the starting-light beeps C, while the music keeps
+time unheard. The player skips interrupts while another bank is paged over the
+tune (`Paged`, set by `CopyFromBank` and `ShowPic`) and stays quiet while the
+game is paused. Main-code AY writes go through `AyPut` (interrupts off) so the
+interrupt's writes can't split them. About 0.2 fps.
+
 ## 6. Toolchain & asset pipeline
 
 | Tool | Purpose |

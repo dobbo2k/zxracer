@@ -107,8 +107,12 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   the road to pass traffic.
 - **Hills:** climbs slow the car (in HIGH it loses speed on a long one),
   descents help it along.
-- **Sound:** AY engine note that follows the revs (speed and gear), gravel noise
-  off-road, bumps and crashes.
+- **Sound:** music: each theme has its own original tune (bass and melody on
+  two of the AY's channels) that starts at the green light and changes with
+  the road, and the title has one too. Under it the AY engine note follows the
+  revs (speed and gear), with gravel noise off-road, bumps and crashes (which
+  take over the bass for a moment). Options: music and engine, engine only,
+  or music only.
 - **Speed:** locked at 16.7 fps; sharp bends with traffic still drop some frames to
   12.5 fps (PLAN.md §3.6).
 - **Next:** a performance pass, then more scenery and music. See PLAN.md §7.

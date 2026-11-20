@@ -70,7 +70,11 @@ SoundTick:
         cp ST_PLAYING
         jr z, .vol
         ld e, 7
-.vol:   ld a, 8
+.vol:   ld a, (SoundMode)       ; music only: no engine
+        cp 2
+        jr nz, .eng
+        ld e, 0
+.eng:   ld a, 8
         call AyWrite
         ; effects: a burst of noise on B (bump, crash) overrides the gravel
         ld a, (SfxTimer)
@@ -78,6 +82,7 @@ SoundTick:
         jr z, .noSfx
         dec a
         ld (SfxTimer), a
+        ld (SfxBusy), a         ; (channel B is the effect's)
         ld e, a                 ; volume fades with the timer
         ld a, 9
         call AyWrite
@@ -96,7 +101,9 @@ SoundTick:
         or a
         jr z, .gr
         ld e, 10
-.gr:    ld a, 9
+.gr:    ld a, e
+        ld (SfxBusy), a
+        ld a, 9
         call AyWrite
         ld e, 12                ; noise period
         ld a, 6
@@ -115,7 +122,9 @@ SoundTick:
 .bp:    ld e, %00101010
         jr .mw
 .mx:    ld e, %00101110
-.mw:    ld a, 7
+.mw:    ld a, e
+        ld (MixVal), a          ; (the music adds its channels)
+        ld a, 7
         jp AyWrite
 
 SFX_BUMP        EQU 6               ; noise period of the effect

@@ -25,6 +25,10 @@ TitleScreen:
         call ScreensEnter
 TitleCycle:
         call DrawTitle
+        ld a, (MusicOn)         ; the title tune (on from the options too)
+        or a
+        ld hl, TitleTune
+        call z, MusicStart
         ld de, TITLE_FRAMES
 .lp:    halt
         ld a, (FrameCount)      ; blink the prompt
@@ -767,11 +771,27 @@ Options:
         ld b, 5
         ld a, $46
         call AttrCol4
+        ld b, 9
+        ld c, 4
+        call AttrAddr
+        ld (hl), $46
         ld b, 13
         ld a, $46
         call AttrRow
 .redraw:
         call ShowKeys
+        ld a, (SoundMode)       ; the sound setting
+        add a, a
+        add a, low SoundTxts
+        ld l, a
+        adc a, high SoundTxts
+        sub l
+        ld h, a
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        ld bc, 9 * 256 + 14
+        call PrintAt
         call WaitNoKey
 .lp:    halt
         call ScanKey
@@ -788,9 +808,23 @@ Options:
         jr z, .preset
         cp KEY_4
         jr z, .define
+        cp KEY_5
+        jr z, .sound
         cp KEY_ENTER
         jr nz, .lp
         jp WaitNoKey
+.sound: ld a, (SoundMode)      ; music and engine / engine only / music only
+        inc a
+        cp 3
+        jr c, .sm
+        xor a
+.sm:    ld (SoundMode), a
+        call MusicStop
+        ld hl, TitleTune
+        call MusicStart         ; (not in engine-only mode)
+        ld a, 40
+        call Beep
+        jp .redraw
 .preset:
         ld de, KeyMap
         ld bc, 10
@@ -996,6 +1030,7 @@ KEY_1           EQU 15
 KEY_2           EQU 16
 KEY_3           EQU 17
 KEY_4           EQU 18
+KEY_5           EQU 19
 KEY_ENTER       EQU 30
 KEY_H           EQU 34
 MapKeys:        db $DF, $01, $DF, $02, $FD, $01, $FB, $01, $7F, $01     ; P O A Q SPACE
@@ -1006,6 +1041,7 @@ MapCursor:      db $EF, $04, $F7, $10, $EF, $10, $EF, $08, $EF, $01     ; 8 5 6 
 ; Mute the game's sound, keep the last game frame on show (screen B).
 ScreensEnter:
         call WaitFlip
+        call MusicStop
         ld a, 1
         ld (Mute), a
         call Silence
@@ -1021,6 +1057,7 @@ ScreensEnter:
 ; (1: a game starts - with a flourish).
 ScreensLeave:
         push af
+        call MusicStop
         dec a
         ld hl, TuneStart
         call z, Tune
@@ -1246,23 +1283,23 @@ Tune:   ld e, (hl)
         push bc
         push de
         xor a
-        call AyWrite            ; tone A fine
+        call AyPut            ; tone A fine
         pop de
         ld e, d
         ld a, 1
-        call AyWrite            ; coarse
+        call AyPut            ; coarse
         ld e, %00111110         ; tone A only
         ld a, 7
-        call AyWrite
+        call AyPut
         ld e, 12
         ld a, 8
-        call AyWrite
+        call AyPut
         pop bc
 .h:     halt
         djnz .h
         ld e, 0                 ; a moment's silence between notes
         ld a, 8
-        call AyWrite
+        call AyPut
         halt
         pop hl
         jr Tune
@@ -1310,20 +1347,20 @@ TuneHigh:       dw N_E5
 ; A = tone period (low byte): a short beep on channel A
 Beep:   ld e, a
         xor a
-        call AyWrite
+        call AyPut
         ld e, 0
         ld a, 1
-        call AyWrite
+        call AyPut
         ld e, %00111110         ; tone A only
         ld a, 7
-        call AyWrite
+        call AyPut
         ld e, 12
         ld a, 8
-        call AyWrite
+        call AyPut
         halt
         ld e, 0
         ld a, 8
-        jp AyWrite
+        jp AyPut
 
 ; ---------------------------------------------------------------- data
 HiMark:         db $FF          ; the table's entry to pick out
@@ -1351,7 +1388,7 @@ TxtOptMenu:     db "1  KEYBOARD  Q A O P SPACE", 0
                 db "2  SINCLAIR JOYSTICK", 0
                 db "3  CURSOR JOYSTICK", 0
                 db "4  CHOOSE YOUR OWN KEYS", 0
-                db " ", 0
+                db "5  SOUND:", 0
                 db "   KEMPSTON WORKS ANY TIME", 0
                 db "   H PAUSES THE GAME", 0
                 db " ", 0
@@ -1362,6 +1399,10 @@ TxtCtrls:       db "ACCELERATE", 0
                 db "STEER RIGHT", 0
                 db "CHANGE GEAR", 0, 0
 TxtBlank5:      db "     ", 0
+SoundTxts:      dw TxtSnd0, TxtSnd1, TxtSnd2
+TxtSnd0:        db "MUSIC AND ENGINE", 0
+TxtSnd1:        db "ENGINE ONLY     ", 0
+TxtSnd2:        db "MUSIC ONLY      ", 0
 TxtCaps:        db "CAPS", 0
 TxtSym:         db "SYM", 0
 TxtEnter:       db "ENTER", 0
@@ -1373,3 +1414,4 @@ TxtTimes:       db " X 1000", 0
 TxtPress:       db "PRESS ANY KEY", 0
 
         INCLUDE "screens_data.asm"
+        INCLUDE "music_title.asm"   ; TitleTune (tools/make_music.py)

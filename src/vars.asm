@@ -114,7 +114,11 @@ LaneChance:     db 2
 Spin:           db 0
 Lights:         db 0            ; starting lights: frames left (0: none)
 LampState:      db 0
-BeepTime:       db 0            ; a beep on channel C: interrupts left            ; the crash is a spin-out (the car slides on, slowing)
+BeepTime:       db 0
+SfxBusy:        db 0            ; an effect (or gravel) has channel B
+MixVal:         db %00101110    ; SoundTick's mixer setting
+Paged:          db 0            ; a bank other than 7 is paged at $C000
+StTune:         dw 0            ; the theme's tune (theme pack header +15)            ; a beep on channel C: interrupts left            ; the crash is a spin-out (the car slides on, slowing)
 ObjType:        db 0
 CrashTimer:     db 0
 SfxTimer:       db 0

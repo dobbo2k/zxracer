@@ -58,6 +58,9 @@ StageOvE:
         ld (OvEntry), hl
         ld a, e
         ld (OvBlank), a
+        ld a, (MusicOn)         ; no music while loading
+        ld (OvMusic), a
+        call MusicStop
         call WaitFlip           ; (no flip may happen meanwhile)
         ld a, (OvBlank)
         or a
@@ -93,11 +96,18 @@ StageOvE:
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
-        ret
+        ld a, (OvBlank)         ; a checkpoint: the new theme's tune
+        or a
+        ret nz
+        ld a, (OvMusic)
+        or a
+        ret z
+        jp MusicTheme
 .go:    jp (hl)
 OvEntry:        dw 0
 OvArg:          db 0
 OvBlank:        db 0
+OvMusic:        db 0
 STAGEOV_AT      EQU $4000
 
 ; A = bank, HL = source (in $C000-$FFFF), DE = destination, BC = length:
@@ -105,6 +115,8 @@ STAGEOV_AT      EQU $4000
 CopyFromBank:
         push bc
         ld b, a
+        ld a, 1
+        ld (Paged), a           ; (the music's tune is out of reach meanwhile)
         ld a, (Port7FFD)
         and $F8
         or b
@@ -114,6 +126,8 @@ CopyFromBank:
         pop bc
         pop bc
         ldir
+        xor a
+        ld (Paged), a
         ld a, (Port7FFD)
         and $F8
         or 7

@@ -15,9 +15,9 @@ start:
         out (c), a
         xor a                   ; black border
         out ($FE), a
-        call Restart            ; stage 1: packs, display, track state
-        call InitInterrupts
+        call InitInterrupts     ; (first: the music stops and starts with ei)
         ei
+        call Restart            ; stage 1: packs, display, track state
         call GoTitle
 
 ; Each game frame: logic and the road's shape first - none of it touches
@@ -138,7 +138,6 @@ FillBlock:
         EDUP
         ret
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
-        INCLUDE "pics.asm"
         ASSERT $ <= ISR_JP
 
         ORG ISR_JP
@@ -157,6 +156,8 @@ FillBlock:
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
         INCLUDE "crew.asm"      ; the crew's crash close-ups
         INCLUDE "lampdraw.asm"  ; the starting lights' lamps
+        INCLUDE "pics.asm"      ; the front end's picture unpacker
+        INCLUDE "music.asm"     ; the music player
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 

@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import make_scenery as scn          # noqa: E402
 from gen_tables import SPLIT_LEN, fork_dx   # noqa: E402
 import make_screens                         # noqa: E402
+import make_music                           # noqa: E402
 
 THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
@@ -35,6 +36,7 @@ TRACK_CACHE_SIZE = 0x8000 - TRACK_CACHE
 PACK_BANKS = [0, 1, 3, 4, 6]
 BANK_SIZE = 0x4000
 PANO_W, PANO_H = 256, 16
+PANO_COPIES, PANO_STEP = 2, 4         # pre-rotated copies of the panorama (src/horizon.asm)
 SHARED_TYPES = ["sign_r", "sign_l", "fork"]          # in every theme pack
 TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 4, 5, 8, 9
             "van": 6, "truck": 7}
@@ -116,13 +118,13 @@ def panorama(style, seed):
 
 def panorama_lines(im):
     out = ["Panorama:"]
-    for s in range(4):
+    for s in range(PANO_COPIES):
         for y in range(PANO_H):
             row = []
             for b in range(32):
                 v = 0
                 for x in range(8):
-                    if im.getpixel(((b * 8 + x + 2 * s) % PANO_W, y)):
+                    if im.getpixel(((b * 8 + x + PANO_STEP * s) % PANO_W, y)):
                         v |= 0x80 >> x
                 row.append(v)
             out.append("        db " + ", ".join(f"${v:02X}" for v in row))
@@ -289,6 +291,7 @@ def theme_pack(name, theme):
            "        db " + ", ".join(str(pal[k]) for k in
                                     ("sky", "pano", "hud", "time", "grass_l", "grass_d",
                                      "kerb_l", "kerb_d", "road")),
+           "        dw Tune                ; (+15: the theme's tune)",
            "TypeDir:",
            "        dw @Scn_traffic"]
     assert len(theme["types"]) == 4, "a theme has four scenery types (ids 4, 5, 8, 9)"
@@ -296,10 +299,11 @@ def theme_pack(name, theme):
     out += ["        dw @Scn_van, @Scn_truck"]
     out += [f"        dw Scn_{t}" for t in types[5:]]
     out += [f'Name:   db "{theme["name"]}", 0']
+    out += make_music.tune_asm(name[6:], "Tune")
     im = panorama(**theme["horizon"])
     im.convert("L").point(lambda v: 0 if v else 255).save(f"assets/gfx/horizon_{name[6:]}.png")
     out += panorama_lines(im)
-    size = 6 + 9 + 2 * (len(types) + 3) + len(theme["name"]) + 1 + 4 * PANO_H * 32
+    size = 6 + 9 + 2 + make_music.tune_bytes(name[6:]) + 2 * (len(types) + 3) + len(theme["name"]) + 1 + PANO_COPIES * PANO_H * 32
     for t in types:
         consts, dirl, data = scn.emit_type(t)
         out += consts + dirl + data

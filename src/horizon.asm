@@ -1,25 +1,26 @@
 ; ---------------------------------------------------------------------------
 ; Horizon panorama: a 256-pixel tiling band of mountains in character rows
-; 10-11, scrolled sideways by the road's curvature. Four copies are stored,
-; pre-rotated by 0/2/4/6 pixels; a copy plus a whole-byte rotation (two LDI
-; runs per line) gives any even scroll position. Redrawn only when the
-; scroll position changed since this buffer last showed it.
+; 10-11, scrolled sideways by the road's curvature. Two copies are stored,
+; pre-rotated by 0 and 4 pixels; a copy plus a whole-byte rotation (two LDI
+; runs per line) gives any scroll position in 4-pixel steps. Redrawn only
+; when the scroll position changed since this buffer last showed it.
 ; ---------------------------------------------------------------------------
 PANO_Y          EQU 80                  ; first line (character row 10)
 
 ; When this game frame already runs late (2 TV frames since the last flip)
-; and the panorama is only 2 pixels behind, skip it: it is a distant band and
-; catching up a frame later is invisible. 4+ pixels behind always redraws.
+; and the panorama is only one step (4 pixels) behind, skip it: it is a
+; distant band and catching up a frame later is invisible. Further behind
+; always redraws.
 DrawHorizonIfTime:
         ld a, (HorizonX + 1)
-        and $FE
+        and $FC
         ld hl, (PanoLast)
         sub (hl)
         ret z                   ; up to date
-        add a, 2
-        cp 5
-        jr nc, DrawHorizon      ; 4+ pixels behind: always redraw
-        ld a, (FrameCount)      ; only 2 behind: skip if running late
+        add a, 4
+        cp 9
+        jr nc, DrawHorizon      ; 8+ pixels behind: always redraw
+        ld a, (FrameCount)      ; only one step behind: skip if running late
         ld hl, LastFlip
         sub (hl)
         cp MIN_FRAMES
@@ -27,15 +28,16 @@ DrawHorizonIfTime:
 
 DrawHorizon:
         ld a, (HorizonX + 1)            ; scroll in pixels
-        and $FE
+        and $FC
         ld hl, (PanoLast)
         cp (hl)
         ret z
         ld (hl), a
         ld c, a
-        ; copy = (scroll >> 1) & 3  ->  source base = Panorama + copy * 768
+        ; copy = (scroll >> 2) & 1  ->  source base = Panorama + copy * 512
         rrca
-        and 3
+        rrca
+        and 1
         ld hl, (StPano)
         ld de, 32 * PANO_H
         jr z, .base

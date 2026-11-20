@@ -124,6 +124,8 @@ StageHeaders:
         ld (StPano), hl
         ld hl, (THEME_CACHE + 4)
         ld (StName), hl
+        ld hl, (THEME_CACHE + 15)
+        ld (StTune), hl
         ld hl, THEME_CACHE + 6
         ld de, Palette
         ld bc, 9

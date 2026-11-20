@@ -39,13 +39,13 @@ EndGame:
 Silence:
         ld e, 0
         ld a, 8
-        call AyWrite
+        call AyPut
         ld e, 0
         ld a, 9
-        call AyWrite
+        call AyPut
         ld e, 0
         ld a, 10
-        jp AyWrite
+        jp AyPut
 
 
 

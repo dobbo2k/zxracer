@@ -39,6 +39,7 @@ Isr:
         xor a
         ld (FlipPending), a
 .done:  call SoundTick              ; after the flip, which must beat the beam
+        call MusicTick
         pop de
         pop bc
         pop hl

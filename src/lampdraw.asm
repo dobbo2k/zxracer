@@ -2,6 +2,9 @@
 ; is a circle in the lamp's colour in a black 2 x 2 cell box; state 5 clears
 ; them back to sky.
 LampDraw:
+        ld a, c                 ; green: the music starts
+        cp 4
+        call z, MusicGo
         ld a, (HudOr)
         push af
         xor a

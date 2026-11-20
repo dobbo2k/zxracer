@@ -1,12 +1,15 @@
 ; The pictures' unpacker (front end; it pages the pictures' banks over the
-; overlay, so it is resident). In a gap of bank 2.
+; overlay, so it is resident, bank 5).
 ; A = bank, HL = compressed picture in it: unpack into screen A, show it
 ShowPic:
         or P7FFD_ROM48 | P7FFD_SHADOW
         ld bc, PORT_7FFD
+        ld (Paged), a           ; (A <> 0: the title tune is out of reach)
         out (c), a
         ld de, $4000
         call UnLZ
+        xor a
+        ld (Paged), a
         ld a, P7FFD_ROM48 | 7   ; screen A on show, bank 7 back
         ld (Port7FFD), a
         ld bc, PORT_7FFD
