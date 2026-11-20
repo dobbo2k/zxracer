@@ -7,3 +7,5 @@ build/
 *.sym
 __pycache__/
 .venv/
+!release/*.tap
+!release/*.tzx

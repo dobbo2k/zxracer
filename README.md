@@ -41,6 +41,11 @@ joystick, or keys of your own choosing.
 The game opens on the title screen, then alternates it with the high-score
 table and a self-driving demo; any of the game keys starts a game.
 
+**Release:** `make release` puts both tape files into `release/` with a
+how-to-play text (`release/README.txt`) and a printable cassette inlay
+(`inlay_outside.png`, `inlay_inside.png`: 300 dpi J-card, drawn by
+`tools/make_inlay.py` from the game's own title art, font and screenshots).
+
 ## Layout
 
 ```

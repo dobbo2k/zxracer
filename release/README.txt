@@ -1,0 +1,77 @@
+SPEED RUN
+A road race for the ZX Spectrum 128K, +2, +2A and +3
+=====================================================
+
+FILES
+
+  speedrun.tzx       The game, turbo loading: about 3 minutes.
+  speedrun.tap       The same at the normal tape speed: about 6 minutes.
+                     Use it if your player or emulator cannot play turbo
+                     TZX blocks.
+  inlay_outside.png  A cassette inlay to print at 300 dpi (101.6 mm tall):
+  inlay_inside.png   back flap, spine and front outside; screenshots and
+                     how to play inside. Fold at the marks.
+
+LOADING
+
+  Choose Tape Loader from the 128K menu (or type LOAD "" and press ENTER)
+  and play the tape. A short BASIC program loads the game's own loader,
+  which draws the loading screen and a progress bar along its bottom row.
+  On a 48K Spectrum it stops with "128K ONLY". If a block fails to load
+  it says "TAPE ERROR, BLOCK n": rewind the tape and load it again from
+  the start (a little louder, or with the other file, may help).
+
+  In an emulator, choose a 128K model. Instant "flash" loading only covers
+  the first two blocks; use the emulator's fast-forward for the rest.
+
+CONTROLS
+
+  Q        accelerate          O / P    steer left / right
+  A        brake               SPACE    change gear (LOW / HIGH)
+  H        pause
+
+  A Kempston joystick works at any time (fire changes gear). On the title
+  screen, ENTER opens the options:
+
+  1-3      keyboard, Sinclair joystick or Cursor joystick
+  4        choose your own keys
+  5        sound: music and effects, or the engine
+  6        level: easy, normal or hard
+
+THE RACE
+
+  Drive from the coast to one of five goals before the clock runs out.
+  There are fifteen stages in five rows: at the end of each stage the road
+  forks, and the branch you keep to - left or right - decides the next
+  stage. Each checkpoint adds time, shows how long the stage took and the
+  next stage's name. Beat a stage's par time and you get EXTENDED PLAY:
+  ten seconds more. In the last ten seconds the clock flashes and pips.
+
+DRIVING
+
+  You start in LOW gear: change up to HIGH at about 180 km/h for the top
+  speed of 280. Bends push the car outwards, harder the faster you go:
+  steering into them only holds the line at a sensible speed, so lift off
+  or brake for the sharp ones, or the tyres let go and the car slides out
+  in a cloud of smoke. The grass slows you down. Drive into the roadside
+  scenery and you crash; ram the back of much slower traffic and you spin
+  out. Later rows have longer, twistier stages, more traffic, and drivers
+  who swerve into your path.
+
+SCORE
+
+  Points for speed as you drive, and at the goal 1000 for every second
+  left on the clock. The route screen after a game shows every stage you
+  drove with its time - a time that beats the stage's record flashes. The
+  top five scores (with your initials) and the stage records are kept
+  until the Spectrum is switched off.
+
+LEVELS
+
+  EASY     80 seconds to start, 55 at each checkpoint, a longer par time,
+           fewer drivers swerving.
+  NORMAL   68 seconds to start, 48 at each checkpoint.
+  HARD     60 seconds to start, 44 at each checkpoint, a shorter par time,
+           more drivers swerving.
+
+All the code, graphics and music are original.
