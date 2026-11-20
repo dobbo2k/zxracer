@@ -184,9 +184,9 @@ TUNES = {
             ("B", "@B4.:8 @B4.7:8 !0"),
         ]),
     ]),
-    # easy-going and lush, G major
-    "country": (7, [
-        ("walk", ENV_BASS, "rock", FILL, [
+    # upbeat and lush, G major
+    "country": (5, [
+        ("walk", ENV_BASS, "half", FILL, [
             ("G", "B4:4 D5:4 !1 /G5:6 !0 F#5:2"),
             ("Em", "E5:4 G5:4 !1 //B5:8 !0"),
             ("C", "C6:4 B5:2 A5:2 G5:4 E5:4"),
@@ -196,7 +196,7 @@ TUNES = {
             ("C", "E5:2 F#5:2 G5:4 A5:4 C6:4"),
             ("D", "@D5.:4 @D5.sus4:4 @D5.:8"),
         ]),
-        ("boom", ENV_BASS, "disco", TOMS, [
+        ("drive", ENV_BASS, "disco", TOMS, [
             ("C", "E5:4 G5:4 !1 /C6:6 !0 B5:2"),
             ("G", "B5:4 G5:4 !1 //D5:8 !0"),
             ("D", "F#5:4 A5:4 /D6:6 C6:2"),

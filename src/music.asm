@@ -66,6 +66,7 @@ SqHold:         db 0                ; interrupts until the next chirp may start
 SqTimer:        db 0                ; interrupts left of a chirp
 SQ_CHIRP        EQU 24
 SQ_SLIDE        EQU 12
+SQ_NOISE        EQU 4               ; the squeal's grit: a high noise
 SQ_CYCLE        EQU 128
 
 SoundTick:
@@ -171,13 +172,20 @@ MusicPlay:
         ld e, 0
         ld a, 1
         call AyWrite
-        ld e, 9
+        ld e, 10
         ld a, 8
         call AyWrite
-        ld hl, 0                ; (the drum it cut off is gone)
+        ld a, (SfxBusy)         ; grit: noise mixed in (a hit's or gravel's
+        or a                    ; noise, if one has the generator)
+        jr nz, .grit
+        ld e, SQ_NOISE
+        ld a, 6
+        call AyWrite
+.grit:  ld hl, 0                ; (the drum it cut off is gone)
         ld (DrumPtr), hl
         ld hl, MixBits
-        res 0, (hl)
+        res 0, (hl)             ; tone A
+        res 3, (hl)             ; and noise A
         jr .b
 .drums: call DrumOut
 .b:     ; B: the bass, or a hit

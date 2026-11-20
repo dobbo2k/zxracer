@@ -470,7 +470,8 @@ scrolls in 4-pixel steps), the title tune in the front-end overlay. A note
 starts at volume 13 (melody) / 12 (bass), fades to 9 / 8 and is silent for its
 last interrupt (not when tied on). Effects take a channel and the music keeps
 time unheard: tyre squeal takes A (fully while sliding or spinning, held 12
-interrupts over the flicker at the grip limit; near the limit a 24-interrupt
+interrupts over the flicker at the grip limit; with noise mixed in for grit;
+near the limit a 24-interrupt
 chirp at most every 128), a bump or crash or off-road gravel takes B (and the
 noise generator),
 the green light's beep takes C. The player skips interrupts while another bank
