@@ -8,6 +8,7 @@
 ; ---------------------------------------------------------------------------
 
 STAGE_BONUS     EQU $48             ; BCD seconds added at a checkpoint
+EXTRA_BONUS     EQU $10             ; ... and more for a stage under its par time
 NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 
 ; A = stage: the packs again after the front end (the demo carries on)
@@ -59,7 +60,7 @@ OvStartGame:
         ld a, FIRST_STAGE
         call RestartState
         call LoadStage
-        jr NameShow             ; the first stage's name
+        jp NameShow             ; the first stage's name
 
 ; A = stage: from its start, standing still
 OvRestartAt:
@@ -67,11 +68,35 @@ OvRestartAt:
         call LoadStage
         jp OvResetDisplay
 
-; The end of a stage that is not the last: onto the branch the car is on
-; (left or right), with extra time
+; The end of a stage that is not the last: its time recorded, onto the
+; branch the car is on (left or right), extra time - more under the stage's
+; par time (extended play) - and the messages: the time, the bonus, the new
+; stage's name.
 OvCheckpoint:
+        ld a, (StageRow)        ; this stage's time, for the results
+        add a, a
+        ld e, a
+        ld d, 0
+        ld hl, StageTimes - 2
+        add hl, de
+        ld de, (StageClock)
+        ld (hl), e
+        inc hl
+        ld (hl), d
         ld a, (Stage)
         call StageEntry
+        push hl
+        ld de, 13
+        add hl, de
+        ld e, (hl)              ; par time
+        inc hl
+        ld d, (hl)
+        ld hl, (StageClock)
+        or a
+        sbc hl, de
+        sbc a, a                ; $FF: under par
+        ld (OvFast), a
+        pop hl
         ld de, 10
         add hl, de              ; -> left, right
         ld a, (PlayerX + 1)
@@ -96,15 +121,64 @@ OvCheckpoint:
         ld (Pos), hl
         pop af
         call LoadStage
+        ld hl, (StageClock)     ; (the time, for the message)
+        push hl
+        ld hl, 0
+        ld (StageClock), hl
+        pop hl
         ld a, (GameState)
         cp ST_PLAYING
         jp nz, OvResetDisplay   ; (attract mode)
-        ld a, (Time)            ; extra time
-        add a, STAGE_BONUS
+        ld de, MsgTime + 12
+        call FmtTime
+        ; the bonus: its message and the extra time
+        ld hl, TxtTimeBonus
+        ld c, STAGE_BONUS
+        ld a, (OvFast)
+        or a
+        jr z, .b
+        ld hl, TxtExtended
+        ld c, STAGE_BONUS + EXTRA_BONUS
+.b:     ld de, MsgBonus
+        ld a, c
+        ld bc, MSG_LEN + 1
+        ldir
+        ld hl, MsgBonus + BONUS_AT
+        ld c, a
+        rrca
+        rrca
+        rrca
+        rrca
+        and $0F
+        add a, "0"
+        ld (hl), a
+        inc hl
+        ld a, c
+        and $0F
+        add a, "0"
+        ld (hl), a
+        ld a, (Time)
+        add a, c
         daa
         jr nc, .t
         ld a, $99
 .t:     ld (Time), a
+        call StageMessage
+        ld hl, MsgBonus         ; the time, then the bonus, then the name
+        ld (MsgThen), hl
+        ld hl, MsgBuf
+        ld (MsgThen + 2), hl
+        ld hl, MsgTime
+        ld (Message), hl
+        ld a, MSG_FRAMES
+        ld (StateTimer), a
+        jp OvResetDisplay
+OvFast:         db 0
+BONUS_AT        EQU 17
+TxtTimeBonus:   db "   TIME BONUS   +00 ", 0
+TxtExtended:    db " EXTENDED PLAY! +00 ", 0
+
+; The stage's name for a while (a new game)
 NameShow:
         call StageMessage
         ld a, NAME_FRAMES
@@ -119,6 +193,11 @@ RestartState:
 .rt:    ld (hl), $FF
         inc hl
         djnz .rt
+        ld hl, MsgThen          ; no messages queued, no stage times
+        ld b, RUN_VARS
+.rv:    ld (hl), 0
+        inc hl
+        djnz .rv
         ld hl, START_POS
         ld (Pos), hl
         ld hl, 0
@@ -461,14 +540,16 @@ InitTraffic:
         ldir
         ld a, (StageRow)        ; this row's mix
         dec a
+        ld l, a
         add a, a
         add a, a
+        add a, l
         ld l, a
         ld h, 0
         ld de, TrafficRows
         add hl, de
         ld de, NTraffic
-        ld bc, 4
+        ld bc, 5
         ldir
         ret
 
@@ -490,13 +571,15 @@ TrafficInit:
         db LANE_X, 12, 0, LANE_X
 
 ; Per row: how many vehicles, then a random 0-7 at or above the first
-; number is a van, at or above the second a lorry; the chance (/256 per
-; game frame) of a lane change
+; number is a van, at or above the second a lorry; the chances (/256 per
+; game frame) of a lane change and of a vehicle in reach weaving into the
+; player's path
 TrafficRows:
-        db 3, 6, 7, 2
-        db 3, 5, 7, 3
-        db 4, 5, 6, 4
-        db 4, 4, 6, 6
-        db 5, 4, 6, 8
+        db 3, 6, 7, 2, 0
+        db 3, 5, 7, 3, 3
+        db 4, 5, 6, 4, 5
+        db 4, 4, 6, 6, 7
+        db 5, 4, 6, 8, 10
 
         INCLUDE "stages.asm"    ; the stage table
+        ASSERT NUM_ROWS == 5    ; (StageTimes, src/vars.asm)

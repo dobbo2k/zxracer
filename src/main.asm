@@ -160,6 +160,7 @@ FillBlock:
         INCLUDE "lampdraw.asm"  ; the starting lights' lamps
         INCLUDE "pics.asm"      ; the front end's picture unpacker
         INCLUDE "music.asm"     ; the music player
+        INCLUDE "extend.asm"    ; stage times, extended play, weaving traffic
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 

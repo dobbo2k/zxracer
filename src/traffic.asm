@@ -52,7 +52,14 @@ UpdateTraffic:
         ld (ix + 2), a
         jr .move
 .inLane:
-        call Random             ; now and then, set off for the other lane
+        ld a, (WeaveChance)     ; now and then, into the player's path
+        ld c, a
+        call Random
+        cp c
+        jr nc, .lane
+        call WeaveTo
+        jr c, .move
+.lane:  call Random             ; now and then, set off for the other lane
         ld hl, LaneChance
         cp (hl)
         jr nc, .move

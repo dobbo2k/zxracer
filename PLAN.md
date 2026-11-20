@@ -456,6 +456,12 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   number of vehicles (3, 3, 4, 4, 5), the van / lorry share and the chance of a
   lane change (a vehicle drifts to the other lane over about 2 s). The sprites
   are resident in bank 5 (fewer pre-shifts than the scenery to fit).
+  Weaving: a vehicle in one of the lanes 600-1111 depth units ahead of the
+  player (before a fork's split) may head for the player's line instead
+  (`WeaveTo`, `src/extend.asm`): a chance per game frame of 0, 3, 5, 7 and 10
+  in 256 by row, so from row 2 one or two swerve into your path each stage.
+  With longer stages and sharper bends (`make_track`) and the traffic mix,
+  that is the difficulty curve across the rows.
 - **Hills** *(as built)*: the hill value under the car changes the speed every
   frame (2/256 per unit: climbs slow it, descents help).
 - **Stages:** 15 original stages (coast, desert, alpine pass, forest, city night,
@@ -463,6 +469,15 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   left/right at each fork. 5 distinct goal scenes.
 - **Timer:** checkpoint extends time; run out = game over. Score from distance/speed,
   time bonus at goal.
+  *As built:* each stage has a clock (50 Hz frames, running once the lights
+  are green). At a checkpoint the time is recorded and the message line shows
+  "STAGE TIME 0'38"24", then the bonus, then the new stage's name (a queue of
+  messages, `MsgThen`). The bonus is 48 s, or 58 s - EXTENDED PLAY - under the
+  stage's par time: `make_stages.py` works it out from the stage's segments
+  (17 depth units a frame on a straight, sqrt(1600 / |curve|) on a bend,
+  fitted to the attract-mode driver's times, within about 3 s a stage) and
+  stores it in the stage table. The route screen after a game lists every
+  stage driven with its time, and the total at the goal.
 - **Radio:** before the race, choose one of 3 original tunes (or engine-only).
 - **High-score table** with initials entry; route map shown on results screen *(as built: §3.2c)*.
 

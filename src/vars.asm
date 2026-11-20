@@ -99,6 +99,11 @@ GameState:      db ST_ATTRACT
 Time:           db START_TIME   ; BCD seconds
 SecTick:        db 0
 StateTimer:     db 0
+; (cleared together at a new run)
+MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
+StageClock:     dw 0            ; 50 Hz frames on this stage
+StageTimes:     ds 5 * 2        ; per row: the stage's time (0: not finished)
+RUN_VARS        EQU 4 + 2 + 5 * 2   ; (5 rows: NUM_ROWS, defined later)
 Score:          ds 4            ; BCD, low byte first
 Message:        dw MsgAttract
 MsgLast:        dw MsgLastA
@@ -115,6 +120,7 @@ NTraffic:       db 3            ; this row's traffic (InitTraffic copies Traffic
 VanFrom:        db 6
 TruckFrom:      db 7
 LaneChance:     db 2
+WeaveChance:    db 0            ; (/256 per game frame) a vehicle in reach heads into the player's path
 Spin:           db 0
 Lights:         db 0            ; starting lights: frames left (0: none)
 LampState:      db 0

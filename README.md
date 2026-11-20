@@ -87,7 +87,9 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   mountain backdrop and colours. At the end of a stage the road really forks:
   it widens, a median opens and two branches pull apart, and the branch you
   drive down picks the next stage (left or right in the next row). Checkpoints
-  add time; the last row ends at the GOAL.
+  show your stage time and add 48 seconds - 58 for EXTENDED PLAY when you beat
+  the stage's par time (worked out from its bends by `tools/make_stages.py`,
+  about as fast as the attract-mode driver goes); the last row ends at the GOAL.
 - **Game:** HUD with score, stage, big countdown timer and speed; starting
   lights (three lamps over the road light red one by one with a beep, then turn
   green: go), game over, attract mode.
@@ -96,15 +98,16 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   route's last stage, that count the time left into the score as a bonus (1000
   points a second). All artwork is drawn by `tools/make_screens.py` (previews
   in `assets/gfx/screen_*.png`).
-- **After a game:** the route you drove through the stage pyramid (with the
-  stages' names), then, for a top-five score, your initials (steer to pick a
+- **After a game:** the route you drove through the stage pyramid, with each
+  stage's name and time (and the total, at the goal), then, for a top-five score, your initials (steer to pick a
   letter, accelerate to take it, brake to go back) and the table with your
   entry flashing. The table lasts until the Spectrum is switched off. The
   screens have their own jingles (a start flourish, a goal fanfare, a high-score
   tune).
 - **Traffic:** cars, vans and lorries in two lanes; now and then one changes
-  lanes. Later rows bring more of them, more lorries and vans and more lane
-  changes. Running into one from behind slows you right down; hit one that is
+  lanes. Later rows bring more of them, more lorries and vans, more lane
+  changes, and drivers who swerve into your path as you close in (from row 2,
+  more often each row) - on top of longer stages with sharper bends. Running into one from behind slows you right down; hit one that is
   much slower than you (at speed) and the car spins out, sliding on in a cloud of
   tyre smoke until it stops, and she lets him have it (with lines of its own:
   "< YOU TAILGATED HIM!"). Driving into a palm off

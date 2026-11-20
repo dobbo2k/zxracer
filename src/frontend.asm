@@ -69,6 +69,11 @@ GameOverScreens:
         jr z, .route
         xor a
         ld (GoalPending), a
+        ld hl, StageTimes + 2 * NUM_ROWS - 2   ; the last stage's time
+        ld de, (StageClock)
+        ld (hl), e
+        inc hl
+        ld (hl), d
         call GoalScreen
 .route: call RouteScreen
         call NewHiScore
@@ -568,17 +573,20 @@ RouteScreen:
         ld d, (hl)
         pop bc
         push bc
-        ld c, 9
+        ld c, NAME_COL
         call PrintAt
         pop bc
         push bc
         ld a, b                 ; its row number
         sub 18 - "1"
-        ld c, 7
+        ld c, NAME_COL - 2
         push af
         call CellAddr
         pop af
         call PrintChar
+        pop bc
+        push bc
+        call RowTime            ; and its time
         pop bc
         pop de
         inc de
@@ -586,9 +594,65 @@ RouteScreen:
         ld a, b
         cp 18 + NUM_ROWS
         jr c, .nm
-.wait:  call WaitRelease
+.wait:  ld hl, (StageTimes + 2 * NUM_ROWS - 2)
+        ld a, h
+        or l
+        jr z, .noTotal          ; (the total only at the goal)
+        ld hl, StageTimes
+        ld b, NUM_ROWS
+        ld de, 0
+.sum:   ld a, (hl)
+        add a, e
+        ld e, a
+        inc hl
+        ld a, (hl)
+        adc a, d
+        ld d, a
+        inc hl
+        djnz .sum
+        ex de, hl
+        ld b, 23
+        call PrintTime
+        ld a, $46               ; bright yellow
+        ld b, 23
+        call AttrRow
+        ld bc, 23 * 256 + NAME_COL
+        ld de, TxtTotal
+        call PrintAt
+.noTotal:
+        call WaitRelease
         ld de, ROUTE_FRAMES
         jp WaitStart
+NAME_COL        EQU 5
+TIME_COL        EQU 23
+
+; B = screen row 18-22: that row's stage time, if it has one
+RowTime:
+        ld a, b
+        sub 18
+        add a, a
+        ld l, a
+        ld h, 0
+        ld de, StageTimes
+        add hl, de
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        ld a, d
+        or e
+        ret z
+        ex de, hl
+; HL = 50 Hz frames, B = row: the time at TIME_COL
+PrintTime:
+        push bc
+        ld de, TimeBuf
+        call FmtTime
+        pop bc
+        ld c, TIME_COL
+        ld de, TimeBuf
+        jp PrintAt
+TimeBuf:        ds 7
+                db 0
 
 ; A = stage -> HL -> its MapStages column byte (row before it, theme after)
 MapEntry:
@@ -1383,6 +1447,7 @@ TxtInitials:    db "ENTER YOUR INITIALS", 0
 TxtPick:        db "STEER: CHOOSE A LETTER", 0
 TxtTake:        db "ACCELERATE: TAKE IT", 0
 TxtRoute:       db "YOUR ROUTE", 0
+TxtTotal:       db "TOTAL", 0
 TxtOptions:     db "OPTIONS", 0
 TxtOptMenu:     db "1  KEYBOARD  Q A O P SPACE", 0
                 db "2  SINCLAIR JOYSTICK", 0

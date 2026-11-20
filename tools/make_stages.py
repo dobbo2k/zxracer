@@ -31,6 +31,8 @@ THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
 TRACK_CACHE = 0x7D80                # bank 5, after the resident data and code
 FRONTEND_RESERVE = 7168             # room kept in a pack bank for the front-end overlay
+PAR_V = 17                         # par times: depth units per 50 Hz frame on a straight
+PAR_K = 1600                       # ... and sqrt(PAR_K / |curve|) on a curve
 STAGEOV_RESERVE = 1536              # ... and for the between-stages overlay (run at $4000)
 TRACK_CACHE_SIZE = 0x8000 - TRACK_CACHE
 PACK_BANKS = [0, 1, 3, 4, 6]
@@ -264,6 +266,18 @@ def merge_hills(segs, hills):
     return out
 
 
+def par_time(segs, stage_len):
+    """A stage's par time (50 Hz frames): beating it is extended play. Each
+    segment at PAR_V depth units a frame, or slower on a curve (curve c:
+    sqrt(PAR_K / |c|)) - about how the autopilot drives."""
+    t = 0.0
+    for seg in segs:
+        length, curve = seg[0], seg[1]
+        v = PAR_V if curve == 0 else min(PAR_V, math.sqrt(PAR_K / abs(curve)))
+        t += length / v
+    return round(t)
+
+
 def track_pack(name, segs, objs, stage_len):
     out = [f"        MODULE {name}",
            "        dw Track, Objects, " + str(stage_len),
@@ -346,7 +360,8 @@ def main(src="assets/stages.yaml", outdir="build"):
             if size > TRACK_CACHE_SIZE:
                 raise SystemExit(f"{label}: {size} bytes, the cache holds {TRACK_CACHE_SIZE}")
             packs.append((label, lines, size, TRACK_CACHE))
-            stages.append({"row": r, "col": k, "theme": theme_label[st["theme"]], "track": label})
+            stages.append({"row": r, "col": k, "theme": theme_label[st["theme"]], "track": label,
+                           "par": par_time(segs, stage_len)})
 
     # title and goal screens: compressed pictures stored with the packs
     shots = make_screens.build(themes)
@@ -389,7 +404,7 @@ def main(src="assets/stages.yaml", outdir="build"):
     open(os.path.join(outdir, "packs.asm"), "w").write("\n".join(out) + "\n")
 
     # stage table (16 bytes per stage): theme bank, src, length; track bank,
-    # src, length; left, right, row, padding
+    # src, length; left, right, row; par time; padding
     rows = cfg["rows"]
     idx = {}
     for i, st in enumerate(stages):
@@ -406,7 +421,9 @@ def main(src="assets/stages.yaml", outdir="build"):
         tab.append(f"        dw Pack_{th}, Pack_{th}_end - Pack_{th}")
         tab.append(f"        db {where[tr]}")
         tab.append(f"        dw Pack_{tr}, Pack_{tr}_end - Pack_{tr}")
-        tab.append(f"        db {left}, {right}, {r + 1}, 0, 0, 0")   # 16 bytes
+        tab.append(f"        db {left}, {right}, {r + 1}")
+        tab.append(f"        dw {st['par']}")                          # par time, 50 Hz frames
+        tab.append(f"        db 0")                                    # 16 bytes
     tab += ["FrontEndPack:", f"        db {where['frontend']}",
             "        dw Pack_frontend, Pack_frontend_end - Pack_frontend"]
     open(os.path.join(outdir, "stages.asm"), "w").write("\n".join(tab) + "\n")

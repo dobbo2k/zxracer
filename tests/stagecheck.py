@@ -54,6 +54,16 @@ if goal:
 if not (goal and v["StageRow"] == 5 and v["Stage"] == 12 and v["Time"] > 0):
     print(f"FAIL: the autopilot did not reach the goal in time by the expected branches")
     ok = False
+if goal:                                   # stage times: rows 1-4 recorded at the checkpoints
+    s = syms(video.replace(".sna", ".sym"))
+    r = subprocess.run([zxsim, video, "-n", str(goal[0]), "-q", "-d", f"{s['StageTimes']}:8"] + keys,
+                       capture_output=True, text=True, check=True)
+    b = [int(x, 16) for x in r.stdout.split()]
+    times = [b[i] + 256 * b[i + 1] for i in range(0, 8, 2)]
+    print("stage times (s): " + " ".join(f"{t / 50:.2f}" for t in times))
+    if not all(1000 < t < 5000 for t in times):
+        print("FAIL: the stage times were not recorded")
+        ok = False
 v = run(video, video.replace(".sna", ".sym"), (goal[0] if goal else 16000) + 4500, keys,   # (goal, route, initials, table, title, table)
         ["GameState", "StageRow"])
 if not (v["GameState"] == 0 and v["StageRow"] == 1):

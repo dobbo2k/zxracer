@@ -10,6 +10,7 @@ ST_OVER         EQU 2
 START_TIME      EQU $68             ; BCD seconds
 OVER_FRAMES     EQU 200             ; 50 Hz frames on the game-over screen
 FORK_WARN       EQU 6500            ; units before the end of a stage
+MSG_FRAMES      EQU 100             ; how long a checkpoint message shows
 
 GameUpdate:
         ld a, (StageDone)       ; reached the end of a stage last frame
@@ -23,7 +24,7 @@ GameUpdate:
         cp ST_PLAYING
         jr z, .playing
         cp ST_OVER
-        jr z, .over
+        jp z, .over
         ; ---- attract: any key starts a game
         ld a, (Input)
         and (1 << IN_LEFT) | (1 << IN_RIGHT) | (1 << IN_UP) | (1 << IN_FIRE)
@@ -38,7 +39,17 @@ GameUpdate:
         ret nz
         jp GoTitle
 .playing:
-        ; timer: one second per 50 frames
+        ld a, (Lights)          ; the stage's clock (once the lights are green)
+        cp LIGHTS_GO
+        jr nc, .held
+        ld a, (Elapsed)
+        ld hl, (StageClock)
+        add a, l
+        ld l, a
+        jr nc, .clk
+        inc h
+.clk:   ld (StageClock), hl
+.held:  ; timer: one second per 50 frames
         ld a, (Elapsed)
         ld hl, SecTick
         add a, (hl)
@@ -85,8 +96,20 @@ GameUpdate:
         xor a
 .st:    ld (StateTimer), a
         ret nz
+        ld hl, (MsgThen)        ; the next message queued, or none
+        ld a, h
+        or l
+        jr nz, .then
         ld hl, MsgNone
         ld (Message), hl
+        ret
+.then:  ld (Message), hl
+        ld hl, (MsgThen + 2)
+        ld (MsgThen), hl
+        ld hl, 0
+        ld (MsgThen + 2), hl
+        ld a, MSG_FRAMES
+        ld (StateTimer), a
         ret
 .over:  xor a                   ; no control: the car rolls to a stop
         ld (Input), a
