@@ -75,7 +75,7 @@ release: build/speedrun.tap build/video.sna $(ZXSIM) tools/make_inlay.py release
 # the cover, the tape's loading screen made from a 4:3 version of it, and the
 # lettering for the inlay's spine (the last two are kept in assets/gfx, so
 # building the tape does not need Chromium)
-LOADING_STYLE ?= dither             # or flat, light, bands, outline (tools/make_loading.py)
+LOADING_STYLE ?= bands              # or dither, flat, light, outline (tools/make_loading.py)
 cover: tools/make_cover.py tools/make_loading.py | build
 	mkdir -p release
 	$(PYTHON) tools/make_cover.py release/cover.png build/cover.svg portrait
