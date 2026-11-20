@@ -511,6 +511,15 @@ def detailed_defs():
   <linearGradient id="cpink" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#ff8ab4"/><stop offset="1" stop-color="#d23a78"/>
   </linearGradient>
+  <linearGradient id="hmass" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffe88a"/><stop offset="0.5" stop-color="#f0c040"/><stop offset="1" stop-color="#b8821c"/>
+  </linearGradient>
+  <linearGradient id="hshadow" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0.45" stop-color="#6a4208" stop-opacity="0"/><stop offset="1" stop-color="#6a4208" stop-opacity="0.45"/>
+  </linearGradient>
+  <linearGradient id="hlockv" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ffeaa0"/><stop offset="0.45" stop-color="#f2c444"/><stop offset="1" stop-color="#b07a18"/>
+  </linearGradient>
   <pattern id="cstripe" width="16" height="40" patternUnits="userSpaceOnUse">
     <rect width="16" height="40" fill="#f4f2ec"/><rect x="5" width="5" height="40" fill="#2f55c8"/>
   </pattern>
@@ -549,7 +558,7 @@ def car_detailed():
         o.append(f'<path d="M{x - 40},1348 Q{x},1342 {x + 40},1348" stroke="#c08a70" stroke-width="3" '
                  f'fill="none" opacity="0.6" stroke-linecap="round"/>')
     # her hair over her headrest, streaming back
-    o.append(hair_stream(742, 1318, front=True))
+    o.append(her_hair_front(742, 1318))
     # door mirrors
     for side in (-1, 1):
         x = cx + side * 214
@@ -669,47 +678,109 @@ def person_her(x, y):
     o.append(f'<path d="{sh}" fill="url(#cpink)" stroke="{INK}" stroke-width="2.5"/>')
     o.append(f'<path d="{sh}" fill="url(#cshade)"/>')
     o.append(f'<path d="M{x - 16},1388 L{x - 14},{y + 30} L{x + 14},{y + 30} L{x + 16},1388 Z" fill="url(#cskin)"/>')
-    # hair: the head, then locks blown back to the right
-    o.append(hair_stream(x, y, front=False))
-    o.append(f'<path d="{head_shape(x, y, 50, 57)}" fill="url(#hblonde)" stroke="#6a4a10" stroke-width="2.2"/>')
-    for k in range(18):
-        a = -math.pi * (0.05 + 0.9 * k / 17)
-        x0, y0 = x - 6 + 6 * math.cos(a), y - 48
-        x1 = x + 50 * math.cos(a)
-        y1 = y + 30 + 20 * math.sin(a * 0.3)
-        c = ("#fff6c8", "#c8901e", "#e8b440")[k % 3]
-        o.append(f'<path d="M{f(x0)},{f(y0)} Q{f(x1 * 0.6 + x0 * 0.4 + 10)},{f(y - 20)} {f(x1 + 14)},{f(y1)}" '
-                 f'stroke="{c}" stroke-width="1.8" fill="none" opacity="0.85" stroke-linecap="round"/>')
+    # her hair, from behind (the locks over the headrest come later)
+    o.append(her_hair_back(x, y))
     return "\n".join(o)
 
 
-def hair_stream(x, y, front):
-    """Her hair blown back: locks behind the headrest, or over it."""
-    r = random.Random(7 if front else 5)
+def ribbon(p0, p1, p2, p3, w0, n=28, full=0.55):
+    """A lock of hair: full width for most of its length, tapering to a soft tip."""
+    spine = bez(p0, p1, p2, p3, n)
+    left, right = [], []
+    for i, (x, y) in enumerate(spine):
+        t = i / n
+        w = w0 * (0.1 + 0.9 * math.sin(min(1, t / 0.3) * math.pi / 2)) * (min(1, (1 - t) / (1 - full)) ** 0.85) + 0.4
+        x2, y2 = spine[min(i + 1, n)]
+        x1, y1 = spine[max(i - 1, 0)]
+        dx, dy = x2 - x1, y2 - y1
+        L = math.hypot(dx, dy) or 1
+        nx, ny = -dy / L, dx / L
+        left.append((x + nx * w, y + ny * w))
+        right.append((x - nx * w, y - ny * w))
+    return left + right[::-1], spine, left, right
+
+
+def strands_along(spine, w, colours, count, r, width=1.3, start=0.0, end=0.92):
+    """Fine strands following a lock's flow, spread across its width."""
     o = []
-    n = 6 if front else 9
-    for k in range(n):
-        t = k / max(1, n - 1)
-        if front:
-            # blown back towards us: over the headrest and down her right shoulder,
-            # inside the cockpit (clear of the windscreen frame)
-            p0 = (x + 14 + t * 16 + r.uniform(-4, 4), y + 4 + t * 22)
-            p1 = (x + 44 + t * 8, y + 10 + t * 16)
-            p2 = (x + 62 + t * 6, y + 56 + t * 14)
-            p3 = (x + 66 + t * 14 + r.uniform(-4, 4), y + 96 + t * 18 + r.uniform(-6, 6))
-            w = r.uniform(8, 12)
-        else:
-            p0 = (x + 10 + r.uniform(-8, 8), y - 30 + t * 56)
-            p1 = (x + 46, y - 26 + t * 40)
-            p2 = (x + 64, y + 20 + t * 30)
-            p3 = (x + 70 + t * 10 + r.uniform(-6, 6), y + 70 + t * 30 + r.uniform(-6, 6))
-            w = r.uniform(12, 17)
-        shape, spine = lock(p0, p1, p2, p3, w, "url(#hlock2)" if k % 3 == 0 else "url(#hlock)")
-        o.append(shape)
-        o.append(f'<path d="{smooth_d(spine[2:-2], False)}" stroke="#fff6c8" stroke-width="1.6" fill="none" '
-                 f'opacity="0.75" stroke-linecap="round"/>')
-        o.append(f'<path d="{smooth_d([(px, py + w * 0.5) for px, py in spine[2:-4]], False)}" stroke="#8a5a10" '
-                 f'stroke-width="1.2" fill="none" opacity="0.6" stroke-linecap="round"/>')
+    n = len(spine) - 1
+    for k in range(count):
+        off = r.uniform(-0.8, 0.8) * w
+        a, b = int(n * (start + r.uniform(0, 0.15))), int(n * (end - r.uniform(0, 0.25)))
+        pts = []
+        for i in range(a, b + 1):
+            x, y = spine[i]
+            x2, y2 = spine[min(i + 1, n)]
+            x1, y1 = spine[max(i - 1, 0)]
+            dx, dy = x2 - x1, y2 - y1
+            L = math.hypot(dx, dy) or 1
+            taper = min(1, (1 - i / n) / 0.45)
+            pts.append((x - dy / L * off * taper, y + dx / L * off * taper))
+        if len(pts) > 2:
+            o.append(f'<path d="{smooth_d(pts, False)}" stroke="{r.choice(colours)}" stroke-width="{f(width * r.uniform(0.6, 1.3))}" '
+                     f'fill="none" opacity="{r.uniform(0.55, 0.9):.2f}" stroke-linecap="round"/>')
+    return "\n".join(o)
+
+
+def her_hair_back(x, y):
+    """The mass of her hair from behind: crown, parting, falling behind the
+    headrest and swept to the right by the wind."""
+    r = random.Random(31)
+    o = []
+    sil = [(x - 2, y - 61), (x + 30, y - 58), (x + 52, y - 40), (x + 62, y - 10), (x + 70, y + 22),
+           (x + 84, y + 46), (x + 98, y + 66), (x + 92, y + 80), (x + 60, y + 86), (x, y + 88),
+           (x - 52, y + 84), (x - 64, y + 50), (x - 62, y + 10), (x - 56, y - 30), (x - 34, y - 56)]
+    d = smooth_d(sil)
+    o.append(f'<path d="{d}" fill="url(#hmass)"/>')
+    # strands from the parting at the crown, combed back and swept right
+    for k in range(46):
+        t = k / 45
+        sx = x - 4 + r.uniform(-3, 3)
+        sy = y - 58 + abs(t - 0.5) * 6
+        ang = math.pi * (1.05 - 1.1 * t)          # from the left side round to the right
+        ex = x + 62 * math.cos(ang) + 26 * t + r.uniform(-4, 4)
+        ey = y + 30 + 52 * (1 - abs(math.cos(ang))) * 0.6 + 30 * t + r.uniform(-6, 10)
+        c1 = (sx + (ex - sx) * 0.15 + 28 * math.cos(ang) * 0.6, sy + 12)
+        c2 = (ex - 10 * math.cos(ang), ey - 40)
+        col = r.choice(("#fff4c0", "#ffe080", "#e8b440", "#c8901e", "#a87010"))
+        pts = bez((sx, sy), c1, c2, (ex, ey), 18)
+        o.append(f'<path d="{smooth_d(pts, False)}" stroke="{col}" stroke-width="{f(r.uniform(1.0, 2.2))}" '
+                 f'fill="none" opacity="{r.uniform(0.5, 0.9):.2f}" stroke-linecap="round"/>')
+    # shadow in the hollows towards the bottom, light along the crown
+    o.append(f'<path d="{d}" fill="url(#hshadow)"/>')
+    rim = sil[13:] + sil[:5]
+    o.append(f'<path d="{smooth_d(rim, False)}" stroke="#fff3c8" stroke-width="3" fill="none" opacity="0.8" stroke-linecap="round"/>')
+    o.append(f'<path d="{d}" fill="none" stroke="#7a5212" stroke-width="2"/>')
+    # the parting
+    o.append(f'<path d="M{x - 4},{y - 60} Q{x - 6},{y - 44} {x - 3},{y - 30}" stroke="#9a6a14" stroke-width="1.6" '
+             f'fill="none" opacity="0.7"/>')
+    return "\n".join(o)
+
+
+def her_hair_front(x, y):
+    """Locks blown back over the top of her headrest and down onto her shoulder,
+    and a few loose wisps - all inside the cockpit."""
+    r = random.Random(47)
+    o = []
+    locks = [  # spine control points (relative), half-width
+        (((20, 14), (46, 6), (66, 30), (70, 78)), 13),
+        (((34, 18), (60, 14), (78, 46), (80, 104)), 14),
+        (((10, 20), (40, 18), (56, 50), (56, 96)), 11),
+        (((48, 16), (74, 22), (90, 60), (86, 112)), 10),
+    ]
+    for (pts, w) in locks:
+        P = [(x + px, y + py) for px, py in pts]
+        poly, spine, left, right = ribbon(*P, w)
+        o.append(f'<path d="{smooth_d(poly)}" fill="url(#hlockv)"/>')
+        o.append(strands_along(spine, w, ("#fff4c0", "#ffe080", "#d8a030", "#b07a18"), 9, r))
+        o.append(f'<path d="{smooth_d(right[2:], False)}" stroke="#7a5212" stroke-width="1.8" fill="none" opacity="0.8"/>')
+        o.append(f'<path d="{smooth_d(left[2:-3], False)}" stroke="#fff3c8" stroke-width="1.6" fill="none" opacity="0.7"/>')
+    for k in range(5):                              # wisps in the wind
+        sx, sy = x + r.uniform(20, 50), y + r.uniform(-40, 0)
+        ex, ey = x + r.uniform(72, 86), y + r.uniform(-30, 20)
+        pts = bez((sx, sy), (sx + 20, sy - 14), (ex - 16, ey - 10), (ex, ey), 14)
+        o.append(f'<path d="{smooth_d(pts, False)}" stroke="#ffe8a0" stroke-width="1.1" fill="none" '
+                 f'opacity="0.7" stroke-linecap="round"/>')
     return "\n".join(o)
 
 
