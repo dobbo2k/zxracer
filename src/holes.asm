@@ -27,14 +27,38 @@ EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3
         ORG X1Page + $60
         ASSERT RoadX1_end <= X1Page + $60
 CrewSay2a: db "< MY HAIR! MY HAIR! ", 0
+; (src/tunnel.asm DrawPortal's working variables: moved here for room)
+PtN:            ds 5
+PtY:            db 0
+PtRow:          db 0
+PtTop:          db 0
+PtR:            db 0
+PtFar:          db 0                ; $FF: too far for the arch
+PtGate:         db 0                ; drawing a gantry, not a tunnel
         ASSERT $ <= X1Page + $80
         ORG X1Page + $E0
         ASSERT RoadRW_end <= X1Page + $E0
 CrewSay2b: db "   IT LOOKS GREAT! >", 0
+; (src/music.asm's flags: moved here for room)
+MusicOn:        db 0
+SoundMode:      db 0
+SfxBusy:        db 0                ; a hit has channel B (and the noise)
+MixBits:        db 0                ; the mixer setting being built
+DrumPtr:        dw 0                ; the drum sounding: its next step (0: none)
+SqHold:         db 0                ; interrupts until the next chirp may start
+SqTimer:        db 0                ; interrupts left of a chirp
+FadeAtt:        db 0                ; the music's volumes less this (MusicFade)
+FadeIn:         db 0                ; a new tune coming in: steps of fade left
         ASSERT $ <= X1Page + 256
         ORG LWPage + $60
         ASSERT LaneWp_end <= LWPage + $60
 CrewSay3a: db "< LET ME DRIVE!     ", 0
+; (src/tunnel.asm's colours and where the stage overlay is: moved here for room)
+TunWall:        db $48, $08         ; walls: bright blue, blue (light / dark bands)
+TUN_LAMP        EQU $76             ; lamps on the walls (src/road.asm RowAttrs): bright yellow
+TunKerbs:       db $78, $00         ; kerbs: bright white, black
+TunSky:         db C_, C_           ; the ceiling (white ink: the message line; the backdrop is cleared)
+        INCLUDE "stageov_pack.asm"
         ASSERT $ <= LWPage + $80
         ORG LWPage + $E0
         ASSERT Band_end <= LWPage + $E0
@@ -85,6 +109,10 @@ CrewSayT1a: db "< YOU TAILGATED HIM!", 0
 CrewSayT1b: db " HE WAS IN MY WAY! >", 0
 CrewSayT2a: db "< LOOK AT THAT DENT!", 0
 CrewSayT2b: db "   THAT WAS THERE! >", 0
+; (src/extend.asm PrintBig's table: moved here for room)
+; a nibble's 4 pixels, each doubled
+DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
+        ASSERT high DblNib == high (DblNib + 15)
         ASSERT $ <= ZHiPage + 256
         ORG MaskPage + $20
         ASSERT LMaskIncl_end <= MaskPage + $20

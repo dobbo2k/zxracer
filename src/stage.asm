@@ -93,9 +93,10 @@ StageOvE:
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
-        ld a, (OvBlank)         ; a checkpoint: the new theme's tune
+        ld a, (OvBlank)         ; a checkpoint: the sound on again, the new theme's tune
         or a
         ret nz
+        ld (Mute), a
         ld a, (OvMusic)
         or a
         ret z
@@ -168,4 +169,3 @@ Checkpoint:
         ld (GoalPending), a
         ret
 
-        INCLUDE "stageov_pack.asm"  ; where the overlay is; the next stages

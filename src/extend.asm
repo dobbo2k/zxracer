@@ -159,6 +159,3 @@ PrintBig:
         pop bc
         pop de
         ret
-; a nibble's 4 pixels, each doubled
-DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
-        ASSERT high DblNib == high (DblNib + 15)

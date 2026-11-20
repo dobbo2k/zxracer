@@ -29,12 +29,12 @@ import make_music                           # noqa: E402
 
 THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
-TRACK_CACHE = 0x7D80                # bank 5, after the resident data and code
+TRACK_CACHE = 0x8000 - 608          # bank 5, after the resident data and code
 FRONTEND_RESERVE = 7168             # room kept in a pack bank for the front-end overlay
 THEME_TOP = 120                    # the cache's last bytes stay free (src/main.asm: CmdListB)
 PAR_V = 17                         # par times: depth units per 50 Hz frame on a straight
 PAR_K = 1600                       # ... and sqrt(PAR_K / |curve|) on a curve
-STAGEOV_RESERVE = 1536              # ... and for the between-stages overlay (run at $4000)
+STAGEOV_RESERVE = 1792              # ... and for the between-stages overlay (run at $4000)
 TRACK_CACHE_SIZE = 0x8000 - TRACK_CACHE
 PACK_BANKS = [0, 1, 3, 4, 6]
 BANK_SIZE = 0x4000
@@ -380,6 +380,12 @@ def main(src="assets/stages.yaml", outdir="build"):
             label = f"track_{len(stages)}"
             segs, objs, stage_len, tunnel = make_track(r, st["seed"], themes[st["theme"]])
             lines, size = track_pack(label, segs, objs, stage_len, tunnel)
+            thin = 2
+            while size > TRACK_CACHE_SIZE:          # too long: a little less small scenery
+                small = [i for i, o in enumerate(objs) if o[2] in (5, 9)]
+                drop = set(small[::thin][:max(1, (size - TRACK_CACHE_SIZE + 3) // 4)])
+                objs = [o for i, o in enumerate(objs) if i not in drop]
+                lines, size = track_pack(label, segs, objs, stage_len, tunnel)
             if size > TRACK_CACHE_SIZE:
                 raise SystemExit(f"{label}: {size} bytes, the cache holds {TRACK_CACHE_SIZE}")
             packs.append((label, lines, size, TRACK_CACHE))

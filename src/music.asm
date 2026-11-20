@@ -57,13 +57,6 @@ ChanC:  dw 0, 0                     ; melody
         dw 0
         db 4, 10, 13, 9, 3, 0
         ds CH_SIZE - 15
-MusicOn:        db 0
-SoundMode:      db 0
-SfxBusy:        db 0                ; a hit has channel B (and the noise)
-MixBits:        db 0                ; the mixer setting being built
-DrumPtr:        dw 0                ; the drum sounding: its next step (0: none)
-SqHold:         db 0                ; interrupts until the next chirp may start
-SqTimer:        db 0                ; interrupts left of a chirp
 SQ_CHIRP        EQU 24
 SQ_SLIDE        EQU 12
 SQ_NOISE        EQU 4               ; the squeal's grit: a high noise
@@ -76,6 +69,7 @@ MusicPlay:
         ld a, (Paged)           ; another bank over the tune
         or a
         ret nz
+        call MusicFade
         push ix
         ld a, (SfxTimer)        ; a hit: a noise burst on B
         or a
@@ -231,6 +225,7 @@ DrumOut:
         ld a, (hl)              ; volume (0: the end)
         or a
         jr z, .end
+        call Atten
         ld e, a
         ld a, 8
         call AyWrite
@@ -543,7 +538,9 @@ MusicOut:
         ld a, (ix + CH_TREG)
         inc a
         call AyWrite
-        ld e, (ix + CH_VOL)
+        ld a, (ix + CH_VOL)
+        call Atten
+        ld e, a
         ld a, (ix + CH_VREG)
         jp AyWrite
 
@@ -594,3 +591,50 @@ MusicStart:
 ; (NoteTab, the tone periods, ArpTab, EnvTab and some of the drums are in
 ; src/holes.asm; NotePeriod, MusicTheme, MusicGo, MusicStop and AyPut in
 ; src/musicb2.asm, bank 2)
+
+; ---------------------------------------------------------------------------
+; Between stages the music fades out over the stage's last 2048 units, and
+; the next stage's tune comes in quietly (the stage overlay sets FadeIn) and
+; swells over a second; the loader plays a drum fill in between
+; (src/stageov.asm). Each interrupt (MusicPlay): FadeAtt, the larger of the
+; two, comes off every music volume (Atten).
+MusicFade:
+        ld hl, FadeIn           ; coming in: a step every 4 interrupts
+        ld a, (FrameCount)
+        and 3
+        jr nz, .k
+        ld a, (hl)
+        or a
+        jr z, .k
+        dec (hl)
+.k:     ld b, (hl)
+        ld a, (Mute)            ; (the front end's tunes: no fading out)
+        or a
+        jr nz, .set
+        ld hl, (StageLen)       ; going out: 15 - (units left) / 128
+        ld de, (Pos)
+        or a
+        sbc hl, de
+        jr nc, .left
+        ld hl, 0                ; (past the end, before the checkpoint: still out)
+.left:  ld a, h
+        cp 2048 / 256
+        jr nc, .set
+        add hl, hl
+        ld a, 15
+        sub h
+        cp b
+        jr c, .set
+        ld b, a
+.set:   ld a, b
+        ld (FadeAtt), a
+        ret
+
+; A = a volume -> A less the fade (not below 0)
+Atten:  push hl
+        ld hl, FadeAtt
+        sub (hl)
+        pop hl
+        ret nc
+        xor a
+        ret

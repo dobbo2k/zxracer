@@ -5,10 +5,6 @@
 ; tunnel's walls and kerbs - and whether the car is in it: then the sky is
 ; its ceiling and the backdrop is not drawn.
 ; ---------------------------------------------------------------------------
-TunWall:        db $48, $08         ; walls: bright blue, blue (light / dark bands)
-TUN_LAMP        EQU $76             ; lamps on the walls (src/road.asm RowAttrs): bright yellow
-TunKerbs:       db $78, $00         ; kerbs: bright white, black
-TunSky:         db C_, C_           ; the ceiling (white ink: the message line; the backdrop is cleared)
 
 ; ---------------------------------------------------------------------------
 ; After the road, on the screen being drawn: the tunnel's mouth ahead - a
@@ -262,13 +258,6 @@ PortalRow:
         pop ix
         ret
 
-PtN:            ds 5
-PtY:            db 0
-PtRow:          db 0
-PtTop:          db 0
-PtR:            db 0
-PtFar:          db 0                ; $FF: too far for the arch
-PtGate:         db 0                ; drawing a gantry, not a tunnel
 
 ; ---------------------------------------------------------------------------
 ; Engine sound mode, no beep on C (EngineSounds): in a tunnel the engine
