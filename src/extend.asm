@@ -89,6 +89,48 @@ WeaveTo:
         ret
 
 ; ---------------------------------------------------------------------------
+; Each interrupt in a game (SoundTick): a jingle's next note on channel C
+; once the one before is nearly over. A new stage's (OvCheckpoint sets
+; JingleHold) waits for its first frame: the interrupt that flips to it
+; (LastFlip = FrameCount, src/interrupt.asm).
+JingleTick:
+        ld a, (JingleHold)
+        or a
+        jr z, .go
+        ld a, (LastFlip)
+        ld hl, FrameCount
+        cp (hl)
+        ret nz
+        xor a
+        ld (JingleHold), a
+.go:    ld hl, (JinglePtr)
+        ld a, h
+        or l
+        ret z
+        ld a, (BeepTime)
+        cp 2
+        ret nc
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        inc hl
+        ld a, d
+        or e
+        jr z, .end
+        ld a, (hl)
+        inc hl
+        ld (JinglePtr), hl
+        jp BeepOn
+.end:   ld (JinglePtr), de
+        ret
+JingleHold:     db 0
+; A new stage begins: a short high beep (C) on its first frame
+JingleGo:
+        dw 106
+        db 8
+        dw 0
+
+; ---------------------------------------------------------------------------
 ; Difficulty (the options screen): 0 easy, 1 normal, 2 hard. The overlay
 ; reads it for the starting time, the checkpoint bonus, the par times and
 ; the weaving (src/stageov.asm DiffTable).

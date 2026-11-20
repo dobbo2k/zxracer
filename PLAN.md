@@ -527,7 +527,11 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   frames of noise through channel A's hardware envelope (the AY decays it,
   so no interrupt code is needed), and a longer, deeper last one - and the
   next tune starts at full volume. The last frame stays on show meanwhile
-  (about 18 frames, 0.36 s), then the display reset. (A fade-out over the
+  (about 18 frames, 0.36 s), then the display reset. A short high beep (C,
+  8 interrupts; before the extended-play flourish when there is one) starts
+  on the interrupt that flips to the new stage's first frame: the overlay
+  sets `JingleHold`, and `JingleTick` (moved to bank 5) waits until
+  `LastFlip` = `FrameCount`. (A fade-out over the
   stage's last stretch, a fade-in of the next tune and a sweep of the new
   stage's colours down the screen were tried and taken out after play
   testing.) The video tools model the AY's envelope: zxsim's `-y` log sets

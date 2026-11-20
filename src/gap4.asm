@@ -11,7 +11,11 @@ Silence:
         ld a, 10
         jp AyPut
 
-; Extended play: tone period, length (interrupts); 0 ends it
+; Jingles (JingleTick, src/extend.asm): tone period, length (interrupts);
+; 0 ends it. Extended play: the new stage's beep, then a flourish
+JingleGoExt:
+        dw 106
+        db 8                    ; C
 JingleExt:
         dw 212
         db 5                    ; C

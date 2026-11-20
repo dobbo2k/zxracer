@@ -440,30 +440,6 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
 .avol:  ld a, 8
         call AyWrite
         jp CrashTickC
-; (the jingle player: moved here from bank 5 for room)
-; Each interrupt in a game (SoundTick): a jingle's next note on channel C
-; once the one before is nearly over
-JingleTick:
-        ld hl, (JinglePtr)
-        ld a, h
-        or l
-        ret z
-        ld a, (BeepTime)
-        cp 2
-        ret nc
-        ld e, (hl)
-        inc hl
-        ld d, (hl)
-        inc hl
-        ld a, d
-        or e
-        jr z, .end
-        ld a, (hl)
-        inc hl
-        ld (JinglePtr), hl
-        jp BeepOn
-.end:   ld (JinglePtr), de
-        ret
         ASSERT $ <= StateB3 + 256
         ORG StateA1 + $E0
         ASSERT StAE_end <= StateA1 + $E0
