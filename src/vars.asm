@@ -14,6 +14,7 @@ StatePage:      db 0
 Input:          db 0
 DemoMode:       db 1            ; attract mode until a steering key is pressed
 PlayerX:        dw 0
+SpeedFrac:      db 0            ; (fraction: Speed.SpeedFrac is 8.8)
 Speed:          db 0
 OffRoad:        db 0
 Pos:            dw 0
@@ -54,13 +55,11 @@ LatAcc:         dw 0            ; its change per frame this update
 LatF:           dw 0            ; curvature * speed
 Sliding:        db 0            ; past the grip limit
 Gear:           db 0            ; 0 LOW, 1 HIGH
-SpeedFrac:      db 0            ; (HIGH gear's slow pull)
 FireWas:        db 0            ; fire held last update (gear changes on a press)
 CrewHerLine:    dw MsgNone      ; what they say after this crash
 CrewHisLine:    dw MsgNone
 CrewShownA:     db 0            ; the close-ups are on buffer A / B
 CrewShownB:     db 0
-SlideTick:      db 0
 OldA:           db 0
 OldB:           db 0
 OldC:           db 0

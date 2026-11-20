@@ -63,9 +63,11 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   half as well and scrubs speed off: brake or ease off for the sharp bends of the
   later stages. You can see it: on a fast bend the car yaws into it, and near the
   grip limit it swings further round with light smoke from both rear tyres.
-- **Gears:** two, like an arcade shifter. LOW pulls hard but tops out at 182 km/h;
-  HIGH reaches 280 km/h but bogs down from a standstill. Start in LOW, change up
-  around 180; the engine note drops as you do, and the HUD shows the gear.
+- **Gears:** two, like an arcade shifter. LOW pulls hard but tops out at 182 km/h
+  (about 4 s from a standstill); HIGH reaches 280 km/h (about 5 s more) but bogs
+  down from a standstill (10 s to 182). Start in LOW, change up around 180; the
+  engine note drops as you do, and the HUD shows the gear. Off the throttle the
+  car coasts down gently; braking is firmer.
 - **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,
   pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
 - **Stages:** 15 stages in a 5-row pyramid across 5 themes (Sunny Coast, Desert

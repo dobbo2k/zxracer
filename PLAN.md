@@ -334,13 +334,17 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   200, e.g. curvature 11 at top speed) the car slides: an extra outward push of a
   quarter of the excess, half the steering and grip, tyre smoke, and holding
   the throttle no longer adds speed (it scrubs off until the tyres grip again).
-- **Gears** *(as built)*: LOW / HIGH, changed with SPACE or fire (on a press).
-  LOW: +1 speed per update up to 13 (182 km/h); above it (changed down at speed)
-  the engine brakes the car to 13. HIGH: up to 20 (280 km/h), pulling 48/256 per
-  update below 6, 96 to 10, 192 to 16, 160 above - from a standstill in HIGH the
-  car takes twice as long to get going. Engine revs: speed in HIGH, 1.5 × speed in
-  LOW. HUD: LOW / HIGH under the speed. The demo driver changes up at 13 and down
-  below 8.
+- **Gears and acceleration** *(as built)*: speed is 8.8 fixed point, changed every
+  50 Hz frame. LOW / HIGH, changed with SPACE or fire (on a press). LOW pulls
+  22 / 18 / 12 (1/256ths per frame) below 6 / 10 / 13 and tops out at 13 (182 km/h,
+  about 4 s from a standstill); changed down above that, the engine brakes the car
+  (32). HIGH pulls 5 below 6, 8 to 10, 10 to 16, 7 to 18, 5 to 20 (280 km/h, about
+  5 s after changing up at 182; from a standstill 10 s to 182). Off the throttle it
+  coasts down (16), braking 64, sliding past the grip limit 24 (the throttle does
+  nothing). Engine revs: speed in HIGH, 1.5 × speed in LOW. HUD: LOW / HIGH. The
+  demo driver changes up at 13 and down below 8. (After slowing the acceleration
+  to arcade-racer pace the timer got a little more: 68 s at the start, 43 s per
+  checkpoint.)
 - **Drift you can see** *(as built)*: the car sprite has 7 frames - straight,
   left, right, and drifting left / right with tyre smoke (two puffs each, swung
   further round). On a bend with |curvature × speed| ≥ 80 and no steering the car

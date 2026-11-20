@@ -9,8 +9,10 @@ MAX_SPEED       EQU 20          ; depth units per 50 Hz frame (HIGH gear: 280 km
 LOW_MAX         EQU 13          ; LOW gear's top speed (182 km/h)
 DEMO_UP         EQU 13          ; the demo driver changes up at this speed...
 DEMO_DOWN       EQU 8           ; ... and down below this one
-DECEL           EQU 1
-BRAKE           EQU 2
+COAST_D         EQU 16          ; speed lost per 50 Hz frame (1/256ths): off the throttle
+BRAKE_D         EQU 64          ; braking
+SLIDE_D         EQU 24          ; sliding past the grip limit (the throttle does nothing)
+LIMIT_D         EQU 32          ; LOW gear above its top speed: engine braking
 OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
 OFFROAD_SPEED   EQU 8
 
@@ -211,32 +213,16 @@ UpdatePlayer:
         sbc hl, de
 .px:    ld (PlayerX), hl
 
-        ; speed
-        ld a, (Speed)
-        bit IN_DOWN, c
-        jr z, .noBrake
-        sub BRAKE
-        jr nc, .noBrake
-        xor a
-.noBrake:
+        ; speed, per 50 Hz frame
+        ld a, (Elapsed)
         ld b, a
-        ld a, (Sliding)         ; sliding: the tyres scrub speed off
-        or a
-        ld a, b
-        jr z, .grips
-        ld hl, SlideTick
-        inc (hl)
-        bit 0, (hl)
-        jr z, .spd
-        jr .coast
-.grips: bit IN_UP, c
-        jr z, .coast
-        call Throttle
-        jr .spd
-.coast: sub DECEL
-        jr nc, .spd
-        xor a
-.spd:   ld (Speed), a
+.spd:   push bc
+        call SpeedStep
+        pop bc
+        djnz .spd
+        ld a, (Input)
+        ld c, a
+        ld a, (Speed)
         ; off the road (past the kerb): speed limited, sheds speed quickly
         ld hl, (PlayerX)        ; distance from the middle of the branch
         call AbsHL
@@ -283,42 +269,70 @@ UpdatePlayer:
         call UpdateTraffic
         jp UpdateObjects
 
-; A = speed, accelerating -> A = the new speed. Two gears, as on a real
-; arcade racer's shifter: LOW pulls hard but tops out at LOW_MAX (above it,
-; after changing down at speed, the engine brakes the car to it); HIGH
-; reaches MAX_SPEED but pulls weakly from low speeds (HighPull: 1/256ths of a
-; speed unit per update).
-Throttle:
-        ld b, a
+; One 50 Hz frame of speed (Speed.SpeedFrac, 8.8). The throttle's pull
+; depends on the gear and the speed, as on an arcade racer's shifter: LOW
+; pulls hard but tops out at LOW_MAX (above it, after changing down at
+; speed, the engine brakes the car to it); HIGH reaches MAX_SPEED but pulls
+; weakly from low speeds. From a standstill LOW reaches 182 km/h in about
+; 4 s, HIGH then 280 km/h in about 5 more; starting in HIGH takes 10 s to
+; 182. Braking beats the throttle; sliding scrubs speed off.
+SpeedStep:
+        ld a, (Input)
+        ld c, a
+        ld hl, (SpeedFrac)      ; L = fraction, H = Speed
+        ld de, -BRAKE_D
+        bit IN_DOWN, c
+        jr nz, .add
+        ld de, -SLIDE_D
+        ld a, (Sliding)
+        or a
+        jr nz, .add
+        ld de, -COAST_D
+        bit IN_UP, c
+        jr z, .add
+        ; throttle
         ld a, (Gear)
         or a
-        ld a, b
-        jr nz, .high
-        cp LOW_MAX
-        jr c, .inc
-        ret z                   ; at the limiter
-        dec a
-        ret
-.inc:   inc a
-        ret
-.high:  cp MAX_SPEED
-        ret nc
-        ld e, a
-        ld d, 0
-        ld hl, HighPull
+        ld a, h
+        ld de, HighPull
+        ld b, MAX_SPEED
+        jr nz, .pull
+        ld de, -LIMIT_D
+        cp LOW_MAX + 1
+        jr nc, .add             ; LOW above its top speed: engine braking
+        ld de, LowPull
+        ld b, LOW_MAX
+.pull:  cp b
+        jr nc, .top             ; at the gear's top speed
+        push hl
+        ld l, a
+        ld h, 0
         add hl, de
-        ld a, (SpeedFrac)
-        add a, (hl)
-        ld (SpeedFrac), a
-        ld a, b
-        ret nc
-        inc a
+        ld e, (hl)              ; the pull at this speed
+        ld d, 0
+        pop hl
+        add hl, de
+        ld a, h
+        cp b
+        jr c, .set
+.top:   ld h, b                 ; (not past the gear's top)
+        ld l, 0
+        jr .set
+.add:   add hl, de
+        jr c, .set              ; (adding a negative: carry while >= 0)
+        ld hl, 0
+.set:   ld (SpeedFrac), hl
         ret
-HighPull:
-        db 48, 48, 48, 48, 48, 48           ; 0-5: it bogs down
-        db 96, 96, 96, 96                   ; 6-9
-        db 192, 192, 192, 192, 192, 192     ; 10-15
-        db 160, 160, 160, 160               ; 16-19
+LowPull:                        ; LOW: 1/256ths of a speed unit per frame
+        db 22, 22, 22, 22, 22, 22           ; 0-5
+        db 18, 18, 18, 18                   ; 6-9
+        db 12, 12, 12                       ; 10-12
+HighPull:                       ; HIGH
+        db 5, 5, 5, 5, 5, 5                 ; 0-5: it bogs down
+        db 8, 8, 8, 8                       ; 6-9
+        db 10, 10, 10, 10, 10, 10           ; 10-15
+        db 7, 7                             ; 16-17
+        db 5, 5                             ; 18-19
 
 ; Demo / attract mode: until a steering key is pressed, drive automatically
 ; (accelerate, steer back towards the middle of the road).

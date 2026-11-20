@@ -16,7 +16,7 @@ FIRST_STAGE     EQU 0               ; (testing: start on another stage)
         IFNDEF START_POS
 START_POS       EQU 0               ; (testing: start further along it)
         ENDIF
-STAGE_BONUS     EQU $40             ; BCD seconds added at a checkpoint
+STAGE_BONUS     EQU $43             ; BCD seconds added at a checkpoint
 NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 
 ; A = stage index: load its theme and track, reset the track state and
