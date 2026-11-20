@@ -62,6 +62,11 @@ GameUpdate:
         sub 1
         daa
         ld (Time), a
+        cp $11
+        jr nc, .noSec
+        call TimeWarn           ; the last 10 seconds: the timer flashes, a pip each second
+        ld a, (Time)
+        or a
         jr nz, .noSec
         ; out of time
         ld a, ST_OVER

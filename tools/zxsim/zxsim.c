@@ -5,7 +5,7 @@
  *  - Z80 core with documented instructions (+ common undocumented IXH/IXL/SLL)
  *  - 128K memory paging via port $7FFD, banks 5/7 displayable
  *  - approximate memory contention (128K timings, access-driven model)
- *  - IM1/IM2 interrupts at the start of each 70908 T frame
+ *  - IM1/IM2 interrupts at the start of each 70908 T frame; FLASH swaps every 16
  *  - scanline-accurate screen + border capture -> PPM screenshots
  *  - keyboard / Kempston input scripts, border-change and flip logging
  *
@@ -160,6 +160,9 @@ static void render_row(int y) {
         uint8_t px = scr[addr + c], at = scr[aaddr + c];
         uint8_t br = (at & 0x40) ? 8 : 0;
         uint8_t ink = (at & 7) | br, pap = ((at >> 3) & 7) | br;
+        if ((at & 0x80) && (frame & 16)) {          /* FLASH: swapped every 16 frames */
+            uint8_t t = ink; ink = pap; pap = t;
+        }
         for (int i = 0; i < 8; i++)
             img[y][32 + c * 8 + i] = (px & (0x80 >> i)) ? ink : pap;
     }

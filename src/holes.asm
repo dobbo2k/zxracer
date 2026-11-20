@@ -418,6 +418,12 @@ MusicKeep:
         pop ix
         ret
         ASSERT $ <= StateB1 + $80
+        ORG StateB1 + $E0
+        ASSERT StBE_end <= StateB1 + $E0
+; Stage records: each stage's best time (50 Hz frames, 0: none yet), kept
+; until the Spectrum is switched off (the route screen sets them)
+StageBest:      ds 15 * 2
+        ASSERT $ <= StateB1 + 256
         ORG Gap3Free            ; (after the starting lights, src/main.asm)
 CrashTickC:                     ; C: debris, a clatter of high notes
         ld e, 0

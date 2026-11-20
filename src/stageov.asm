@@ -7,8 +7,7 @@
 ; pack bank and calls one of the Ov... entries. Assembled to run at $4000.
 ; ---------------------------------------------------------------------------
 
-STAGE_BONUS     EQU $48             ; BCD seconds added at a checkpoint
-EXTRA_BONUS     EQU $10             ; ... and more for a stage under its par time
+EXTRA_BONUS     EQU $10             ; BCD seconds more at a checkpoint for a stage under its par time
 NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 
 ; A = stage: the packs again after the front end (the demo carries on)
@@ -51,7 +50,8 @@ OvStartGame:
         ld (hl), a
         inc hl
         ld (hl), a
-        ld a, START_TIME
+        call DiffEntry          ; the starting time
+        ld a, (hl)
         ld (Time), a
         ld a, LIGHTS_TIME
         ld (Lights), a
@@ -91,7 +91,28 @@ OvCheckpoint:
         ld e, (hl)              ; par time
         inc hl
         ld d, (hl)
-        ld hl, (StageClock)
+        ld a, (Difficulty)      ; easy: + 1/8, hard: - 1/16
+        cp 1
+        jr z, .par
+        ld h, d
+        ld l, e
+        srl h
+        rr l
+        srl h
+        rr l
+        srl h
+        rr l
+        or a                    ; (A = 0: easy)
+        jr nz, .hard
+        add hl, de
+        jr .pd
+.hard:  srl h
+        rr l
+        ex de, hl
+        or a
+        sbc hl, de
+.pd:    ex de, hl
+.par:   ld hl, (StageClock)
         or a
         sbc hl, de
         sbc a, a                ; $FF: under par
@@ -132,13 +153,20 @@ OvCheckpoint:
         ld de, MsgTime + 12
         call FmtTime
         ; the bonus: its message and the extra time
+        call DiffEntry
+        inc hl
+        ld c, (hl)              ; this level's bonus
         ld hl, TxtTimeBonus
-        ld c, STAGE_BONUS
         ld a, (OvFast)
         or a
         jr z, .b
+        ld hl, JingleExt        ; with a flourish
+        ld (JinglePtr), hl
+        ld a, c
+        add a, EXTRA_BONUS
+        daa
+        ld c, a
         ld hl, TxtExtended
-        ld c, STAGE_BONUS + EXTRA_BONUS
 .b:     ld de, MsgBonus
         ld a, c
         ld bc, MSG_LEN + 1
@@ -164,11 +192,11 @@ OvCheckpoint:
         ld a, $99
 .t:     ld (Time), a
         call StageMessage
-        ld hl, MsgBonus         ; the time, then the bonus, then the name
+        ld hl, MsgTime          ; the bonus, then the time, then the name
         ld (MsgThen), hl
         ld hl, MsgBuf
         ld (MsgThen + 2), hl
-        ld hl, MsgTime
+        ld hl, MsgBonus
         ld (Message), hl
         ld a, MSG_FRAMES
         ld (StateTimer), a
@@ -247,6 +275,21 @@ StageMessage:
         ldir
         ld hl, MsgBuf
         ld (Message), hl
+        ret
+
+; Per difficulty: the starting time, the time added at a checkpoint (BCD)
+DiffTable:
+        db $80, $55             ; easy
+        db START_TIME, $48      ; normal
+        db $60, $44             ; hard
+; HL -> this difficulty's DiffTable entry
+DiffEntry:
+        ld a, (Difficulty)
+        add a, a
+        ld l, a
+        ld h, 0
+        ld de, DiffTable
+        add hl, de
         ret
 
 ; A = stage -> HL = its entry in the stage table
@@ -551,6 +594,19 @@ InitTraffic:
         ld de, NTraffic
         ld bc, 5
         ldir
+        ld hl, WeaveChance      ; easy: half the weaving, hard: half as much again
+        ld a, (Difficulty)
+        cp 1
+        ret z
+        ld a, (hl)
+        jr c, .easy
+        ld c, a
+        srl a
+        add a, c
+        ld (hl), a
+        ret
+.easy:  srl a
+        ld (hl), a
         ret
 
 TrafficInit:
@@ -583,3 +639,4 @@ TrafficRows:
 
         INCLUDE "stages.asm"    ; the stage table
         ASSERT NUM_ROWS == 5    ; (StageTimes, src/vars.asm)
+        ASSERT NUM_STAGES == 15 ; (StageBest, src/holes.asm)

@@ -12,6 +12,7 @@ be checked automatically: screenshots, frame rate, and exact cycle counts.
   uses it), and execution entering `$0000-$3FFF` is reported as an error.
 - Screen and border are captured line by line, so tearing and border timing bars
   show up in screenshots exactly as on hardware.
+- FLASH attributes swap ink and paper every 16 frames, as on hardware.
 
 ```
 zxsim game.sna [options]

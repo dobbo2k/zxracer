@@ -87,9 +87,14 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   mountain backdrop and colours. At the end of a stage the road really forks:
   it widens, a median opens and two branches pull apart, and the branch you
   drive down picks the next stage (left or right in the next row). Checkpoints
-  show your stage time and add 48 seconds - 58 for EXTENDED PLAY when you beat
-  the stage's par time (worked out from its bends by `tools/make_stages.py`,
-  about as fast as the attract-mode driver goes); the last row ends at the GOAL.
+  add 48 seconds - 58 and a fanfare for EXTENDED PLAY when you beat the
+  stage's par time (worked out from its bends by `tools/make_stages.py`, about
+  as fast as the attract-mode driver goes) - and show your stage time; the last
+  row ends at the GOAL. In the last 10 seconds the timer flashes and pips.
+- **Levels** (options, key 6): EASY starts with 80 seconds, gives 55 a
+  checkpoint, an eighth more par time and half the weaving traffic; NORMAL 68
+  and 48; HARD 60 and 44, a sixteenth less par time and half as much weaving
+  again.
 - **Game:** HUD with score, stage, big countdown timer and speed; starting
   lights (three lamps over the road light red one by one with a beep, then turn
   green: go), game over, attract mode.
@@ -99,7 +104,9 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   points a second). All artwork is drawn by `tools/make_screens.py` (previews
   in `assets/gfx/screen_*.png`).
 - **After a game:** the route you drove through the stage pyramid, with each
-  stage's name and time (and the total, at the goal), then, for a top-five score, your initials (steer to pick a
+  stage's name and time (and the total, at the goal; a time that beats the
+  stage's record flashes - records last until the Spectrum is switched off),
+  then, for a top-five score, your initials (steer to pick a
   letter, accelerate to take it, brake to go back) and the table with your
   entry flashing. The table lasts until the Spectrum is switched off. The
   screens have their own jingles (a start flourish, a goal fanfare, a high-score

@@ -477,7 +477,16 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   (17 depth units a frame on a straight, sqrt(1600 / |curve|) on a bend,
   fitted to the attract-mode driver's times, within about 3 s a stage) and
   stores it in the stage table. The route screen after a game lists every
-  stage driven with its time, and the total at the goal.
+  stage driven with its time, and the total at the goal; a time under the
+  stage's record (`StageBest`, in a state-page hole) sets it and flashes.
+  Extended play also plays a jingle on channel C (`JingleTick`, run each
+  interrupt from `SoundTick`, chains beeps). In the last 10 seconds the big
+  timer's cells get the FLASH attribute in both screens (no cost per frame;
+  the next display reset clears it) and each second pips.
+- **Levels** *(as built)*: `Difficulty` (options key 6) picks a row of
+  `DiffTable` in the overlay (start time 80 / 68 / 60 s, checkpoint bonus
+  55 / 48 / 44 s), scales the par time (+1/8 easy, -1/16 hard) and the
+  weave chance (x0.5 easy, x1.5 hard).
 - **Radio:** before the race, choose one of 3 original tunes (or engine-only).
 - **High-score table** with initials entry; route map shown on results screen *(as built: §3.2c)*.
 

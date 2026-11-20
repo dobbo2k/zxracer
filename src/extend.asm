@@ -91,3 +91,71 @@ WeaveTo:
 ; The checkpoint's messages (filled in by OvCheckpoint)
 MsgTime:        db " STAGE TIME 0'00", $22, "00 ", 0
 MsgBonus:       ds MSG_LEN + 1
+
+; ---------------------------------------------------------------------------
+; Difficulty (the options screen): 0 easy, 1 normal, 2 hard. The overlay
+; reads it for the starting time, the checkpoint bonus, the par times and
+; the weaving (src/stageov.asm DiffTable).
+Difficulty:     db 1
+
+; ---------------------------------------------------------------------------
+; The last 10 seconds (GameUpdate, each second): the big timer's cells
+; FLASH in both screens (the next display reset clears it), and a pip.
+BEEP_WARN       EQU 110
+TimeWarn:
+        ld a, (PalTime)
+        or $80
+        ld hl, $5800 + 32 + 14
+        call .cells
+        ld hl, $D800 + 32 + 14
+        call .cells
+        ld a, (Time)
+        or a
+        ret z
+        ld de, BEEP_WARN
+        jp StartBeep
+.cells: ld c, 2
+.row:   ld b, 4
+.c:     ld (hl), a
+        inc l
+        djnz .c
+        ld de, 32 - 4
+        add hl, de
+        dec c
+        jr nz, .row
+        ret
+
+; Each interrupt in a game (SoundTick): a jingle's next note on channel C
+; once the one before is nearly over
+JingleTick:
+        ld hl, (JinglePtr)
+        ld a, h
+        or l
+        ret z
+        ld a, (BeepTime)
+        cp 2
+        ret nc
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        inc hl
+        ld a, d
+        or e
+        jr z, .end
+        ld a, (hl)
+        inc hl
+        ld (JinglePtr), hl
+        jp BeepOn
+.end:   ld (JinglePtr), de
+        ret
+; Extended play: tone period, length (interrupts); 0 ends it
+JingleExt:
+        dw 212
+        db 5                    ; C
+        dw 168
+        db 5                    ; E
+        dw 141
+        db 5                    ; G
+        dw 106
+        db 20                   ; C, an octave up
+        dw 0

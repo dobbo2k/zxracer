@@ -67,7 +67,8 @@ SoundTick:
         or a
         ret z
         jp MusicPlay
-.game:  ld a, (CrashOn)
+.game:  call JingleTick
+        ld a, (CrashOn)
         or a
         jr z, .noCrash
         ld a, (MusicOn)

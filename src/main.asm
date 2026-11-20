@@ -118,7 +118,6 @@ hv      DEFL 1
         db $81, hv
 hv      DEFL hv + 2
         EDUP
-        INCLUDE "beep.asm"      ; (in the gap before SrcLine)
         ASSERT $ <= SrcLine
         ORG SrcLine
 hv      DEFL 0
@@ -140,6 +139,7 @@ FillBlock:
         EDUP
         ret
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
+        INCLUDE "beep.asm"
         ASSERT $ <= ISR_JP
 
         ORG ISR_JP

@@ -103,7 +103,8 @@ StateTimer:     db 0
 MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
 StageClock:     dw 0            ; 50 Hz frames on this stage
 StageTimes:     ds 5 * 2        ; per row: the stage's time (0: not finished)
-RUN_VARS        EQU 4 + 2 + 5 * 2   ; (5 rows: NUM_ROWS, defined later)
+JinglePtr:      dw 0            ; the jingle's next note on channel C (0: none)
+RUN_VARS        EQU 4 + 2 + 5 * 2 + 2   ; (5 rows: NUM_ROWS, defined later)
 Score:          ds 4            ; BCD, low byte first
 Message:        dw MsgAttract
 MsgLast:        dw MsgLastA

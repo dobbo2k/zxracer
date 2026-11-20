@@ -454,6 +454,8 @@ DrawSlots:
 ; ---------------------------------------------------------------- the route
 ; The stage pyramid, the route taken through it, and the stages' names.
 RouteScreen:
+        xor a
+        ld (RecFlag), a
         ld a, $07
         call ClearA
         call Stripes
@@ -594,7 +596,16 @@ RouteScreen:
         ld a, b
         cp 18 + NUM_ROWS
         jr c, .nm
-.wait:  ld hl, (StageTimes + 2 * NUM_ROWS - 2)
+.wait:  ld a, (RecFlag)         ; any stage records: say so
+        or a
+        jr z, .noRec
+        ld b, 3
+        ld a, $46               ; bright yellow (the record times flash)
+        call AttrRow
+        ld bc, 3 * 256 + 8
+        ld de, TxtRecord
+        call PrintAt
+.noRec: ld hl, (StageTimes + 2 * NUM_ROWS - 2)
         ld a, h
         or l
         jr z, .noTotal          ; (the total only at the goal)
@@ -626,10 +637,12 @@ RouteScreen:
 NAME_COL        EQU 5
 TIME_COL        EQU 23
 
-; B = screen row 18-22: that row's stage time, if it has one
+; B = screen row 18-22: that row's stage time, if it has one; if it beats
+; the stage's record, the new record (flashing)
 RowTime:
         ld a, b
         sub 18
+        ld c, a                 ; the row of the pyramid
         add a, a
         ld l, a
         ld h, 0
@@ -641,7 +654,49 @@ RowTime:
         ld a, d
         or e
         ret z
+        push de                 ; the time
+        push bc
+        ld b, 0
+        ld hl, Route
+        add hl, bc
+        ld a, (hl)              ; the stage
+        add a, a
+        ld l, a
+        ld h, 0
+        ld bc, StageBest
+        add hl, bc
+        ld c, (hl)
+        inc hl
+        ld b, (hl)              ; its record
+        ld a, b
+        or c
+        jr z, .first            ; none yet: this is it (no fuss)
         ex de, hl
+        push hl
+        or a
+        sbc hl, bc
+        pop hl
+        ex de, hl
+        jr nc, .print           ; no better
+        ld (hl), d
+        dec hl
+        ld (hl), e
+        pop bc
+        push bc
+        ld c, TIME_COL          ; a new record: it flashes
+        call AttrAddr
+        ld b, 7
+.fl:    set 7, (hl)
+        inc hl
+        djnz .fl
+        ld a, 1
+        ld (RecFlag), a
+        jr .print
+.first: ld (hl), d
+        dec hl
+        ld (hl), e
+.print: pop bc
+        pop hl
 ; HL = 50 Hz frames, B = row: the time at TIME_COL
 PrintTime:
         push bc
@@ -653,6 +708,7 @@ PrintTime:
         jp PrintAt
 TimeBuf:        ds 7
                 db 0
+RecFlag:        db 0
 
 ; A = stage -> HL -> its MapStages column byte (row before it, theme after)
 MapEntry:
@@ -839,6 +895,9 @@ Options:
         ld c, 4
         call AttrAddr
         ld (hl), $46
+        ld bc, 32
+        add hl, bc
+        ld (hl), $46
         ld b, 13
         ld a, $46
         call AttrRow
@@ -855,6 +914,18 @@ Options:
         inc hl
         ld d, (hl)
         ld bc, 9 * 256 + 14
+        call PrintAt
+        ld a, (Difficulty)      ; the level
+        add a, a
+        add a, low LevelTxts
+        ld l, a
+        adc a, high LevelTxts
+        sub l
+        ld h, a
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        ld bc, 10 * 256 + 14
         call PrintAt
         call WaitNoKey
 .lp:    halt
@@ -874,9 +945,20 @@ Options:
         jr z, .define
         cp KEY_5
         jr z, .sound
+        cp KEY_6
+        jr z, .level
         cp KEY_ENTER
         jr nz, .lp
         jp WaitNoKey
+.level: ld a, (Difficulty)     ; easy / normal / hard
+        inc a
+        cp 3
+        jr c, .lv
+        xor a
+.lv:    ld (Difficulty), a
+        ld a, 40
+        call Beep
+        jp .redraw
 .sound: ld a, (SoundMode)      ; music and effects / the engine
         inc a
         cp 2
@@ -895,7 +977,7 @@ Options:
         ldir
         ld a, 40
         call Beep
-        jr .redraw
+        jp .redraw
 .define:
         ld b, 0                 ; the control (in ShowKeys' order)
 .def:   push bc
@@ -1095,6 +1177,7 @@ KEY_2           EQU 16
 KEY_3           EQU 17
 KEY_4           EQU 18
 KEY_5           EQU 19
+KEY_6           EQU 24
 KEY_ENTER       EQU 30
 KEY_H           EQU 34
 MapKeys:        db $DF, $01, $DF, $02, $FD, $01, $FB, $01, $7F, $01     ; P O A Q SPACE
@@ -1448,15 +1531,16 @@ TxtPick:        db "STEER: CHOOSE A LETTER", 0
 TxtTake:        db "ACCELERATE: TAKE IT", 0
 TxtRoute:       db "YOUR ROUTE", 0
 TxtTotal:       db "TOTAL", 0
+TxtRecord:      db "NEW STAGE RECORD!", 0
 TxtOptions:     db "OPTIONS", 0
 TxtOptMenu:     db "1  KEYBOARD  Q A O P SPACE", 0
                 db "2  SINCLAIR JOYSTICK", 0
                 db "3  CURSOR JOYSTICK", 0
                 db "4  CHOOSE YOUR OWN KEYS", 0
                 db "5  SOUND:", 0
+                db "6  LEVEL:", 0
                 db "   KEMPSTON WORKS ANY TIME", 0
                 db "   H PAUSES THE GAME", 0
-                db " ", 0
                 db "   ENTER: BACK", 0, 0
 TxtCtrls:       db "ACCELERATE", 0
                 db "BRAKE", 0
@@ -1467,6 +1551,10 @@ TxtBlank5:      db "     ", 0
 SoundTxts:      dw TxtSnd0, TxtSnd1
 TxtSnd0:        db "MUSIC AND EFFECTS", 0
 TxtSnd1:        db "ENGINE           ", 0
+LevelTxts:      dw TxtLv0, TxtLv1, TxtLv2
+TxtLv0:         db "EASY  ", 0
+TxtLv1:         db "NORMAL", 0
+TxtLv2:         db "HARD  ", 0
 TxtCaps:        db "CAPS", 0
 TxtSym:         db "SYM", 0
 TxtEnter:       db "ENTER", 0
