@@ -44,7 +44,11 @@ table and a self-driving demo; any of the game keys starts a game.
 **Release:** `make release` puts both tape files into `release/` with a
 how-to-play text (`release/README.txt`) and a printable cassette inlay
 (`inlay_outside.png`, `inlay_inside.png`: 300 dpi J-card, drawn by
-`tools/make_inlay.py` from the game's own title art, font and screenshots).
+`tools/make_inlay.py` from the game's own title art, font and screenshots). `make cover` draws
+`release/cover.png`: a hand-drawn style cover illustration of the title
+scene (`tools/make_cover.py`: seeded sketchy ink lines, hatching, washes and
+paper grain as SVG, brush lettering from its own letter skeletons, rendered
+with Chromium).
 
 ## Layout
 

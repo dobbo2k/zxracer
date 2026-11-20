@@ -7,7 +7,7 @@ ASMFLAGS ?= --nologo --msg=war --fullpath -Ibuild --lst=build/zxracer.lst --sym=
 SRC   := $(wildcard src/*.asm)
 ZXSIM := build/zxsim
 
-.PHONY: all clean run test shots profile video tap release
+.PHONY: all clean run test shots profile video tap release cover
 all: build/zxracer.sna
 
 build:
@@ -70,6 +70,11 @@ release: build/speedrun.tap build/video.sna $(ZXSIM) tools/make_inlay.py
 	$(PYTHON) tools/make_inlay.py build $(foreach f,$(SHOTS),build/shot_$(f).ppm)
 	mkdir -p release
 	cp build/speedrun.tap build/speedrun.tzx build/inlay_outside.png build/inlay_inside.png release/
+
+# Hand-drawn style cover art (needs Node with Playwright and Chromium to render)
+cover: tools/make_cover.py | build
+	mkdir -p release
+	$(PYTHON) tools/make_cover.py release/cover.png build/cover.svg
 
 build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
