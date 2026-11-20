@@ -520,11 +520,11 @@ def detailed_defs():
   <linearGradient id="hlockv" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#ffeaa0"/><stop offset="0.45" stop-color="#f2c444"/><stop offset="1" stop-color="#b07a18"/>
   </linearGradient>
-  <filter id="hsheen"><feGaussianBlur stdDeviation="3"/></filter>
+  <filter id="hsheen" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="3"/></filter>
   <pattern id="cstripe" width="16" height="40" patternUnits="userSpaceOnUse">
     <rect width="16" height="40" fill="#f4f2ec"/><rect x="5" width="5" height="40" fill="#2f55c8"/>
   </pattern>
-  <filter id="cblur"><feGaussianBlur stdDeviation="6"/></filter>
+  <filter id="cblur" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="6"/></filter>
 """
 
 
@@ -869,8 +869,8 @@ def defs():
     <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="7" result="n"/>
     <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/>
   </filter>
-  <filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
-  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="40"/></filter>
+  <filter id="soft" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1300" height="2000"><feGaussianBlur stdDeviation="40"/></filter>
   <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
     <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="n"/>
     <feDisplacementMap in="SourceGraphic" in2="n" scale="3.5" xChannelSelector="R" yChannelSelector="G"/>
