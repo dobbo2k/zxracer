@@ -70,8 +70,13 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   down from a standstill (10 s to 182). Start in LOW, change up around 180; the
   engine note drops as you do, and the HUD shows the gear. Off the throttle the
   car coasts down gently; braking is firmer.
-- **Scenery:** palm trees and curve-warning signs along the track (XOR-drawn,
-  pre-scaled, pre-shifted) and a mountain panorama that scrolls with the bends.
+- **Scenery:** four kinds of roadside scenery per theme (XOR-drawn,
+  pre-scaled, pre-shifted): palms, bushes, beach parasols and now and then a
+  lifeguard tower on the coast; cacti, rocks, tumbleweed and windpumps in the
+  desert; pines, rocks, snowmen and chalets on the alpine pass; trees, bushes,
+  hay bales and windmills in the valley; street lamps, bushes, palms and
+  billboards on the boulevard. Curve-warning signs, and a mountain panorama
+  that scrolls with the bends.
 - **Stages:** 15 stages in a 5-row pyramid across 5 themes (Sunny Coast, Desert
   Highway, Alpine Pass, Green Valley, Sunset Boulevard), each with its own scenery,
   mountain backdrop and colours. At the end of a stage the road really forks:

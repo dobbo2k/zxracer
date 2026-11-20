@@ -357,7 +357,7 @@ def goal_screen(theme):
             d.line([span(y), (span(y)[1], y)] if False else [(span(y)[0], y), (span(y)[1], y)],
                    fill=(0, 0, 0))
     # theme scenery either side
-    big, small = theme["types"]
+    big, small = theme["types"][:2]
     for x, h, name in ((0, 72, big), (34, 50, big), (186, 50, big), (220, 72, big)):
         m = silhouette(name, h)
         paste_mask(im, m, x, 128 - h, (0, 0, 0))

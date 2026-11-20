@@ -14,6 +14,7 @@ shift_mask selects which pixel shifts exist: x & shift_mask picks the copy
 usage: make_scenery.py out.asm
 """
 import math
+import random
 import sys
 from PIL import Image, ImageDraw
 
@@ -226,25 +227,191 @@ def lamp():
     return im
 
 
+def tower():
+    """Lifeguard tower: a hut on stilts with a sloping roof, 192 x 256."""
+    im = Image.new("L", (192, 256), 0)
+    d = ImageDraw.Draw(im)
+    for x0, x1 in ((40, 58), (134, 152)):                             # stilts
+        d.polygon([(x0, 255), (x0 + 18, 255), (x1 - 4, 132), (x1 - 22, 132)], fill=255)
+    d.line([(52, 230), (140, 150)], fill=255, width=10)                # bracing
+    d.line([(52, 150), (140, 230)], fill=255, width=10)
+    d.rectangle([24, 120, 168, 134], fill=255)                         # platform
+    d.rectangle([36, 48, 156, 122], fill=255)                          # cabin
+    d.rectangle([54, 64, 90, 96], fill=0)                              # windows
+    d.rectangle([102, 64, 138, 96], fill=0)
+    d.polygon([(14, 50), (96, 8), (178, 50)], fill=255)                # roof
+    d.line([(96, 8), (96, 0)], fill=255, width=6)                      # flag
+    d.polygon([(96, 0), (128, 6), (96, 14)], fill=255)
+    return im
+
+
+def parasol():
+    """Beach parasol: a striped canopy on a pole, 192 x 160."""
+    im = Image.new("L", (192, 160), 0)
+    d = ImageDraw.Draw(im)
+    d.pieslice([4, 6, 188, 110], 180, 360, fill=255)                   # canopy
+    for k in (1, 3, 5):                                                # stripes
+        a0, a1 = 180 + k * 30, 180 + k * 30 + 30
+        d.pieslice([24, 22, 168, 94], a0, a1, fill=0)
+    d.rectangle([90, 50, 102, 159], fill=255)                          # pole
+    d.ellipse([88, 0, 104, 14], fill=255)
+    return im
+
+
+def windpump():
+    """Windpump: a wheel of vanes on a lattice tower, 176 x 256."""
+    im = Image.new("L", (176, 256), 0)
+    d = ImageDraw.Draw(im)
+    d.line([(40, 255), (82, 80)], fill=255, width=12)                  # legs
+    d.line([(136, 255), (94, 80)], fill=255, width=12)
+    for y in (120, 170, 220):                                          # cross bars
+        w = (y - 80) * 0.24
+        d.line([(88 - 6 - w, y), (88 + 6 + w, y)], fill=255, width=8)
+    d.line([(60, 220), (110, 120)], fill=255, width=6)
+    d.ellipse([28, 4, 148, 124], fill=255)                             # the wheel
+    d.ellipse([74, 50, 102, 78], fill=0)
+    for k in range(12):                                                # gaps between vanes
+        a = math.radians(k * 30 + 15)
+        d.line([(88 + 18 * math.cos(a), 64 + 18 * math.sin(a)),
+                (88 + 60 * math.cos(a), 64 + 60 * math.sin(a))], fill=0, width=5)
+    d.ellipse([82, 58, 94, 70], fill=255)
+    d.polygon([(130, 56), (174, 40), (174, 88), (130, 72)], fill=255)  # tail vane
+    return im
+
+
+def tumbleweed():
+    """Tumbleweed: a tangled ball of twigs, 128 x 112."""
+    im = Image.new("L", (128, 112), 0)
+    d = ImageDraw.Draw(im)
+    d.ellipse([4, 4, 124, 110], fill=255)
+    rnd = random.Random(5)
+    for _ in range(14):                                                # gaps in the tangle
+        x, y = rnd.randint(24, 104), rnd.randint(22, 92)
+        a = rnd.random() * math.pi
+        d.line([(x - 18 * math.cos(a), y - 18 * math.sin(a)),
+                (x + 18 * math.cos(a), y + 18 * math.sin(a))], fill=0, width=5)
+    return im
+
+
+def chalet():
+    """Alpine chalet: a broad steep roof over a timber house, 256 x 224."""
+    im = Image.new("L", (256, 224), 0)
+    d = ImageDraw.Draw(im)
+    d.rectangle([36, 100, 220, 223], fill=255)                         # house
+    d.polygon([(0, 120), (128, 4), (256, 120), (232, 120), (128, 30), (24, 120)], fill=255)
+    d.polygon([(24, 120), (128, 30), (232, 120)], fill=255)            # gable
+    d.rectangle([20, 150, 236, 160], fill=255)                         # balcony
+    for x in range(30, 232, 18):
+        d.rectangle([x, 160, x + 6, 182], fill=0)
+    d.rectangle([60, 116, 96, 144], fill=0)                            # windows
+    d.rectangle([160, 116, 196, 144], fill=0)
+    d.rectangle([112, 70, 144, 100], fill=0)
+    d.rectangle([110, 182, 146, 223], fill=0)                          # door
+    return im
+
+
+def snowman():
+    """Snowman with a hat, coal eyes and stick arms, 160 x 192."""
+    im = Image.new("L", (160, 192), 0)
+    d = ImageDraw.Draw(im)
+    d.ellipse([28, 104, 132, 191], fill=255)                           # body
+    d.ellipse([44, 56, 116, 120], fill=255)                            # chest
+    d.ellipse([54, 22, 106, 72], fill=255)                             # head
+    d.rectangle([56, 16, 104, 24], fill=255)                           # hat
+    d.rectangle([66, 0, 94, 18], fill=255)
+    d.rectangle([60, 18, 100, 22], fill=0)                             # its band
+    d.rectangle([68, 38, 76, 46], fill=0)                              # eyes
+    d.rectangle([86, 38, 94, 46], fill=0)
+    for y in (74, 92, 132, 156):                                       # buttons
+        d.ellipse([74, y, 86, y + 12], fill=0)
+    d.line([(48, 84), (6, 52)], fill=255, width=7)                     # arms
+    d.line([(112, 84), (154, 52)], fill=255, width=7)
+    return im
+
+
+def windmill():
+    """Windmill: a tapering tower with a cap and four sails, 224 x 256."""
+    im = Image.new("L", (224, 256), 0)
+    d = ImageDraw.Draw(im)
+    d.polygon([(70, 255), (154, 255), (136, 90), (88, 90)], fill=255)  # tower
+    d.pieslice([82, 66, 142, 114], 180, 360, fill=255)                 # cap
+    d.rectangle([98, 200, 126, 255], fill=0)                           # door
+    d.ellipse([104, 130, 120, 146], fill=0)                            # window
+    cx, cy = 112, 86
+    for k in range(4):                                                 # sails
+        a = math.radians(45 + 90 * k)
+        ux, uy = math.cos(a), math.sin(a)
+        px, py = -uy, ux
+        p0 = (cx + 10 * ux, cy + 10 * uy)
+        p1 = (cx + 108 * ux, cy + 108 * uy)
+        d.polygon([(p0[0], p0[1]), (p1[0], p1[1]),
+                   (p1[0] + 22 * px, p1[1] + 22 * py), (p0[0] + 22 * px, p0[1] + 22 * py)], fill=255)
+        for t in (40, 64, 88):                                         # lattice
+            q = (cx + t * ux, cy + t * uy)
+            d.line([(q[0] + 4 * px, q[1] + 4 * py), (q[0] + 18 * px, q[1] + 18 * py)], fill=0, width=4)
+    d.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=255)
+    return im
+
+
+def haybales():
+    """Two round hay bales, end on, 224 x 112."""
+    im = Image.new("L", (224, 112), 0)
+    d = ImageDraw.Draw(im)
+    for cx, cy, r in ((60, 60, 52), (160, 62, 50)):
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)
+        for rr in (r - 14, r - 28, r - 40):                            # the rolled spiral
+            if rr > 4:
+                d.arc([cx - rr, cy - rr, cx + rr, cy + rr], 20, 330, fill=0, width=4)
+    return im
+
+
+def billboard():
+    """Roadside billboard: a big board with a sunset on two legs, 256 x 192."""
+    im = Image.new("L", (256, 192), 0)
+    d = ImageDraw.Draw(im)
+    d.rectangle([56, 120, 72, 191], fill=255)                          # legs
+    d.rectangle([184, 120, 200, 191], fill=255)
+    d.rectangle([0, 0, 255, 124], fill=255)                            # the board
+    d.rectangle([10, 10, 245, 114], fill=0)
+    d.pieslice([78, 30, 178, 130], 180, 360, fill=255)                 # a sun setting
+    for y in (54, 66, 76):                                             # its stripes
+        d.rectangle([70, y, 186, y + 4], fill=0)
+    d.rectangle([10, 82, 245, 114], fill=255)                          # the sea
+    for x in range(20, 240, 40):                                       # waves
+        d.arc([x, 88, x + 30, 104], 200, 340, fill=0, width=4)
+    return im
+
+
 # name: (draw function, height relative to a palm at the same distance,
 #        pre-shifted copies per size)
 SHIFTS_SMALL = [2, 2, 2, 2, 4, 4, 4, 8, 8]     # for signs: less memory, coarser steps
 SHIFTS_TRAFFIC = [2, 2, 2, 2, 2, 4, 4, 4, 4]   # traffic (resident): memory is short
 SHIFTS_VAN = [1, 1, 2, 2, 2, 4, 4, 4, 4]
+SHIFTS_SCENERY = [2, 2, 2, 2, 2, 4, 4, 4, 4]   # theme cache: room for four types
 TYPES = {
-    "palm": (palm, 1.0, SHIFTS),
+    "palm": (palm, 1.0, SHIFTS_SCENERY),
     "traffic": (car, 0.45, SHIFTS_TRAFFIC),
     "van": (van, 0.62, SHIFTS_VAN),
     "truck": (truck, 0.8, SHIFTS_TRAFFIC),
-    "sign_r": (sign(1), 0.5, SHIFTS_SMALL),
-    "sign_l": (sign(-1), 0.5, SHIFTS_SMALL),
-    "fork": (fork, 0.6, SHIFTS_SMALL),
-    "bush": (bush, 0.35, SHIFTS),
-    "cactus": (cactus, 0.85, SHIFTS),
-    "rock": (rock, 0.35, SHIFTS),
-    "pine": (pine, 1.0, SHIFTS),
-    "tree": (tree, 0.95, SHIFTS),
-    "lamp": (lamp, 1.0, SHIFTS),
+    "sign_r": (sign(1), 0.5, SHIFTS_SCENERY),
+    "sign_l": (sign(-1), 0.5, SHIFTS_SCENERY),
+    "fork": (fork, 0.6, SHIFTS_SCENERY),
+    "bush": (bush, 0.35, SHIFTS_SCENERY),
+    "cactus": (cactus, 0.85, SHIFTS_SCENERY),
+    "rock": (rock, 0.35, SHIFTS_SCENERY),
+    "pine": (pine, 1.0, SHIFTS_SCENERY),
+    "tree": (tree, 0.95, SHIFTS_SCENERY),
+    "lamp": (lamp, 1.0, SHIFTS_SCENERY),
+    "tower": (tower, 0.85, SHIFTS_SCENERY),
+    "parasol": (parasol, 0.45, SHIFTS_SCENERY),
+    "windpump": (windpump, 1.0, SHIFTS_SCENERY),
+    "tumbleweed": (tumbleweed, 0.3, SHIFTS_SCENERY),
+    "chalet": (chalet, 0.8, SHIFTS_SCENERY),
+    "snowman": (snowman, 0.45, SHIFTS_SCENERY),
+    "windmill": (windmill, 0.9, SHIFTS_SCENERY),
+    "haybales": (haybales, 0.35, SHIFTS_SCENERY),
+    "billboard": (billboard, 0.75, SHIFTS_SCENERY),
+    "citypalm": (palm, 0.8, SHIFTS_SCENERY),         # (a smaller palm for the boulevard)
 }
 
 

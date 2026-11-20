@@ -10,7 +10,7 @@ themes:
   coast:
     name: SUNNY COAST
     hills: 4                        # hill strength (0: flat)
-    types: [palm, bush]
+    types: [palm, bush, tower, parasol]
     horizon: {style: mountains, seed: 7}
     palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,
               grass_l: 0b01100000, grass_d: 0b00100000, kerb_l: 0b01111000, kerb_d: 0b01010000,
@@ -18,7 +18,7 @@ themes:
   desert:
     name: DESERT HIGHWAY
     hills: 3                        # hill strength (0: flat)
-    types: [cactus, rock]
+    types: [cactus, rock, windpump, tumbleweed]
     horizon: {style: mesas, seed: 3}
     palette: {sky: 0b01101000, pano: 0b01101010, hud: 0b01101010, time: 0b01101010,
               grass_l: 0b01110000, grass_d: 0b00110000, kerb_l: 0b01111000, kerb_d: 0b01010000,
@@ -26,7 +26,7 @@ themes:
   alpine:
     name: ALPINE PASS
     hills: 6                        # hill strength (0: flat)
-    types: [pine, rock]
+    types: [pine, rock, chalet, snowman]
     horizon: {style: peaks, seed: 11}
     palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,
               grass_l: 0b01111000, grass_d: 0b00111000, kerb_l: 0b01010000, kerb_d: 0b01001000,
@@ -34,7 +34,7 @@ themes:
   country:
     name: GREEN VALLEY
     hills: 6                        # hill strength (0: flat)
-    types: [tree, bush]
+    types: [tree, bush, windmill, haybales]
     horizon: {style: hills, seed: 21}
     palette: {sky: 0b01101000, pano: 0b01101100, hud: 0b01101001, time: 0b01101010,
               grass_l: 0b01100000, grass_d: 0b00100000, kerb_l: 0b01111000, kerb_d: 0b01010000,
@@ -42,7 +42,7 @@ themes:
   sunset:
     name: SUNSET BOULEVARD
     hills: 4                        # hill strength (0: flat)
-    types: [lamp, bush]
+    types: [lamp, bush, billboard, citypalm]
     horizon: {style: skyline, seed: 5}
     palette: {sky: 0b01011000, pano: 0b01011000, hud: 0b01011110, time: 0b01011111,
               grass_l: 0b01100000, grass_d: 0b00100000, kerb_l: 0b01111000, kerb_d: 0b01010000,

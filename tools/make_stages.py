@@ -9,7 +9,7 @@ Outputs (sjasmplus include files):
   build/stages.asm         stage table (where each stage's packs are, forks)
 
 Theme pack (runs at THEME_CACHE in bank 7): header, type directory, name,
-panorama, the curve/fork signs and the theme's two scenery types.
+panorama, the curve/fork signs and the theme's four scenery types.
 Track pack (runs at TRACK_CACHE in bank 5): header, segments, objects.
 usage: make_stages.py [stages.yaml] [build dir]
 """
@@ -35,8 +35,10 @@ PACK_BANKS = [0, 1, 3, 4, 6]
 BANK_SIZE = 0x4000
 PANO_W, PANO_H = 256, 16
 SHARED_TYPES = ["sign_r", "sign_l", "fork"]          # in every theme pack
-TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 4, 5
+TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 4, 5, 8, 9
             "van": 6, "truck": 7}
+LANDMARK_SHARE = 0.18               # of the big roadside scenery: the theme's landmark
+SMALL2_SHARE = 0.4                  # of the small scenery: the theme's second small type
 RESIDENT_TYPES = ["traffic", "van", "truck"]          # in bank 5
 MAP_PAPER = {"coast": 5, "desert": 6, "alpine": 7, "country": 4, "sunset": 3}   # route map boxes
 END_STRAIGHT = SPLIT_LEN            # the road forks along the final straight
@@ -157,8 +159,8 @@ def make_track(row, seed, theme):
     hills = hill_profile(rnd, stage_len, theme.get("hills", 0))
 
     objs = []
-    big, small = theme["types"]
-    tid = {big: 4, small: 5}
+    big, small, landmark, small2 = theme["types"]
+    tid = {big: 4, small: 5, landmark: 8, small2: 9}
     fork = row < 4                                   # the last row ends at the goal
     zs = stage_len - SPLIT_LEN                       # where the road splits
 
@@ -174,11 +176,15 @@ def make_track(row, seed, theme):
     while z < end:                                   # big scenery, both sides
         for side in (-1, 1):
             if rnd.random() < 0.7:
-                side_obj(z + rnd.randint(0, 200), side, rnd.randint(240, 300), tid[big])
+                if rnd.random() < LANDMARK_SHARE:            # now and then a landmark
+                    side_obj(z + rnd.randint(0, 200), side, rnd.randint(270, 320), tid[landmark])
+                else:
+                    side_obj(z + rnd.randint(0, 200), side, rnd.randint(240, 300), tid[big])
         z += rnd.randint(900, 1300)
     z = 2800
     while z < end:                                   # small scenery
-        side_obj(z, rnd.choice([-1, 1]), rnd.randint(200, 320), tid[small])
+        t = tid[small2] if rnd.random() < SMALL2_SHARE else tid[small]
+        side_obj(z, rnd.choice([-1, 1]), rnd.randint(200, 320), t)
         z += rnd.randint(500, 900)
     zc = 0
     for length, curve in segs:                       # curve warning signs (before hills are merged)
@@ -284,9 +290,10 @@ def theme_pack(name, theme):
                                      "kerb_l", "kerb_d", "road")),
            "TypeDir:",
            "        dw @Scn_traffic"]
-    assert len(theme["types"]) == 2, "a theme has two scenery types (ids 4 and 5)"
-    out += [f"        dw Scn_{t}" for t in types]
+    assert len(theme["types"]) == 4, "a theme has four scenery types (ids 4, 5, 8, 9)"
+    out += [f"        dw Scn_{t}" for t in types[:5]]
     out += ["        dw @Scn_van, @Scn_truck"]
+    out += [f"        dw Scn_{t}" for t in types[5:]]
     out += [f'Name:   db "{theme["name"]}", 0']
     im = panorama(**theme["horizon"])
     im.convert("L").point(lambda v: 0 if v else 255).save(f"assets/gfx/horizon_{name[6:]}.png")

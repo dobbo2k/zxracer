@@ -246,6 +246,13 @@ part under the real ROMs, and real hardware.
 
 ### 3.4 Sprites (scenery, traffic, player)
 
+*(As built:)* each theme has four scenery types: two common ones (ids 4, 5),
+a landmark that takes the place of the big one 18% of the time (id 8) and a
+second small one that takes 40% of the small places (id 9). To fit them in the
+theme cache, scenery and signs keep fewer pre-shifted copies
+(`SHIFTS_SCENERY`: 2 per size for the near sizes, 4 for the far ones, so
+positions step by 4 or 2 pixels); that freed about 1.8 KB per theme.
+
 - Every object exists at **8–12 pre-scaled sizes** (generated offline by the asset
   pipeline, hand-touched for the largest sizes), each with mask; chosen by `1/z`.
 - Masked blit with **pre-rotated shift tables** (256-byte page per shift) so any x
