@@ -1,10 +1,10 @@
 ; ---------------------------------------------------------------------------
-; AY-3-8912 sound effects, updated from the 50 Hz interrupt.
+; AY-3-8912: register writes, the engine note's pitch and the effects (the
+; interrupt's SoundTick and the music are in src/music.asm). Without music:
 ;   A: engine - square wave, pitch rising with the revs (speed and gear:
 ;      it drops when you change up), with a small wobble
 ;      every interrupt so it sounds like a motor rather than a beep
-;   B: gravel noise while off the road
-; (Music will take A/B later, with the engine moving to C.)
+;   B: gravel noise while off the road, bumps and crashes
 ; ---------------------------------------------------------------------------
 AY_SEL          EQU $FFFD
 AY_DATA         EQU $BFFD
@@ -43,89 +43,6 @@ EngineUpdate:
         sbc hl, de
         ld (EnginePeriod), hl
         ret
-
-SoundTick:
-        ld a, (Mute)            ; (the title / goal screens make their own)
-        or a
-        ret nz
-        ; engine period with a small wobble every interrupt
-        ld hl, (EnginePeriod)
-        ld a, (FrameCount)
-        and 3
-        add a, l
-        ld l, a
-        jr nc, .nw
-        inc h
-.nw:    push hl
-        ld e, l
-        xor a                   ; tone A fine
-        call AyWrite
-        pop hl
-        ld e, h
-        ld a, 1                 ; tone A coarse
-        call AyWrite
-        ; engine volume: 11 when the game is running, quieter in attract
-        ld e, 11
-        ld a, (GameState)
-        cp ST_PLAYING
-        jr z, .vol
-        ld e, 7
-.vol:   ld a, (SoundMode)       ; music only: no engine
-        cp 2
-        jr nz, .eng
-        ld e, 0
-.eng:   ld a, 8
-        call AyWrite
-        ; effects: a burst of noise on B (bump, crash) overrides the gravel
-        ld a, (SfxTimer)
-        or a
-        jr z, .noSfx
-        dec a
-        ld (SfxTimer), a
-        ld (SfxBusy), a         ; (channel B is the effect's)
-        ld e, a                 ; volume fades with the timer
-        ld a, 9
-        call AyWrite
-        ld a, (SfxType)
-        ld e, a                 ; noise period: low = rumble
-        ld a, 6
-        call AyWrite
-        jr .mix
-.noSfx:
-        ; gravel: noise on B while off the road and moving
-        ld e, 0
-        ld a, (OffRoad)
-        or a
-        jr z, .gr
-        ld a, (Speed)
-        or a
-        jr z, .gr
-        ld e, 10
-.gr:    ld a, e
-        ld (SfxBusy), a
-        ld a, 9
-        call AyWrite
-        ld e, 12                ; noise period
-        ld a, 6
-        call AyWrite
-.mix:
-        ; mixer: tone A, noise B (0 bits enable), and tone C for a beep
-        ld a, (BeepTime)
-        or a
-        jr z, .mx
-        dec a
-        ld (BeepTime), a
-        jr nz, .bp
-        ld e, a                 ; its end: volume C off
-        ld a, 10
-        call AyWrite
-.bp:    ld e, %00101010
-        jr .mw
-.mx:    ld e, %00101110
-.mw:    ld a, e
-        ld (MixVal), a          ; (the music adds its channels)
-        ld a, 7
-        jp AyWrite
 
 SFX_BUMP        EQU 6               ; noise period of the effect
 SFX_CRASH       EQU 24

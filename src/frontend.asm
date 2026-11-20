@@ -813,9 +813,9 @@ Options:
         cp KEY_ENTER
         jr nz, .lp
         jp WaitNoKey
-.sound: ld a, (SoundMode)      ; music and engine / engine only / music only
+.sound: ld a, (SoundMode)      ; music and effects / the engine
         inc a
-        cp 3
+        cp 2
         jr c, .sm
         xor a
 .sm:    ld (SoundMode), a
@@ -1399,10 +1399,9 @@ TxtCtrls:       db "ACCELERATE", 0
                 db "STEER RIGHT", 0
                 db "CHANGE GEAR", 0, 0
 TxtBlank5:      db "     ", 0
-SoundTxts:      dw TxtSnd0, TxtSnd1, TxtSnd2
-TxtSnd0:        db "MUSIC AND ENGINE", 0
-TxtSnd1:        db "ENGINE ONLY     ", 0
-TxtSnd2:        db "MUSIC ONLY      ", 0
+SoundTxts:      dw TxtSnd0, TxtSnd1
+TxtSnd0:        db "MUSIC AND EFFECTS", 0
+TxtSnd1:        db "ENGINE           ", 0
 TxtCaps:        db "CAPS", 0
 TxtSym:         db "SYM", 0
 TxtEnter:       db "ENTER", 0

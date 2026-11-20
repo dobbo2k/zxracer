@@ -43,9 +43,9 @@ pos = int(dump[0], 16) | (int(dump[1], 16) << 8)
 if pos < 1000:                      # (from a standing start)
     print(f"FAIL: the car only travelled {pos} units in the 210 frames since the lights went green")
     ok = False
-period = ay[0] | (ay[1] << 8)
-if not (ay[8] and period < 1200 and not ay[7] & 1):
-    print(f"FAIL: engine sound not running at speed (period {period}, volume {ay[8]}, mixer {ay[7]:02X})")
+melody = ay[4] | (ay[5] << 8)            # with music on there is no engine note
+if not (melody and not ay[7] & 4 and not ay[7] & 2):
+    print(f"FAIL: music not playing in the game (melody period {melody}, mixer {ay[7]:02X})")
     ok = False
 if fps < 12:
     print(f"FAIL: frame rate {fps} below 12")

@@ -89,6 +89,11 @@ SMOKE_AT        EQU 160             ; ... and its rear tyres smoke
 
 DrawCar:
         call CarFrame           ; C = frame
+        ld a, c                 ; frames 3-6 (smoke, spinning): the squeal
+        cp 3
+        sbc a, a
+        cpl
+        ld (Squeal), a
         ld a, c
         add a, a
         add a, a

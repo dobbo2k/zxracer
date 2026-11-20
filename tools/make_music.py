@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Original tunes for ZX Racer, and their encoding for src/music.asm.
 
-A tune is two channels on the AY: bass (channel B) and melody (channel C);
-the engine keeps channel A. Each is written per bar: a chord (the bass line
-follows it with the tune's bass pattern) and the melody as notes with
-lengths in sixteenths.
+A tune is three channels on the AY: drums (channel A), bass (B) and melody
+(C). It is written per bar: a chord (the bass line follows it with the
+tune's bass pattern) and the melody as notes with lengths in sixteenths; the
+drums are a one-bar pattern of sixteenths (K kick, S snare, H hi-hat, -
+nothing) played for 7 bars, then a fill, round and round.
 
 Encoding, per channel (a byte stream, looping):
   $00         rest for the current length
-  $01-$5E     note (1 = C2 ... 60 = B6) for the current length
+  $01-$5E     note (1 = C2 ... 60 = B6) for the current length (drums:
+              1 kick, 2 snare, 3 hi-hat)
   $5F         tie: the note goes on for the current length (no new attack)
   $60-$9F     current length = byte - $5F (1-64 interrupts)
   $FF         back to the start
-Tune: dw bass, melody.
+Tune: dw bass, melody, drums.
 
 usage: make_music.py out.asm       (the title tune; theme tunes go into
                                     the theme packs via make_stages.py)
@@ -175,6 +177,34 @@ TUNES = {
 }
 
 
+DRUMS = {                           # one bar of sixteenths
+    "coast": "K-H-S-H-K-K-S-H-",
+    "desert": "K-HHS-HHK-HHS-HK",
+    "alpine": "K-H-S-H-K-H-S-HH",
+    "country": "K-H-S-H-K-HKS-H-",
+    "sunset": "K--HS-HK-KH-S-HH",
+    "title": "K-H-S-H-K-H-S-H-",
+}
+FILL = "K-H-S-H-S-SSS-SS"                   # the eighth bar
+DRUM_IDS = {"K": 1, "S": 2, "H": 3}
+
+
+def drum_events(tune):
+    tick = TUNES[tune][0]
+    steps = DRUMS[tune] * 7 + FILL
+    assert len(DRUMS[tune]) == 16 and len(FILL) == 16
+    out = []
+    for ch in steps:
+        if ch == "-":
+            if out:
+                out[-1] = (out[-1][0], out[-1][1] + tick)
+            else:
+                out.append((0, tick))
+        else:
+            out.append((DRUM_IDS[ch], tick))
+    return out
+
+
 def events(tune):
     """-> (bass, melody): lists of (note index or 0, interrupts)."""
     tick, pattern, bars = TUNES[tune]
@@ -212,8 +242,8 @@ def encode(evs):
 def tune_asm(tune, label):
     """Assembler lines for a tune: label: dw bass, melody; then the data."""
     bass, melody = events(tune)
-    lines = [f"{label}:", f"        dw {label}_b, {label}_m"]
-    for suffix, evs in (("_b", bass), ("_m", melody)):
+    lines = [f"{label}:", f"        dw {label}_b, {label}_m, {label}_d"]
+    for suffix, evs in (("_b", bass), ("_m", melody), ("_d", drum_events(tune))):
         data = encode(evs)
         lines.append(f"{label}{suffix}:")
         for i in range(0, len(data), 16):
@@ -223,7 +253,7 @@ def tune_asm(tune, label):
 
 def tune_bytes(tune):
     bass, melody = events(tune)
-    return 4 + len(encode(bass)) + len(encode(melody))
+    return 6 + len(encode(bass)) + len(encode(melody)) + len(encode(drum_events(tune)))
 
 
 def main(out):
