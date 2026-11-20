@@ -1,51 +1,12 @@
 ; ---------------------------------------------------------------------------
 ; HUD in the sky rows: SCORE (left), big TIME (centre), SPEED and GEAR (right), and a
-; message line. Static labels are printed into both buffers once; numbers
-; are redrawn into the back buffer every frame; messages only when the
-; message this buffer shows changes.
+; message line. Static labels are printed once at a stage start (InitHud,
+; src/stageov.asm); numbers are redrawn into the back buffer every frame;
+; messages only when the message this buffer shows changes.
 ; ---------------------------------------------------------------------------
 MSG_ROW         EQU 5
 MSG_COL         EQU 6
 MSG_LEN         EQU 20
-
-; A = 0 (buffer A) or $80 (buffer B): print the static labels
-InitHud:
-        ld (HudOr), a
-        ; red attribute cells for the big timer (rows 1-2, columns 14-17)
-        or $58
-        ld h, a
-        ld l, 32 + 14
-        ld a, (PalTime)
-        ld c, a
-        ld b, 2
-.ta:    ld (hl), c
-        inc l
-        ld (hl), c
-        inc l
-        ld (hl), c
-        inc l
-        ld (hl), c
-        ld a, l
-        add a, 32 - 3
-        ld l, a
-        djnz .ta
-        ld bc, $0001
-        ld de, TxtScore
-        call PrintAt
-        ld bc, $000E
-        ld de, TxtTime
-        call PrintAt
-        ld bc, $0019
-        ld de, TxtSpeed
-        call PrintAt
-        ld bc, $011D
-        ld de, TxtKmh
-        call PrintAt
-        ld bc, $0201            ; STAGE n
-        ld de, TxtStage
-        call PrintAt
-        ld a, (StageRow)
-        jp PrintDigit
 
 DrawHud:
         ld a, (BufHiOr)
@@ -282,13 +243,8 @@ PrintBig:
         djnz .bl
         ret
 
-TxtScore:       db "SCORE", 0
-TxtTime:        db "TIME", 0
-TxtSpeed:       db "SPEED", 0
-TxtKmh:         db "KM", 0
 TxtLow:         db "LOW ", 0
 TxtHigh:        db "HIGH", 0
-TxtStage:       db "STAGE ", 0
 MsgGoal:        db "  GOAL! WELL DONE!  ", 0
 MsgFork:        db " << CHOOSE A ROAD >>", 0
 MsgNone:        db "                    ", 0

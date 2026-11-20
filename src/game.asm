@@ -99,36 +99,6 @@ GameUpdate:
         ret nz
         jp EndGame
 
-StartGame:
-        ld a, ST_PLAYING
-        ld (GameState), a
-        call Restart
-        xor a
-        ld (DemoMode), a
-        IF AUTOPLAY
-        inc a                   ; video build: the autopilot keeps driving
-        ld (DemoMode), a
-        xor a
-        ENDIF
-        ld (SecTick), a
-        ld (StateTimer), a
-        ld (StageDone), a
-        ld hl, Score
-        ld (hl), a
-        inc hl
-        ld (hl), a
-        inc hl
-        ld (hl), a
-        inc hl
-        ld (hl), a
-        ld a, START_TIME
-        ld (Time), a
-        call LightsStart
-        call StageMessage       ; the first stage's name
-        ld a, NAME_FRAMES
-        ld (StateTimer), a
-        ret
-
 ; Score += Speed * Elapsed / 4 (while playing)
 AddScore:
         ld a, (GameState)

@@ -3,7 +3,7 @@
 ; includes tables.asm). Most tables fill 96 or 192 bytes of their 256-byte
 ; page; nothing reads or writes past them - checked with zxsim -u over whole
 ; games (PLAN.md) - except one byte after ScrLo and ScrHi, kept clear, and
-; the parts of the state pages ResetDisplay clears. Besides data, two
+; the parts of the state pages OvResetDisplay clears. Besides data, two
 ; routines that are not time-critical live in the state pages' holes. The
 ; ASSERTs keep a table from growing into what follows it.
 ; ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ DrumHat:        db 10, 1
                 db 0
         ASSERT $ <= StripPage + 256
 
-; The state pages (src/stage.asm ResetDisplay clears only their tables)
+; The state pages (src/stageov.asm OvResetDisplay clears only their tables)
         ORG StateA2 + $60
         ASSERT StALane_end <= StateA2 + $60
 ; No music: the engine on A, gravel and hits on B, the lights' beeps on C

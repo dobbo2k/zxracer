@@ -7,10 +7,13 @@
 ; pack bank and calls one of the Ov... entries. Assembled to run at $4000.
 ; ---------------------------------------------------------------------------
 
+STAGE_BONUS     EQU $48             ; BCD seconds added at a checkpoint
+NAME_FRAMES     EQU 120             ; how long the new stage's name shows
+
 ; A = stage: the packs again after the front end (the demo carries on)
 OvReloadStage:
         call LoadPacks
-        jp ResetDisplay
+        jp OvResetDisplay
 
 ; The front-end overlay into bank 7 (over the theme cache)
 OvLoadFrontEnd:
@@ -27,8 +30,89 @@ OvLoadFrontEnd:
         ld hl, THEME_CACHE
         jp CopyToCache
 
+; A new game: the clock, the score and the starting lights afresh, from the
+; first stage
+OvStartGame:
+        ld a, ST_PLAYING
+        ld (GameState), a
+        xor a
+        IF AUTOPLAY
+        inc a                   ; video build: the autopilot keeps driving
+        ENDIF
+        ld (DemoMode), a
+        xor a
+        ld (SecTick), a
+        ld hl, Score
+        ld (hl), a
+        inc hl
+        ld (hl), a
+        inc hl
+        ld (hl), a
+        inc hl
+        ld (hl), a
+        ld a, START_TIME
+        ld (Time), a
+        ld a, LIGHTS_TIME
+        ld (Lights), a
+        ld a, $FF
+        ld (LampState), a
+        ld a, FIRST_STAGE
+        call RestartState
+        call LoadStage
+        jr NameShow             ; the first stage's name
+
 ; A = stage: from its start, standing still
 OvRestartAt:
+        call RestartState
+        call LoadStage
+        jp OvResetDisplay
+
+; The end of a stage that is not the last: onto the branch the car is on
+; (left or right), with extra time
+OvCheckpoint:
+        ld a, (Stage)
+        call StageEntry
+        ld de, 10
+        add hl, de              ; -> left, right
+        ld a, (PlayerX + 1)
+        bit 7, a
+        jr nz, .left
+        inc hl
+.left:  ld a, (hl)
+        push af
+        ld hl, (PlayerX)        ; onto the middle of the new road
+        ld de, (PlayerDx)
+        bit 7, h
+        jr nz, .rl
+        or a
+        sbc hl, de
+        jr .rb
+.rl:    add hl, de
+.rb:    ld (PlayerX), hl
+        ld hl, (Pos)            ; carry the overshoot into the new stage
+        ld de, (StageLen)
+        or a
+        sbc hl, de
+        ld (Pos), hl
+        pop af
+        call LoadStage
+        ld a, (GameState)
+        cp ST_PLAYING
+        jp nz, OvResetDisplay   ; (attract mode)
+        ld a, (Time)            ; extra time
+        add a, STAGE_BONUS
+        daa
+        jr nc, .t
+        ld a, $99
+.t:     ld (Time), a
+NameShow:
+        call StageMessage
+        ld a, NAME_FRAMES
+        ld (StateTimer), a
+        jp OvResetDisplay
+
+; A = stage (kept): a new run from the stage's start, standing still
+RestartState:
         push af
         ld hl, Route            ; a new run: no route yet
         ld b, 5
@@ -52,11 +136,55 @@ OvRestartAt:
         ld a, 1 << IN_FIRE      ; (a fire press that started the game is no gear change)
         ld (FireWas), a
         pop af
-        jp OvLoadStage
+        ret
+
+; Message line: the new stage's name, centred.
+StageMessage:
+        ld hl, MsgBuf
+        ld de, MsgBuf + 1
+        ld bc, MSG_LEN - 1
+        ld (hl), " "
+        ldir
+        ld hl, (StName)
+        ld b, 0
+.len:   ld a, (hl)
+        or a
+        jr z, .gotLen
+        inc hl
+        inc b
+        jr .len
+.gotLen:
+        ld a, MSG_LEN
+        sub b
+        srl a
+        ld e, a
+        ld d, 0
+        ld hl, MsgBuf
+        add hl, de
+        ex de, hl
+        ld hl, (StName)
+        ld c, b
+        ld b, 0
+        ldir
+        ld hl, MsgBuf
+        ld (Message), hl
+        ret
+
+; A = stage -> HL = its entry in the stage table
+StageEntry:
+        ld l, a
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl              ; 16 bytes per stage
+        ld de, StageTable
+        add hl, de
+        ret
 
 ; A = stage index: load its theme and track, reset the track state and
-; the display.
-OvLoadStage:
+; the traffic.
+LoadStage:
         call LoadPacks
         jr StageHeaders
 
@@ -67,14 +195,7 @@ LoadPacks:
         call WaitFlip           ; (no flip may happen while banks are paged)
         pop af
         ld (Stage), a
-        ld l, a
-        ld h, 0
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl              ; 16 bytes per stage
-        ld de, StageTable
-        add hl, de
+        call StageEntry
         ; ---- theme pack -> THEME_CACHE, via TRACK_CACHE
         ld a, (hl)
         inc hl
@@ -149,10 +270,155 @@ StageHeaders:
         ld (HasFork), a
         ld hl, 0
         ld (PlayerDx), hl
-        ld hl, 0
         ld (SegStart), hl
-        call InitTraffic
-        jp ResetDisplay
+        jp InitTraffic
+
+ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40)
+                                    ; and the cockpit's attributes ($60)
+; Start both buffers afresh in the new palette: screen B cleared and
+; labelled, every per-buffer record of what is on screen reset, then screen
+; B copied over screen A (CopyScreenBA, resident) - over this overlay too,
+; so that is the last thing done.
+OvResetDisplay:
+        call WaitFlip
+        ; screen B: bitmap clear; sky rows get the sky attribute, road rows grass
+        ld hl, $C000
+        ld de, $C001
+        ld (hl), 0
+        ld bc, 6143
+        ldir
+        ld h, d
+        ld l, e
+        inc de
+        ld a, (PalHud)
+        ld (hl), a
+        ld bc, 32 * 3 - 1
+        ldir
+        ld h, d
+        ld l, e
+        inc de
+        ld a, (PalSky)
+        ld (hl), a
+        ld bc, 32 * (PANO_ROW0 - 3) - 1
+        ldir
+        ld h, d
+        ld l, e
+        inc de
+        ld a, (PalPano)
+        ld (hl), a
+        ld bc, 32 * (ROAD_ROW0 - PANO_ROW0) - 1
+        ldir
+        ld h, d
+        ld l, e
+        inc de
+        ld a, (PalGrassL)
+        ld (hl), a
+        ld bc, 32 * (24 - ROAD_ROW0) - 1
+        ldir
+        call InitHud
+        ; road state pages (per buffer: St1 D/E = 0, St2 lane = $FF,
+        ; St3 row ranges = 0 / row band = $FF)
+        ld hl, StateA1
+        call .state
+        ld hl, StateB1
+        call .state
+        ; caches
+        ld hl, HudCacheA
+        ld de, HudCacheA + 1
+        ld bc, 13
+        ld (hl), $FF
+        ldir                    ; HudCacheA + HudCacheB
+        ld hl, 0
+        ld (MsgLastA), hl
+        ld (MsgLastB), hl
+        xor a
+        ld (CrewShownA), a
+        ld (CrewShownB), a
+        ld (CmdListA), a
+        ld (CmdListB), a
+        ld (LastStraight), a
+        dec a
+        ld (CarShownA), a
+        ld (CarShownB), a
+        ld (PanoLastA), a
+        ld (PanoLastB), a
+        ld a, 1
+        ld (CarDirty), a
+        ld (CarAttrDirty), a
+        ld hl, $8000
+        ld (Pass1PX), hl
+        jp CopyScreenBA
+.state: ld bc, StAD_end - StAD   ; (just the tables: the rest of each page
+        xor a                   ; holds other data - src/holes.asm)
+        call .fill              ; St1: D
+        ld l, $80
+        ld bc, StAE_end - StAE
+        call .fill              ; St1: E
+        inc h
+        ld l, 0
+        ld bc, StALane_end - StALane
+        ld a, $FF
+        call .fill              ; St2: centre line
+        inc h
+        ld l, 0
+        ld bc, ST3_USED
+        xor a
+        call .fill              ; St3: row ranges, fork rows, cockpit
+        ld l, $80
+        ld bc, RowABand_end - RowABand
+        ld a, $FF
+; HL = start, BC = length, A = value (HL is kept)
+.fill:  push hl
+        ld (hl), a
+        ld d, h
+        ld e, l
+        inc de
+        dec bc
+        ldir
+        pop hl
+        ret
+
+; Screen B's HUD labels and the timer's red cells
+InitHud:
+        ld a, $80
+        ld (HudOr), a
+        ld hl, $D800 + 32 + 14  ; red attribute cells for the big timer (rows 1-2, columns 14-17)
+        ld a, (PalTime)
+        ld c, a
+        ld b, 2
+.ta:    ld (hl), c
+        inc l
+        ld (hl), c
+        inc l
+        ld (hl), c
+        inc l
+        ld (hl), c
+        ld a, l
+        add a, 32 - 3
+        ld l, a
+        djnz .ta
+        ld bc, $0001
+        ld de, TxtScore
+        call PrintAt
+        ld bc, $000E
+        ld de, TxtTime
+        call PrintAt
+        ld bc, $0019
+        ld de, TxtSpeed
+        call PrintAt
+        ld bc, $011D
+        ld de, TxtKmh
+        call PrintAt
+        ld bc, $0201            ; STAGE n
+        ld de, TxtStage
+        call PrintAt
+        ld a, (StageRow)
+        jp PrintDigit
+TxtScore:       db "SCORE", 0
+TxtTime:        db "TIME", 0
+TxtSpeed:       db "SPEED", 0
+TxtKmh:         db "KM", 0
+TxtStage:       db "STAGE ", 0
 
 ; A = bank, DE = source, BC = length, HL = destination in bank 7 (the
 ; theme cache): copy through TRACK_CACHE in chunks (which it overwrites).

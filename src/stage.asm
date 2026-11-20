@@ -17,8 +17,6 @@ FIRST_STAGE     EQU 0               ; (testing: start on another stage)
         IFNDEF START_POS
 START_POS       EQU 0               ; (testing: start further along it)
         ENDIF
-STAGE_BONUS     EQU $48             ; BCD seconds added at a checkpoint
-NAME_FRAMES     EQU 120             ; how long the new stage's name shows
 
 ; ---------------------------------------------------------------------------
 ; Loading stages: the stage-loading code is an overlay (src/stageov.asm) run
@@ -42,11 +40,10 @@ LoadFrontEnd:
         ld hl, OvLoadFrontEnd
         jr StageOv
 
-; A = stage, from the checkpoint: the last game frame stays on show
-LoadStage:
-        ld hl, OvLoadStage
-        ld e, 0
-        jr StageOvE
+; A new game: from the first stage, the clock and score afresh
+StartGame:
+        ld hl, OvStartGame
+        jr StageOv
 
 ; HL = an entry in the overlay, A = what it takes in A. With screen B on
 ; show (blanked first, as there is no telling what it holds), copy the
@@ -138,130 +135,26 @@ CopyFromBank:
         pop bc
         ret
 
-ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40)
-                                    ; and the cockpit's attributes ($60)
-; Start both buffers afresh in the new palette: bitmaps, attributes, HUD
-; labels, and every per-buffer record of what is on screen.
-ResetDisplay:
-        call WaitFlip
-        call InitScreens
-        xor a
-        call InitHud
-        ld a, $80
-        call InitHud
-        ; road state pages (per buffer: St1 D/E = 0, St2 lane = $FF,
-        ; St3 row ranges = 0 / row band = $FF)
-        ld hl, StateA1
-        call .state
-        ld hl, StateB1
-        call .state
-        ; caches
-        ld hl, HudCacheA
-        ld de, HudCacheA + 1
-        ld bc, 13
-        ld (hl), $FF
-        ldir                    ; HudCacheA + HudCacheB
-        ld hl, 0
-        ld (MsgLastA), hl
-        ld (MsgLastB), hl
-        xor a
-        ld (CrewShownA), a
-        ld (CrewShownB), a
-        ld a, $FF
-        ld (CarShownA), a
-        ld (CarShownB), a
-        ld (PanoLastA), a
-        ld (PanoLastB), a
-        ld a, 1
-        ld (CarDirty), a
-        ld (CarAttrDirty), a
-        xor a
-        ld (CmdListA), a
-        ld (CmdListB), a
-        ld (LastStraight), a
-        ld hl, $8000
-        ld (Pass1PX), hl
-        ret
-.state: ld bc, StAD_end - StAD   ; (just the tables: the rest of each page
-        xor a                   ; holds other data - src/holes.asm)
-        call .fill              ; St1: D
-        ld l, $80
-        ld bc, StAE_end - StAE
-        call .fill              ; St1: E
-        inc h
-        ld l, 0
-        ld bc, StALane_end - StALane
-        ld a, $FF
-        call .fill              ; St2: centre line
-        inc h
-        ld l, 0
-        ld bc, ST3_USED
-        xor a
-        call .fill              ; St3: row ranges, fork rows, cockpit
-        ld l, $80
-        ld bc, RowABand_end - RowABand
-        ld a, $FF
-; HL = start, BC = length, A = value (HL is kept)
-.fill:  push hl
-        ld (hl), a
-        ld d, h
-        ld e, l
-        inc de
-        dec bc
+; The end of a display reset (OvResetDisplay, in the overlay): screen B,
+; cleared and labelled, over screen A - and over the overlay with it.
+CopyScreenBA:
+        ld hl, $C000
+        ld de, $4000
+        ld bc, 6912
         ldir
-        pop hl
         ret
 
-; The car reached the end of the stage: take the branch it is on (left or
-; right), or the goal on the last row.
+; The car reached the end of the stage: the goal on the last row, else the
+; next stage (OvCheckpoint) with the last game frame on show meanwhile.
 Checkpoint:
         xor a
         ld (StageDone), a
-        ld a, (Stage)
-        ld l, a
-        ld h, 0
-        add hl, hl              ; 2 bytes per stage
-        ld de, StageNext
-        add hl, de              ; -> left, right
-        ld a, (PlayerX + 1)
-        bit 7, a
-        jr nz, .left
-        inc hl
-.left:  ld a, (hl)
-        cp $FF
-        jr z, .goal
-        push af
-        ld hl, (PlayerX)        ; onto the middle of the new road
-        ld de, (PlayerDx)
-        bit 7, h
-        jr nz, .rl
-        or a
-        sbc hl, de
-        jr .rb
-.rl:    add hl, de
-.rb:    ld (PlayerX), hl
-        ld hl, (Pos)            ; carry the overshoot into the new stage
-        ld de, (StageLen)
-        or a
-        sbc hl, de
-        ld (Pos), hl
-        pop af
-        call LoadStage
-        ld a, (GameState)
-        cp ST_PLAYING
-        ret nz
-        ld hl, MsgNone          ; (clears the fork message)
-        ld (Message), hl
-        ld a, (Time)            ; extra time
-        add a, STAGE_BONUS
-        daa
-        jr nc, .t
-        ld a, $99
-.t:     ld (Time), a
-        call StageMessage
-        ld a, NAME_FRAMES
-        ld (StateTimer), a
-        ret
+        ld a, (StageRow)
+        cp NUM_ROWS
+        jr nc, .goal
+        ld hl, OvCheckpoint
+        ld e, 0
+        jp StageOvE
 .goal:  ld a, (GameState)
         cp ST_PLAYING
         jp nz, Restart          ; attract mode: round again
@@ -273,38 +166,6 @@ Checkpoint:
         ld (Message), hl
         ld a, 1
         ld (GoalPending), a
-        ret
-
-; Message line: the new stage's name, centred.
-StageMessage:
-        ld hl, MsgBuf
-        ld de, MsgBuf + 1
-        ld bc, MSG_LEN - 1
-        ld (hl), " "
-        ldir
-        ld hl, (StName)
-        ld b, 0
-.len:   ld a, (hl)
-        or a
-        jr z, .gotLen
-        inc hl
-        inc b
-        jr .len
-.gotLen:
-        ld a, MSG_LEN
-        sub b
-        srl a
-        ld e, a
-        ld d, 0
-        ld hl, MsgBuf
-        add hl, de
-        ex de, hl
-        ld hl, (StName)
-        ld c, b
-        ld b, 0
-        ldir
-        ld hl, MsgBuf
-        ld (Message), hl
         ret
 
         INCLUDE "stageov_pack.asm"  ; where the overlay is; the next stages

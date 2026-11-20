@@ -12,14 +12,6 @@ LAMP_COL        EQU 11              ; lamps at columns 11, 15, 19 (2 x 2 cells)
 BEEP_RED        EQU 400             ; tone periods
 BEEP_GREEN      EQU 200
 
-; StartGame: the lights from the start
-LightsStart:
-        ld a, LIGHTS_TIME
-        ld (Lights), a
-        ld a, $FF
-        ld (LampState), a
-        ret
-
 ; A = C = the new lamp state: beep, draw
 LampChange:
         or a

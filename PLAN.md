@@ -42,8 +42,9 @@ any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displa
 ```
 $4000-$5AFF  Bank 5: screen buffer A
 $5B00-$788E  Bank 5: resident graphics (car, van and lorry sprites, font,
-             player car, crew close-ups), the checkpoint, the ways into the
-             stage loader and the front end; 1.2 KB free up to the track cache
+             player car, crew close-ups), the music player, the ways into
+             the stage loader and the front end; 333 bytes free up to the
+             track cache
 $7D80-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
              (640 bytes; also the bounce buffer while a theme or the front end
              is loaded)
@@ -57,14 +58,19 @@ $DB00-$FFFF  Bank 7: THEME CACHE: the current theme's sprites (scenery types,
 
 Freeing memory *(as built)*:
 
-- **Between-stages overlay** (`src/stageov.asm`, 650 bytes): stage loading
-  (packs, track state, traffic set-up) and the stage table only run at a stage
-  change, at power-on and between games, and each time the screen is about to
-  be cleared or replaced by the front end. So they are stored in a pack bank
-  and run from screen A: `StageOv` (`src/stage.asm`) shows screen B (blanked
-  first, except at a checkpoint, where the last game frame stays on show),
-  copies the overlay to `$4000`, calls it, and shows what was on show before.
-  The checkpoint itself stays resident (it needs `StageNext`, 2 bytes a stage).
+- **Between-stages overlay** (`src/stageov.asm`, 1.2 KB): stage loading
+  (packs, track state, traffic set-up), the checkpoint's move onto the next
+  stage (branch, extra time, the stage's name), a new game's set-up, the
+  display reset (screen clear, HUD labels, per-buffer state) and the stage
+  table only run at a stage change, at power-on and between games, and each
+  time the screen is about to be cleared or replaced by the front end. So they
+  are stored in a pack bank and run from screen A: `StageOv` (`src/stage.asm`)
+  shows screen B (blanked first, except at a checkpoint, where the last game
+  frame stays on show), copies the overlay to `$4000` and calls it. The
+  display reset clears and labels screen B only and ends with a resident
+  12-byte copy of screen B over screen A, which also wipes the overlay, so
+  that copy is always the overlay's last act. Resident: the ways in, the goal
+  check (the last row) and that copy.
 - **Table-page holes** (`src/holes.asm`): most lookup tables fill 96 or 192
   bytes of their page. `zxsim -u` (a map of what a run reads, writes and
   executes) showed nothing touches the rest over whole games, apart from one
@@ -77,7 +83,10 @@ Freeing memory *(as built)*:
 - **Car frames** as shared top and bottom parts: the drift frames' two smoke
   puffs differ only in the bottom cell row (`png2zx.py` split mode).
 
-Together: bank 5 went from 4 bytes free to 1265.
+Together: bank 5 went from 4 bytes free to 1265 (since spent on more
+scenery, the music player and the crash sound). Moving the checkpoint, new
+game set-up and display reset into the overlay later freed another 303 bytes
+of bank 5 and 221 of bank 2's code area (which had none left).
 
 Bank 7 stays paged at `$C000` all the time. While buffer A is drawn, bank 7 is
 the screen being shown, but paging it in only for memory access doesn't change

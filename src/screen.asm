@@ -2,51 +2,6 @@
 ; Screen buffers: A = bank 5 at $4000, B = bank 7 (paged at $C000)
 ; ---------------------------------------------------------------------------
 
-; Clear both buffers and set the sky attributes. Expects bank 7 at $C000.
-InitScreens:
-        ld hl, $4000
-        call ClearScreen
-        ld hl, $C000
-        ; fall through
-
-; HL = buffer base. Clears the bitmap; sky rows get ATTR_SKY, road rows grass.
-ClearScreen:
-        ld d, h
-        ld e, l
-        inc de
-        ld (hl), 0
-        ld bc, 6143
-        ldir
-        ld h, d
-        ld l, e
-        inc de
-        ld a, (PalHud)
-        ld (hl), a
-        ld bc, 32 * 3 - 1
-        ldir
-        ld h, d
-        ld l, e
-        inc de
-        ld a, (PalSky)
-        ld (hl), a
-        ld bc, 32 * (PANO_ROW0 - 3) - 1
-        ldir
-        ld h, d
-        ld l, e
-        inc de
-        ld a, (PalPano)
-        ld (hl), a
-        ld bc, 32 * (ROAD_ROW0 - PANO_ROW0) - 1
-        ldir
-        ld h, d
-        ld l, e
-        inc de
-        ld a, (PalGrassL)
-        ld (hl), a
-        ld bc, 32 * (24 - ROAD_ROW0) - 1
-        ldir
-        ret
-
 ; Page in the back buffer and point the renderer at it.
 SelectBackBuffer:
         ld a, (BackBuf)
