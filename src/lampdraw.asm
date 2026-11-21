@@ -7,13 +7,19 @@ LampDraw:
         call z, MusicGo
         ld a, (HudOr)
         push af
-        xor a
+        IFNDEF EINSTEIN         ; (the Einstein: screen B only; screen A's
+        xor a                   ; memory holds the stage overlay there)
         call .scr
+        ENDIF
         ld a, $80
         call .scr
         pop af
         ld (HudOr), a
+        IFDEF EINSTEIN
+        jp EinLampCells         ; (their cells to be sent: src/einstein/sky.asm)
+        ELSE
         ret
+        ENDIF
 .scr:   ld (HudOr), a
         ld b, 0                 ; lamp 0-2
 .lamp:  push bc

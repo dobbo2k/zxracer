@@ -1,20 +1,32 @@
 ; ---------------------------------------------------------------------------
 ; Speed Run - entry point and main loop
-; Target: ZX Spectrum 128K, assembled with sjasmplus
+; Target: ZX Spectrum 128K, assembled with sjasmplus; with -DEINSTEIN the
+; Tatung Einstein (docs/port_einstein.md): the same game at the same
+; addresses in a flat 64K, with src/einstein/ in place of the Spectrum's
+; screen, input, sound out, interrupt and paging.
 ; ---------------------------------------------------------------------------
+        IFDEF EINSTEIN
+        DEVICE NOSLOT64K
+        ELSE
         DEVICE ZXSPECTRUM128
+        ENDIF
         INCLUDE "defs.asm"
+        IFDEF EINSTEIN
+        INCLUDE "einstein/platform.asm" ; the COM file's entry at $0100, the platform code
+        ENDIF
 
         ORG $8000
 start:
         di
         ld sp, STACK_TOP
+        IFNDEF EINSTEIN
         ld a, P7FFD_ROM48 | 7   ; display bank 5, bank 7 paged at $C000
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
         xor a                   ; black border
         out ($FE), a
+        ENDIF
         call InitInterrupts     ; (first: the music stops and starts with ei)
         ei
         call Restart            ; stage 1: packs, display, track state
@@ -23,6 +35,25 @@ start:
 ; Each game frame: logic and the road's shape first - none of it touches
 ; the screen, so it runs while the last frame still waits for its flip -
 ; then, once that buffer is on show, draw the other one and ask for a flip.
+        IFDEF EINSTEIN
+MainLoop:
+        call ReadInput
+        call UpdatePlayer
+        call RoadPrepare
+        call WaitFlip           ; (the last frame sent: its buffers free)
+        call EinSprSave         ; traffic and scenery into screen B, as ever
+        call EraseSprites
+        call DrawSprites
+        call DrawCar            ; (into screen B: its cells are sent)
+        call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
+        call EinSprCells        ; the cells they cover (src/einstein/sprites.asm)
+        call EinPortal          ; and the portal's (src/einstein/portal.asm)
+        call EinHorizon
+        call EinDraw            ; the frame into RAM: names, patterns (src/einstein)
+        call DrawHud            ; (into screen B: the cells it writes are sent)
+        call RequestFlip        ; then into VRAM, in the vertical blank
+        jr MainLoop
+        ELSE
 MainLoop:
         call CheckPause
         BORDER 1                ; blue: game logic
@@ -48,10 +79,15 @@ MainLoop:
         call DrawHud
         call RequestFlip
         jr MainLoop
+        ENDIF
 
         INCLUDE "interrupt.asm"
+        IFDEF EINSTEIN
+        INCLUDE "einstein/screen.asm"   ; (FillA: the rest is in src/einstein)
+        ELSE
         INCLUDE "screen.asm"
         INCLUDE "input.asm"
+        ENDIF
         INCLUDE "player.asm"
         INCLUDE "road.asm"
         INCLUDE "track.asm"
@@ -179,7 +215,11 @@ CmdListA:       db 0            ; buffer A's sprite commands
 ; Buffer B's: the top of bank 7, which no theme pack reaches (make_stages.py
 ; keeps THEME_TOP free; bank 7 is paged in all through a game)
 THEME_TOP       EQU 120
+        IFDEF EINSTEIN
+CmdListB        EQU EIN_CMDLISTB    ; (src/einstein/platform.asm: above the shadow screen)
+        ELSE
 CmdListB        EQU $10000 - THEME_TOP
+        ENDIF
         ASSERT 1 + MAX_SPR * CMD_SIZE <= THEME_TOP
 
         INCLUDE "holes.asm"     ; small data in the unused ends of the table pages
@@ -205,6 +245,14 @@ ScnEnd:
 ; Stage packs in banks 0, 1, 3, 4 and 6 (copied to the caches at a stage start)
         INCLUDE "packs.asm"
 
+        IFDEF EINSTEIN
+; The between-stages overlay stays where the Spectrum runs it ($4000: its
+; screen A, plain RAM here), resident: nothing pages over it.
+        ORG $4000
+        INCLUDE "stageov.asm"
+        ; the COM file: $0100 up to the stack
+        SAVEBIN "build/einstein/speedrun.com", $0100, STACK_TOP - 256 - $0100
+        ELSE
         IF AUTOPLAY
         SAVESNA "build/video.sna", start
         ELSE
@@ -212,5 +260,6 @@ ScnEnd:
         SAVESNA "build/release.sna", start     ; (no timing bars: the tape is made from this)
         ELSE
         SAVESNA "build/zxracer.sna", start
+        ENDIF
         ENDIF
         ENDIF

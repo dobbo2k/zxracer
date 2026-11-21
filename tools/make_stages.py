@@ -305,7 +305,15 @@ def main(src="assets/stages.yaml", outdir="build"):
     res.append(f"SCN_SIZES EQU {len(scn.SIZES)}")
     open(os.path.join(outdir, "resident_data.asm"), "w").write("\n".join(res) + "\n")
 
-    # packs
+    packs, stages, art_sizes = stage_packs(cfg)
+    finish_packs(cfg, packs, stages, art_sizes, outdir)
+
+
+def stage_packs(cfg):
+    """The theme, track and art packs: -> (packs, stages, art_sizes), packs
+    as (label, lines, size, cache address or None). Also used by
+    tools/make_einstein.py."""
+    themes = cfg["themes"]
     packs = []                                       # (label, lines, size)
     theme_label = {}
     for tname, theme in themes.items():
@@ -340,7 +348,11 @@ def main(src="assets/stages.yaml", outdir="build"):
             packs.append((label, lines, size, TRACK_CACHE))
             stages.append({"row": r, "col": k, "theme": theme_label[st["theme"]], "track": label, "art": art,
                            "par": par_time(segs, stage_len)})
+    return packs, stages, art_sizes
 
+
+def finish_packs(cfg, packs, stages, art_sizes, outdir):
+    themes = cfg["themes"]
     # title and goal screens: compressed pictures stored with the packs
     shots = make_screens.build(make_screens.ending_themes(cfg))
     for name, (raw, packed) in shots.items():

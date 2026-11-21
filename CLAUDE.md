@@ -77,6 +77,16 @@ wait, then capture `MainWindowHandle` with user32 `PrintWindow` (flag 2) in
 PowerShell. `CopyFromScreen` gives a blank image when the window is covered.
 Both Fuse and ZEsarUX (SDL) capture this way.
 
+## Tatung Einstein port
+
+`make einstein`, `make test-einstein` and `make run-einstein` (Albert) build
+and test `build/einstein/speedrun.dsk`. See docs/port_einstein.md. They use
+the einstein repository (`EINSTEIN_REPO` in `local.mk`: XtalDOS, the MOS ROM,
+Albert's core library), and the harness needs Visual Studio's C++ tools.
+The Einstein assembles the same `src/main.asm` with `-DEINSTEIN`. After
+changing a shared file, check that the Spectrum build is still
+byte-identical: `make build/speedrun.tap`, then `cmp` it with `release/`.
+
 ## Conventions
 
 - Commits end with the `Co-Authored-By:` and session-link trailer lines.

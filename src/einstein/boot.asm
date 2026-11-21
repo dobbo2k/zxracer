@@ -1,0 +1,79 @@
+; ---------------------------------------------------------------------------
+; Einstein: start-up and the 50 Hz tick
+;
+; XtalDOS loads SPEEDRUN.COM at $0100 and jumps there. From then on the
+; machine is the game's: interrupts in mode 2 through the Spectrum's own
+; vector table ($BE00, every entry $BDBD: JP Isr), now driven by the CTC.
+; ---------------------------------------------------------------------------
+
+EinBoot:
+        di
+        ld sp, STACK_TOP
+        call VdpInit            ; Graphics II, the display off
+        ld a, 7                 ; the AY: tone and noise off, port A out (the
+        ld e, $3F               ; keyboard's rows), port B in
+        call AyWrite
+        call SelectBackBuffer   ; the Spectrum drawing code's pointers: screen B
+        ld a, $80
+        ld (HudOr), a
+        jp start
+
+; The interrupt (from InitInterrupts). The VDP's frame interrupt does not
+; reach the Z80, so the CTC asks it: channel 2, a timer on the 4 MHz clock,
+; /16, 250 counts, interrupts every 1 ms (vector base 0: channel 2's vector
+; is 4, IM2_TABLE + 4 -> Isr), and each time the handler reads the VDP's
+; status. Its frame flag (set as the picture ends, cleared by the read)
+; starts a TV frame: the Spectrum's 50 Hz interrupt, at most 1 ms late.
+; Channel 3 (MOS's clock) is stopped.
+EinCtcInit:
+        xor a
+        out (EIN_CTC0), a       ; the vector (bit 0 clear: not a control word)
+        ld a, %00000011         ; channel 3: reset, no interrupt
+        out (EIN_CTC3), a
+        ld a, %10000111         ; channel 2: interrupt, timer, /16, a time
+        out (EIN_CTC2), a       ; constant follows, reset
+        ld a, 250
+        out (EIN_CTC2), a
+        in a, (EIN_VDP_CTRL)    ; (a frame flag from before: gone)
+        ret
+
+; Each millisecond: a new TV frame? Then as the Spectrum's interrupt: count
+; it, send a frame that is ready (src/einstein/flip.asm EinUpload: in this
+; vertical blank, at least MIN_FRAMES after the last), and the sound.
+EinIsr:
+        push af
+        in a, (EIN_VDP_CTRL)
+        rla
+        jr c, .frame
+        pop af
+        ei
+        reti
+.frame: push hl
+        push bc
+        push de
+        push ix
+        push iy
+        ld hl, FrameCount
+        inc (hl)
+        ld a, (FlipPending)
+        or a
+        jr z, .snd
+        ld a, (hl)
+        ld hl, LastFlip
+        sub (hl)
+        cp MIN_FRAMES
+        jr c, .snd
+        ld a, (FrameCount)
+        ld (hl), a
+        call EinUpload
+        xor a
+        ld (FlipPending), a
+.snd:   call SoundTick
+        pop iy
+        pop ix
+        pop de
+        pop bc
+        pop hl
+        pop af
+        ei
+        reti

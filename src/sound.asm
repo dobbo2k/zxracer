@@ -13,11 +13,24 @@ ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpda
 
 ; A = register, E = value
 AyWrite:
+        IFDEF EINSTEIN
+        out (EIN_PSG_SELECT), a ; (A kept, as on the Spectrum)
+        push af
+        cp 7                    ; the mixer: port A out (the keyboard's rows),
+        ld a, e                 ; port B in (its columns)
+        jr nz, .w
+        and $3F
+        or $40
+.w:     out (EIN_PSG_WRITE), a
+        pop af
+        ret
+        ELSE
         ld bc, AY_SEL
         out (c), a
         ld b, high AY_DATA
         out (c), e
         ret
+        ENDIF
 
 ; Called from the IM2 handler. Preserves everything but AF, BC, DE, HL.
 ; Engine tone period for the current speed, once per game frame (not in

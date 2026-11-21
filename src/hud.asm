@@ -199,6 +199,9 @@ PrintChar:
         inc h
         djnz .l
         pop hl
+        IFDEF EINSTEIN
+        call EinMarkCell        ; (to be sent to the VDP: src/einstein/sky.asm)
+        ENDIF
         pop bc
         pop de
         ret

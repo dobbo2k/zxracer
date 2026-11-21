@@ -139,6 +139,10 @@ DrawCar:
         ld (de), a
         xor a
         ld (CarDirty), a
+        IFDEF EINSTEIN
+        inc a                   ; (all its cells to be sent)
+        ld (EinCarFull), a
+        ENDIF
         ; bitmap: rows 20-23 lie in the bottom third ($5000), line k of a
         ; cell row is 256 bytes after line 0
         ld a, (BufHiOr)
@@ -171,7 +175,12 @@ DrawCar:
         ld hl, (CarTopSrc)
         ld bc, CAR_TOP_PX
         add hl, bc
-.attrs: xor a
+.attrs:
+        IFDEF EINSTEIN
+        ld a, 1                 ; (its cells to be sent: src/einstein/sky.asm)
+        ld (EinCarDirty), a
+        ENDIF
+        xor a
         ld (CarAttrDirty), a
         ; attributes. The top cell row is the open cockpit: its paper is
         ; whatever lies underneath (grass, kerb or road: the road renderer

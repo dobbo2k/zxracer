@@ -81,6 +81,10 @@ RoadPrepare:
 .shapeChanged:
         ld hl, (PlayerX)
         ld (Pass1PX), hl
+        IFDEF EINSTEIN
+        ld a, 1                 ; (every row's shape to be drawn again)
+        ld (EinShape), a
+        ENDIF
         call RoadPass1
 .shapeSame:
         jp RoadBands

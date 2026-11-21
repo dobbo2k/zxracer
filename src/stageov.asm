@@ -598,7 +598,11 @@ OvResetDisplay:
         ld (CarAttrDirty), a
         ld hl, $8000
         ld (Pass1PX), hl
+        IFDEF EINSTEIN
+        jp EinResetDisplay      ; screen B into the VDP (src/einstein/flip.asm)
+        ELSE
         jp CopyScreenBA
+        ENDIF
 .state: ld bc, StAD_end - StAD   ; (just the tables: the rest of each page
         xor a                   ; holds other data - src/holes.asm)
         call .fill              ; St1: D
@@ -691,6 +695,10 @@ TxtStage:       db "STAGE ", 0
 ; A = bank, DE = source, BC = length, HL = destination in bank 7 (the
 ; theme cache): copy through TRACK_CACHE in chunks (which it overwrites).
 CopyToCache:
+        IFDEF EINSTEIN
+        ex de, hl               ; (no banks: DE's records of STAGES.DAT, BC of them)
+        jp EinRead
+        ENDIF
         ld (LdBank), a
         ld (LdSrc), de
         ld (LdLen), bc

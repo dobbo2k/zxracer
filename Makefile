@@ -14,7 +14,7 @@ ZXSIM := ./build/zxsim$(EXE)
 # Machine-specific settings (emulator paths); see CLAUDE.md
 -include local.mk
 
-.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet
+.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet einstein test-einstein run-einstein
 all: build/zxracer.sna
 
 build:
@@ -126,3 +126,50 @@ run-realtape: build/speedrun.tap
 
 clean:
 	rm -rf build
+
+# ---------------------------------------------------------------------------
+# Tatung Einstein (docs/port_einstein.md): build/einstein/speedrun.dsk, a
+# bootable XtalDOS disc with SPEEDRUN.COM (type SPEEDRUN at the 0: prompt).
+# EINSTEIN_REPO (local.mk) is the einstein repository: XtalDOS's system
+# tracks, the MOS ROM and Albert's core for the test harness.
+EINSTEIN_REPO   ?= $(subst \,/,$(USERPROFILE))/OneDrive/Documents/GitHub/einstein
+EINSTEIN_SYSTEM ?= $(EINSTEIN_REPO)/roms/disassembled/Einstein/__XTALDOS131/SYSTEM131.CPM
+EINSTEIN_ROM    ?= $(EINSTEIN_REPO)/roms/Tatung X-TAL MOS v1.2 (1983)(Tatung).rom
+EIN_SRC := $(wildcard src/einstein/*.asm)
+EIN_GEN := build/einstein/packs.asm build/einstein/stagepacks.asm build/einstein/stageov_pack.asm build/einstein/music_notes.asm
+EIN_DAT := build/einstein/stages.asm build/einstein/STAGES.DAT
+
+einstein: build/einstein/speedrun.dsk
+
+build/einstein:
+	mkdir -p build/einstein
+
+$(EIN_GEN) &: tools/make_einstein.py build/stages.asm | build/einstein
+	$(PYTHON) tools/make_einstein.py gen assets/stages.yaml build/einstein
+
+# every stage's packs, each assembled where it runs, then STAGES.DAT
+build/einstein/stagepacks.stamp: build/einstein/stagepacks.asm
+	$(ASM) --nologo --msg=war -Ibuild build/einstein/stagepacks.asm
+	touch $@
+
+$(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py
+	$(PYTHON) tools/make_einstein.py dat assets/stages.yaml build/einstein
+
+build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/tables.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build/einstein
+	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
+
+build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.DAT tools/make_einstein_disk.py
+	$(PYTHON) tools/make_einstein_disk.py -o $@ -s "$(EINSTEIN_SYSTEM)" $< build/einstein/STAGES.DAT
+
+# The harness (Albert's core, Visual Studio's C++ tools): tests/einstein/build_harness.cmd
+EIN_HARNESS := build/einstein/speedrun_check.exe
+$(EIN_HARNESS): tests/einstein/speedrun_check.cpp
+	cmd //c "tests\einstein\build_harness.cmd"
+
+test-einstein: build/einstein/speedrun.dsk $(EIN_HARNESS)
+	$(PYTHON) tests/einstein_check.py $(EIN_HARNESS) "$(EINSTEIN_ROM)" build/einstein/speedrun.dsk build/einstein/speedrun.sym build/einstein
+
+# Albert, the Einstein emulator: at XtalDOS's 0: prompt type SPEEDRUN and ENTER
+ALBERT ?= /c/Tatung Einstein/albert/albert.exe
+run-einstein: build/einstein/speedrun.dsk
+	"$(ALBERT)" --disk build/einstein/speedrun.dsk &

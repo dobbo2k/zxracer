@@ -4,7 +4,11 @@
 
 ; Build options
         IFNDEF PROFILE
+        IFDEF EINSTEIN
+PROFILE         EQU 0           ; (no border on the Einstein)
+        ELSE
 PROFILE         EQU 1           ; 1 = border colour timing bars
+        ENDIF
         ENDIF
         IFNDEF AUTOPLAY
 AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the game (videos)

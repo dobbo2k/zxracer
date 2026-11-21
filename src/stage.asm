@@ -60,6 +60,12 @@ StageOvE:
         ld (OvMusic), a
         call MusicStop
         call WaitFlip           ; (no flip may happen meanwhile)
+        IFDEF EINSTEIN
+        ld a, (OvArg)           ; the overlay is resident: straight in
+        ld hl, (OvEntry)
+        call .go
+        jr .after
+        ENDIF
         ld a, (OvBlank)
         or a
         jr z, .shown
@@ -94,6 +100,7 @@ StageOvE:
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
+.after:
         ld a, (OvBlank)         ; a checkpoint: the sound on again, the new theme's tune
         or a
         ret nz
@@ -111,6 +118,9 @@ STAGEOV_AT      EQU $4000
 ; A = bank, HL = source (in $C000-$FFFF), DE = destination, BC = length:
 ; copy with the bank paged at $C000, then page bank 7 back. HL advances.
 CopyFromBank:
+        IFDEF EINSTEIN
+        jp EinRead              ; (no banks: HL records of STAGES.DAT, BC of them)
+        ENDIF
         push bc
         ld b, a
         ld a, 1
@@ -139,6 +149,9 @@ CopyFromBank:
 ; The end of a display reset (OvResetDisplay, in the overlay): screen B,
 ; cleared and labelled, over screen A - and over the overlay with it.
 CopyScreenBA:
+        IFDEF EINSTEIN
+        ret                     ; (the Spectrum's screens: not shown here)
+        ENDIF
         ld hl, $C000
         ld de, $4000
         ld bc, 6912

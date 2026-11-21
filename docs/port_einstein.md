@@ -1,216 +1,220 @@
 # Porting Speed Run to the Tatung Einstein
 
-A plan, not a commitment: what carries over, what has to be rebuilt, and in
-what order. The Einstein is less documented than the Spectrum or the CPC:
-facts marked *(verify)* need checking against the Einstein's technical
-manual (or a working machine or emulator) before the work that depends on
-them starts.
+The plan, reviewed against the hardware as Albert's emulation core models
+it, and the port as far as it has got. Build and test with `make einstein`
+and `make test-einstein` (see "Building and testing" at the end).
 
 ## 1. Target
 
-- **Machine:** Tatung Einstein TC-01: 64K RAM, a TMS9129 video chip with
-  its own 16K, an AY sound chip, a built-in 3" disc drive.
-- **Media:** a disc image only (the Einstein has no tape port).
-- **Frame rate:** 25 fps where possible, 16.7 fps at worst, as on the
-  Spectrum. The video chip makes this harder: see §5.
+- **Machine:** Tatung Einstein TC-01: Z80 at 4 MHz, 64K RAM, a TMS9129
+  video chip with its own 16K, an AY-3-8910, a built-in 3" disc drive.
+- **Media:** a disc image (the Einstein has no tape port): XtalDOS 1.31's
+  system tracks, `SPEEDRUN.COM` and `STAGES.DAT`. At the `0:` prompt, type
+  `SPEEDRUN`.
+- **Frame rate:** the Spectrum's 16.7 fps where possible. It's about 8 fps
+  now in the attract demo's worst stretch (steering, curves, hills and
+  scenery every frame): see section 7.
 
-## 2. The two machines side by side
+## 2. The hardware, as found
 
-| | Spectrum 128 (now) | Tatung Einstein |
+The first draft of this plan left several facts to verify. The Wonder Boy
+port (`C:\ZX Spectrum\Wonderboy`, `src/platform/einstein`) and Albert's core
+(the einstein repository's `emulator/src/core`) settle them:
+
+| | Spectrum 128 | Tatung Einstein |
 |---|---|---|
-| CPU | Z80 3.55 MHz | Z80 4 MHz |
-| Screen | 256×192 in main memory, colour per 8×8 cell | 256×192 in the video chip's own 16K (Graphics II), colour per **8×1** pixels; reached only through I/O ports |
-| Colours | fixed 15 | fixed 15 (TMS9129 palette), no palette changes |
-| Sprites | none (all software) | 32 hardware sprites, one colour each, 16×16 (or 32×32 magnified), at most **4 on a line** |
-| Double buffering | two screens, port $7FFD | the name table's base can be switched; the pattern and colour tables cannot (§5) |
-| Memory | 128K, banked | 64K, no banking, but the screen is not in it |
-| Sound | AY at 1.7734 MHz | AY at about 2 MHz *(verify)* |
-| Interrupt | 50 Hz, IM 2 | Z80 CTC timers (IM 2); the video chip's frame interrupt may not reach the CPU *(verify)* |
-| Storage | tape (turbo loader) | 3" disc, Xtal DOS |
+| CPU | Z80 3.55 MHz | Z80 4 MHz; a PAL frame is 79,749 T (313 lines of 254.8 T) |
+| Screen | 256x192 in main memory, a colour per 8x8 cell | TMS9129 Graphics II: 256x192 in its own 16K, a colour pair per 8x1 line of a cell; reached through ports $08 (data) and $09 (control, status) |
+| VRAM timing | - | with the picture on, accesses at least 32 T apart (8 us), or the chip loses them; the vertical blank is about 30,800 T |
+| Colours | fixed 15 | fixed 15 (the TMS palette) |
+| Sprites | none | 32 hardware sprites, 16x16 in one colour, 4 on a line |
+| Sound | AY at 1.7734 MHz | AY at **2 MHz** (derived from MOS's beep: Albert `ay38910.h`); register latch port $02 (also the read port), data $03 |
+| Interrupt | 50 Hz IM2 from the ULA | the VDP's frame interrupt is **not wired** to the Z80. A Z80 CTC at $28-$2B: channels 0-2 count a 2 MHz clock (their timers the 4 MHz system clock), channel 2's ZC/TO drives channel 3. IM2 through the CTC's daisy chain |
+| Keyboard | ports $xxFE | through the AY's I/O ports: the row selected (active low) on register 14 (port A, an output), the columns read (active low) from register 15 (port B). Register 7 must keep bit 6 set and bit 7 clear |
+| Joystick | Kempston | analogue, an ADC0844 at $38; fire on port $20 bit 0 |
+| Memory | 128K in 16K banks | 64K flat; the 8K MOS ROM pages over $0000-$1FFF (port $24 toggles it); writes under it reach RAM |
+| Storage | tape | 3" disc, 40 tracks x 10 sectors x 512 bytes; 190K free after XtalDOS |
 
-## 3. What carries over unchanged
+## 3. Review of the first plan
 
-As for the CPC (docs/port_cpc.md §3):
-- the game logic and the road's shape pass;
-- scenery projection, tunnels, traffic and the fork;
-- the music sequencer and every tune;
-- the stage data, its tools and zpack.
+What held, and what changed:
 
-## 4. Step 0: the platform layer
+1. **Testing tools already exist (phase 1 is done).** The plan budgeted
+   about 1,500 lines of C for an Einstein mode in `tools/zxsim`. Albert's
+   core is a complete Einstein, with VRAM timing checks (it counts every
+   access that comes too fast) and the disc controller. The harness
+   `tests/einstein/speedrun_check.cpp` links against it, as the Wonder Boy
+   port's does. The disc builder (`tools/make_einstein_disk.py`, from More
+   Burgers! by way of Wonder Boy) is proven against real XtalDOS.
+2. **No separate platform layer (phase 0, changed).** Splitting the
+   Spectrum code behind an interface first would have meant moving most of
+   bank 2's tightly packed layout. Instead the Einstein assembles the same
+   `src/main.asm` with `-DEINSTEIN` and the game runs at its Spectrum
+   addresses ($4000-$BFFF). About 20 `IFDEF EINSTEIN`s in the shared files
+   swap out what touches the hardware, and `src/einstein/` holds the rest.
+   The Spectrum build stays byte-identical (`make` then `cmp` against
+   `release/`).
+3. **The frame tick: the CTC asks the VDP.** The VDP's interrupt doesn't
+   reach the Z80. So CTC channel 2 (a timer, /16, 250) interrupts every
+   millisecond, through the Spectrum's own IM2 table (vector base 0;
+   `$BE04` holds `$BDBD`, `JP Isr`). The handler (`EinIsr`) reads the VDP's
+   status each time, and its frame flag starts a TV frame, at most 1 ms
+   late. Then it does what the Spectrum's 50 Hz interrupt does: it counts
+   the frame, sends a frame that is ready (in that vertical blank), and
+   plays the music. The main loop asks for a frame (`RequestFlip`) and
+   waits (`WaitFlip`) only before touching what is being sent.
+4. **The panorama is in the middle third, not the top.** The plan's "the
+   upper third's patterns are otherwise unused, so there is room" was
+   wrong: rows 10-11 share the middle third with road rows 12-15. The
+   budget there: 16 solid colours, 48 road slots, 64 patterns for sky rows
+   8-9, 64 for the panorama (one copy: it scrolls in 8-pixel steps, not
+   the Spectrum's 4) and 64 for cells there under a silhouette.
+5. **Most of the sky and HUD comes free.** The plan had the HUD rebuilt from
+   font cells. Instead the Spectrum's own HUD, message line, sky artwork
+   and starting lights still draw into its screen B (plain RAM at $C000
+   here). The Einstein mirrors the cells they write, each with its own
+   pattern. Rows 0-7 are the top third's 256 patterns, one each. The car's
+   32 cells work the same way.
+6. **Memory: the plan's map, rearranged.** The shared code keeps
+   $4000-$BFFF. The theme cache moves to $0120 (the Spectrum's $DB00 would
+   collide with XtalDOS, which stays at $EC00 for loading). The platform
+   code sits after the panorama cache, and the Einstein's buffers at
+   $DB00-$EBFF. The Spectrum's screen B ($C000-$DAFF) stays as the
+   mirror's source. Writes into screen A's memory ($4000-$5AFF) must not
+   happen, because the stage overlay lives there; `LampDraw` was one.
+7. **Stages load from the disc (the plan's option 2).** All 35 packs (5
+   themes, 15 tracks, 15 stages' art) are in `STAGES.DAT` (56K). At a
+   checkpoint the race stops for a moment while the next stage is read.
+   The BDOS needs MOS's own interrupts to time the disc, so each read
+   switches back to MOS's set-up (I = $FB, CTC channels 2 and 3 as
+   `ZZTIME` sets them) and then back to the game's. A theme or track
+   already in its cache isn't read again.
+8. **Traffic and scenery: the Spectrum's silhouettes, composited.** The
+   plan wanted hardware sprites for traffic. Instead the Spectrum's own
+   code projects traffic and scenery and XORs its silhouettes into screen
+   B. Below the sky, screen B holds nothing else (the Spectrum's road
+   isn't drawn there), so every cell a draw command covers is the road's
+   (or the panorama's) cell XOR the silhouette, in a slot of its row's own.
+   A silhouette takes the cell's ink, as on the Spectrum: black on grass
+   and kerbs, white on the road. No 4-a-line limit, and no flicker.
+9. **Interrupt sources on real hardware:** the keyboard, ADC and fire
+   buttons have interrupt masks (ports $20, $21, $25). Albert doesn't model
+   those interrupts. If MOS leaves one enabled, the game's IM2 table (every
+   entry `Isr`) would count extra 50 Hz ticks. Check on a real machine and
+   mask them if needed.
 
-The same split as in the CPC plan (docs/port_cpc.md §4), with
-`PLATFORM=EINSTEIN`: screen, road output, sprites, HUD, sound out, input,
-interrupt, paging and loading behind one interface. The Spectrum build stays
-byte-identical, checked by the existing tests.
+## 4. What is done
+
+Run `make einstein`, then `make run-einstein` (Albert) or `make
+test-einstein`.
+
+- **Start-up:** XtalDOS loads the 48K `SPEEDRUN.COM` (about 9 s), and
+  `EinBoot` takes over the machine: Graphics II, the AY, the CTC tick. The
+  first stage loads from `STAGES.DAT`.
+- **The game:** the attract demo drives, and a key starts a game (Q/A/O/P/
+  SPACE, as on the Spectrum). The lights count down, the clock and score
+  run, and each stage's tune plays (the AY's tone periods for 2 MHz).
+  Checkpoints load the next stage, and all 15 stages and 5 themes work.
+- **The road** (`src/einstein/roadgfx.asm`): pass 1 is the Spectrum's
+  (`RoadPrepare`). Per character row, as the Spectrum's `DrawRoadRow`, the
+  row is grass, kerb, road, kerb, grass. Solid cells are one name byte;
+  kerb cells with the road's edge in them, and road cells with the centre
+  line, get pattern slots (8 bytes, one colour byte), worked out in line
+  pairs as the Spectrum draws them. A slot is sent only when it differs
+  from what VRAM holds. A row is drawn again only if pass 1 ran or its
+  bands moved.
+- **The fork:** rows with both branches (`RowFork`) get both spans' kerbs
+  and road, and kerb cells hold both branches' pixels.
+- **Tunnels and the gantry** (`src/einstein/portal.asm`): the Spectrum's
+  `DrawPortal`, `Ceiling` and `Gate` paint screen B's attributes. Cells
+  that change in the sky rows are mirrored. In the road rows, a cell
+  whose attribute isn't its row's own is the portal's, a solid cell of its
+  paper. Inside, the walls (from the band's tunnel bit), their lamps and
+  the ceiling.
+- **Traffic and scenery** (`src/einstein/sprites.asm`): see 3.8.
+- **The sky and HUD** (`src/einstein/sky.asm`): the Spectrum code's cells
+  are mirrored, at most 48 a frame (the rest wait). The panorama is sent
+  once a stage and scrolls by its names alone.
+- **The player's car:** the Spectrum's `DrawCar`, its 32 cells mirrored
+  (all of them when the frame changes, otherwise only the cockpit's
+  colours over a new colour underneath).
+- **Writing VRAM:** a frame goes in during one vertical blank, row by row
+  (a row's slots, then its names), so no row shows new names over old
+  patterns. What doesn't fit in the blank is written paced (32 T), and the
+  harness counts no access that comes too fast.
+
+Not yet:
+
+- the crew's crash close-ups
+- the timer's flash in the last ten seconds
+- the front end (title, options, high scores, goal screens)
+- drum and engine pitches, which are still the Spectrum's periods, so a
+  little high at 2 MHz
+- the joystick
+- speed (section 7)
 
 ## 5. Graphics: the name table does the work
 
-The video chip's own memory is reached one byte at a time through a port.
-During the visible part of the frame it accepts a byte only every 8 µs or
-so (about 32 T-states), and much faster in the vertical blank. So the
-Spectrum's approach, writing bitmap and attributes directly, would be
-limited to about 2,000 bytes a frame in total. The port has to write as
-little as possible. Graphics II mode gives the tool for that:
+As planned, with the details above. Per third (256 patterns each):
 
-- **Graphics II** is a 32×24 grid of cells. Each cell shows one of 256
-  patterns (8×8 pixels), with a foreground/background colour for each of
-  its 8 lines. There are 256 patterns for each third of the screen.
-- **Shared solid cells:** most of the road area is solid colour: light
-  grass, dark grass, road, tunnel wall, sky, and both colours of kerb. Each
-  is one pattern, defined once. A cell becomes "dark grass" by writing
-  **one name-table byte**, not 16 bytes of pattern and colour. This is the
-  Spectrum's attribute trick, done with the name table instead.
-- **Edge cells:** only cells that a road edge, kerb boundary or the centre
-  line passes through need their own pattern. Each gets a dynamic pattern
-  slot: 8 pattern bytes, then 8 colour bytes, with the kerb colours exact to
-  the line (better than the Spectrum's whole-cell kerb colour). That is
-  roughly 2 edges × 12 rows × 1-2 cells, plus the centre line: about 50
-  cells, 800 bytes a frame, and fewer when the shape does not change.
-- **Bands:** the grass and kerb bands stay per character row as on the
-  Spectrum (`RowAttrs` becomes "choose the row's solid patterns").
-- **Double buffering:** two name tables, flipped by the name-table base
-  register at the frame's end, so the picture never tears. Dynamic pattern
-  slots are split in two sets, one per buffer, so the buffer on show is
-  never changed. Each third has 256 patterns: about 20 shared solids, then
-  two sets of about 110 slots.
-- **Writes in cell order:** a pattern's 8 bytes are 8 *lines* of one cell,
-  so drawing works cell by cell (build the 8 lines, then send them in one
-  run), not line by line as on the Spectrum.
-
-VRAM budget (16K): patterns 6K, colours 6K, two name tables 1.5K, sprite
-patterns 2K (64 patterns of 16×16), sprite attributes 128 bytes. That fits,
-just.
-
-### Backdrop and sky
-
-- The mountain band is two rows of cells. Its scrolling uses pre-shifted
-  pattern sets: 4 shifts of a 32-cell band is 128 patterns. Scrolling then
-  means rewriting 64 name bytes, not 512 bitmap bytes. The upper third's
-  patterns are otherwise unused, so there is room.
-- The sky is solid cells; tunnel ceilings and portals are name changes.
-
-### Sprites
-
-Use the hardware where it helps, and software for the rest:
-
-- **Traffic cars:** hardware sprites, two each (body colour and black
-  details), from pre-scaled sizes in the sprite pattern table. A traffic car
-  uploads 32-64 bytes when it changes size. Five cars at most, two
-  sprites each, is 10 of the 32.
-- **The player's car:** it sits low and nearly still on the screen, so it
-  is mostly static cells with their own patterns (uploaded once per
-  steering pose), with up to 4 hardware sprites on top for extra colours.
-  The 4-a-line limit is spent there, so traffic sprites must not share the
-  car's lines: traffic near the car falls back to software cells, or
-  overlaps for only a frame or two.
-- **Scenery** (trees, signs, houses, the goal's gantry): software, drawn
-  into dynamic cells like the road's edges. They gain colour per 8×1 line,
-  where the Spectrum has one per cell.
-- `make_scenery.py` and `make_car.py` emit cell-organised data (8 vertical
-  bytes a cell), plus sprite patterns for the traffic.
-
-### HUD and text
-
-The HUD rows are cells with the font as patterns: a digit or letter is one
-name byte, so the HUD is nearly free. The big timer digits become 2×2 cell
-glyphs.
-
-## 6. Sound
-
-The same AY chip, so the music needs only:
-
-- **the clock** *(verify: about 2 MHz)*: set `AY_CLOCK` in
-  `make_music.py`, and scale the drum periods and engine pitch from it;
-- **`AyWrite`:** the Einstein's AY register and data ports *(verify the
-  addresses)*;
-- **timing:** music at 50 Hz from a CTC timer interrupt, or from the
-  video chip's frame interrupt if it is wired *(verify)*.
-
-## 7. Input
-
-- The keyboard matrix is read partly through the AY's I/O port *(verify
-  which port selects the row and which reads the keys)*.
-- The joystick ports are analogue *(verify)*: read them through the ADC and
-  threshold them into the same left/right/up/down/fire bits that
-  `ReadInput` produces now.
-
-## 8. Memory
-
-The Einstein has 64K and no banks. That is less memory than the Spectrum,
-but the screen does not live in it, which frees the 13.8K the Spectrum
-spends on two screens.
-
-| Range | Use |
+| Third | Patterns |
 |---|---|
-| $0000-$00FF | interrupt vectors (the ROM paged out after loading) |
-| $0100-$7FFF | code and tables (about 30K on the Spectrum today) |
-| $8000-$A7FF | the theme cache (9.4K) and the track cache |
-| $A800-$FFFF | packed stage data, or a disc buffer (§9) |
+| top (rows 0-7) | rows 0-7 mirrored, one pattern a cell |
+| middle (rows 8-15) | 0-15 solid colours, 16-63 road slots (rows 12-15, 12 each), 64-127 rows 8-9 mirrored, 128-191 the panorama (2 rows x 32), 192-255 the panorama's cells under a silhouette |
+| bottom (rows 16-23) | 0-15 solid colours, 16-207 road slots (24 a row: the road's, then its silhouettes'), 208-239 the player's car, 240-255 free |
 
-The Spectrum keeps about 76K of stage, theme and front-end packs in its
-banks. They will not all fit raw in 22K. Two ways, decided by measuring:
+Colours come from the Spectrum's attributes. Each Spectrum colour (with
+bright) maps to the nearest TMS colour (`SpecTms` in
+`src/einstein/vdp.asm`). Each theme's palette still wants picking for the
+TMS colours, as the plan said.
 
-1. **Keep them compressed in memory:** zpack the theme and track packs
-   (expect about half size, so 35-40K) and unpack one at each checkpoint, as
-   the tape does now. If the packed set fits in about 22K, the game never
-   touches the disc after loading.
-2. **Load from disc at each checkpoint:** read the next stage's theme and
-   track pack (about 10K) at the stage change: a second or two from a 3"
-   disc. The stage change shows "Loading..." over the frozen frame. This is
-   simpler and always fits.
+## 6. Speed
 
-Start with option 2; move to 1 if the packed sizes allow.
+In the attract demo's worst stretch (`make test-einstein`, which wants at
+least 7), a game frame takes about 6 TV frames: 8 fps against the
+Spectrum's 16.7. The shared game logic (pass 1, the hill mapping, the
+projection) costs the same T-states as on the Spectrum. The rest is the
+Einstein's: the kerb cells, the slot commits, the silhouettes' cells, and
+the writes that spill past the vertical blank. Ideas, roughly in order:
 
-## 9. Loading
+- leave a row's kerb cells alone when only its bands moved (only colours
+  change then)
+- a silhouette cell: XOR into the slot only where its mask has pixels, and
+  keep a cell's slot from frame to frame
+- compare slots in their line pairs (4 bytes, not 8) and unroll the loops
+- fewer writes past the blank: send the colour of a slot only when it
+  changes, and spread the sky's cells over frames (done: 48 a frame)
+- memory: the platform code ends just under $4000 (an assertion checks).
+  The Spectrum's own drawing code that the Einstein never calls (road pass
+  2, screen flips, the panorama's bitmap) could go, to make room.
 
-A disc image with a boot program for Xtal DOS. It loads the code and the
-front end, pages the ROM out, and takes over the machine (interrupts, CTC,
-video chip). The packs are separate files on the same disc (option 2
-above). Build it with a `make_dsk.py` beside `make_tap.py`.
+## 7. Building and testing
 
-## 10. Tools and tests
+| Command | Does |
+|---|---|
+| `make einstein` | `build/einstein/speedrun.dsk` (and `.com`, `.sym`, `.lst`) |
+| `make test-einstein` | boots it in Albert's core and checks it (`tests/einstein_check.py`); builds the harness first if needed |
+| `make run-einstein` | opens it in Albert; type `SPEEDRUN` at the `0:` prompt |
 
-- **Emulator:** an Einstein mode for `tools/zxsim` (or a headless emulator
-  with scripting). It needs the TMS9129 Graphics II mode and sprites, VRAM
-  port timing (to catch writes that come too fast), the AY, the CTC, the
-  keyboard and a disc trap. That is about 1,500 lines of C. Port timing is
-  the important part: on real hardware, writes that arrive faster than the
-  chip accepts are simply lost.
-- **Tests:** smoke, carcheck, stagecheck and a rendercheck from Graphics II
-  screenshots, all for `PLATFORM=EINSTEIN`, plus a test that counts VRAM
-  writes per frame and fails over budget.
+They need, from the einstein repository (`EINSTEIN_REPO` in `local.mk`):
+XtalDOS 1.31's `SYSTEM131.CPM`, the MOS 1.2 ROM, and Albert's
+`ein_core.lib` (`emulator/build`). The harness also needs Visual Studio's
+C++ tools (`tests/einstein/build_harness.cmd`).
 
-## 11. Phases
+The harness (`build/einstein/speedrun_check.exe <rom> <dsk> <sym>
+commands...`) boots the disc and runs commands. Its header lists them:
+`boot`, `frames`, `hold`, `peek8`, `vram`, `shot`, `record` (pictures and
+sound), `rec_start`/`rec_stop` (record whatever runs between them, the
+boot too), `type`, `until`, `profile` (T-states per routine) and `stats`
+(VRAM accesses that came too fast).
 
-| Phase | Work | Size |
-|---|---|---|
-| 0 | the platform layer (shared with the CPC port) | M |
-| 1 | Einstein emulation in zxsim, with VRAM timing checks | L |
-| 2 | boot from disc, memory map, CTC interrupt, video chip set-up, input | M |
-| 3 | the road in Graphics II: solid cells, edge cells, two name tables | L |
-| 4 | the backdrop's pre-shifted patterns, the HUD from font cells | M |
-| 5 | traffic as hardware sprites, the car, software scenery cells | L |
-| 6 | sound (clock and ports), front end screens, options | M |
-| 7 | stage changes from disc (or packed memory), tunnels and gantries | M |
-| 8 | the disc image and packaging, speed tuning, playtesting | M |
+The game's Einstein-specific generated files (`packs.asm`, `stages.asm`,
+`stageov_pack.asm`, `music_notes.asm`) and `STAGES.DAT` come from
+`tools/make_einstein.py`, in two steps either side of assembling every
+stage pack (`stagepacks.asm`), into `build/einstein`. It's last on the
+include path because sjasmplus 1.21 searches the last `-I` first.
 
-## 12. Risks and open questions
-
-- **VRAM bandwidth** is the hard limit. Every frame's writes must fit about
-  2,000 slow bytes plus the faster vertical blank. Busy frames (sharp bends,
-  hills, the fork) may drop to 12.5 fps unless the edge cells are clever
-  (for example, reuse an identical edge pattern instead of uploading a new
-  one).
-- **The 4-sprites-a-line limit:** traffic beside the player's car may
-  flicker or vanish. Rotating sprite priorities each frame (the usual
-  TMS9918 trick) turns vanishing into flicker.
-- **Fixed colours:** 15 fixed TMS colours. The themes need re-picking (the
-  TMS palette has good greens and blues, but no orange: the sunset theme
-  needs care).
-- **Hardware details** *(verify)*: the AY's clock and ports; the keyboard
-  scan; the analogue joysticks; whether the video chip's frame interrupt
-  reaches the Z80; how Xtal DOS hands over the machine; the 3" disc's read
-  speed for option 2.
-- **Few users and emulators:** testing on real hardware will need a
-  helper with an Einstein. A scriptable emulator matters even more here
-  than for the CPC.
+For testing a later stage or a place in one, assemble with
+`-DFIRST_STAGE=n` and `-DSTART_POS=units` as the Spectrum build allows
+(the attract demo starts there), make a disc with
+`tools/make_einstein_disk.py`, and `touch src/main.asm` afterwards.
