@@ -43,7 +43,7 @@ MainLoop:
         call DrawPortal         ; (a tunnel's mouth or way out)
         BORDER 3                ; magenta: sprites
         call DrawSprites
-        call DrawCar
+        call DrawTyres          ; (the car, then its rolling tyres)
         BORDER 5                ; cyan: HUD
         call DrawHud
         call RequestFlip
@@ -74,6 +74,8 @@ CodeEnd:
         INCLUDE "tables.asm"
 TablesEnd:
         ASSERT TablesEnd <= PANO_LDI_END - 64
+        INCLUDE "tyres.asm"     ; (in the gap before the panorama's chain)
+        ASSERT $ <= PANO_LDI_END - 64
 
 ; Unrolled LDI chain for the panorama: entered at PanoLdiEnd - 2*n
         ORG PANO_LDI_END - 64

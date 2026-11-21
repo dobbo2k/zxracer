@@ -65,6 +65,10 @@ make run-realtape                # ZEsarUX, the tape played as audio (real tape 
 make run-realtape ZX_MACHINE=P341
 ```
 
+Fuse loads the 128K `.sna` as a **Pentagon 128K** whatever `--machine` says
+(no contended memory, other timings), so `make run` is for a quick look
+only. `make run-tape` boots a real Spectrum 128K from the tape.
+
 Fuse machine names are `48`, `128`, `plus2`, `plus2a` and `plus3`. ZEsarUX's
 are `48k`, `128k`, `P2`, `P2A41` and `P341` (`zesarux --help` lists all).
 

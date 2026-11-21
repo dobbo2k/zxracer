@@ -467,6 +467,16 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   yaws into the bend; from 72 (past what steering holds, and while sliding) it
   shows the smoke frames (light smoke from both rear tyres), animated. The tyre
   squeal comes with the music (§5).
+- **Rolling tyres** *(as built, `src/tyres.asm`)*: the rear tyres' dashed
+  tread row rolls up their faces (two tread rows, three pixel rows apart, in
+  three positions), a row per 64 depth units travelled, at most one a frame:
+  about 16 rows a second at full speed, slower as the car slows, still when it
+  stops. After `DrawCar`, every frame, the tyres' bytes (the car's columns 0-1
+  and 6-7, pixel rows 26-31) are written from the frame's own tread and plain
+  rows, so the redraw-skipping stays as it was; steering frames only (smoke
+  hides the tyres). 108 bytes in the unused gap between the lookup tables'
+  end (`$B900`) and the panorama's LDI chain (`$B9C0`); 84 bytes are left
+  there. About 1,000 T a frame; the frame rate is unchanged.
 - **Crew** *(as built)*: the car sprite's open cockpit row shows his head
   (white ink) and hers (yellow) over whatever lies under the car (ink turns
   black where it matches); his striped shirt and her hair sit on the rear deck.

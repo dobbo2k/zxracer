@@ -91,7 +91,8 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   quickly. Past the tyres' grip limit it slides, steers half as well and
   scrubs speed off. You can see it: on a fast bend the car yaws into it, and
   past what steering can hold it swings further round with light smoke from
-  both rear tyres.
+  both rear tyres. The rear tyres' tread rolls as the car moves, faster the
+  faster it goes.
 - **Gears:** two, like an arcade shifter. LOW pulls hard but tops out at 182 km/h
   (about 5 s from a standstill); HIGH reaches 280 km/h (about 6 s more) but bogs
   down from a standstill (12 s to 182). After a crash the car is back in LOW. Start in LOW, change up around 180; the

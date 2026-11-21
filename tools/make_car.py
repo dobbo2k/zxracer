@@ -71,11 +71,14 @@ def car(lean, smoke=None):
         d.point((x + 1, 18), K)
     # --- row 3 (y 24-31): bumper, tyres outlined in red, shadow
     d.rectangle([1, 24, 62, 25], R)
-    for x0 in (3 + b, 47 + b):
+    # The tread is the one row the game animates (src/tyres.asm copies the
+    # tyres' outer bytes, 0-1 and 6-7, from it): mirrored left and right so
+    # in every steering frame it stays inside those bytes.
+    for x0, t0 in ((3 + b, 1), (47 + b, 2)):
         d.rectangle([x0, 26, x0 + 13, 31], K)
         d.line([(x0, 26), (x0, 31)], R)                # tyre sidewalls
         d.line([(x0 + 13, 26), (x0 + 13, 31)], R)
-        for x in range(x0 + 2, x0 + 12, 3):            # tread
+        for x in range(x0 + t0, x0 + 12, 3):           # tread
             d.line([(x, 27), (x + 1, 27)], R)
     for x in (22, 39):                                 # exhaust tips
         d.rectangle([x, 26, x + 2, 27], R)
