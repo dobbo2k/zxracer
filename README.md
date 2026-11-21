@@ -113,7 +113,7 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   add 48 seconds - 58 and a fanfare for EXTENDED PLAY when you beat the
   stage's par time (worked out from its bends by `tools/make_stages.py`, about
   as fast as the attract-mode driver goes) - and show your stage time; the last
-  row ends at the GOAL. In the last 10 seconds the timer flashes and pips.
+  row ends at the GOAL. In the last 10 seconds the timer flashes.
 - **Levels** (options, key 6): EASY starts with 80 seconds, gives 55 a
   checkpoint, an eighth more par time and half the weaving traffic; NORMAL 68
   and 48; HARD 60 and 44, a sixteenth less par time and half as much weaving

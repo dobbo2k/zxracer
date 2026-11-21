@@ -578,7 +578,7 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   Extended play also plays a jingle on channel C (`JingleTick`, run each
   interrupt from `SoundTick`, chains beeps). In the last 10 seconds the big
   timer's cells get the FLASH attribute in both screens (no cost per frame;
-  the next display reset clears it) and each second pips.
+  the next display reset clears it), with no beep.
 - **Levels** *(as built)*: `Difficulty` (options key 6) picks a row of
   `DiffTable` in the overlay (start time 80 / 68 / 60 s, checkpoint bonus
   55 / 48 / 44 s), scales the par time (+1/8 easy, -1/16 hard) and the

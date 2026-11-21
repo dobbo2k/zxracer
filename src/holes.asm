@@ -336,20 +336,13 @@ DemoTraffic:
         ret
 ; (the last ten seconds: moved here from bank 5 for room)
 ; The last 10 seconds (GameUpdate, each second): the big timer's cells
-; FLASH in both screens (the next display reset clears it), and a pip.
-BEEP_WARN       EQU 110
+; FLASH in both screens (the next display reset clears it).
 TimeWarn:
         ld a, (PalTime)
         or $80
         ld hl, $5800 + 32 + 14
         call .cells
         ld hl, $D800 + 32 + 14
-        call .cells
-        ld a, (Time)
-        or a
-        ret z
-        ld de, BEEP_WARN
-        jp StartBeep
 .cells: ld c, 2
 .row:   ld b, 4
 .c:     ld (hl), a
