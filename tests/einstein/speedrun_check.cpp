@@ -30,6 +30,9 @@
 //   wait16 SYM VALUE   run until the word at SYM reaches VALUE; prints the
 //                      TV frames it took (with -DFIXED_ELAPSED: a benchmark)
 //   profile N          T-states per routine over N frames, the 80 costliest
+//   profilel N         the same, local labels counted apart
+//   fastpc N           run N frames: where VRAM writes came too fast
+//   linehist SYM N     run N frames: the raster lines the PC reached SYM on
 //   stats              VDP frames, fast VRAM accesses since the game began,
 //                      interrupts, PC
 //
@@ -331,10 +334,11 @@ int main(int argc, char** argv) {
                 recorder.frame();
             }
             recorder.finish();
-        } else if (command == "profile") {
+        } else if (command == "profile" || command == "profilel") {
+            const bool locals = command == "profilel";  // (local labels too)
             std::vector<std::pair<std::uint16_t, std::string>> labels;
             for (const auto& [name, address] : symbols)
-                if (name.find('.') == std::string::npos && address >= 0x0100) labels.emplace_back(address, name);
+                if ((locals || name.find('.') == std::string::npos) && address >= 0x0100) labels.emplace_back(address, name);
             std::sort(labels.begin(), labels.end());
             std::map<std::string, std::uint64_t> spent, calls;
             const int count = std::stoi(next());
@@ -357,6 +361,76 @@ int main(int argc, char** argv) {
                 std::printf("profile=%-24s %9.0f T a frame %5.1f%% %8.2f calls a frame\n", order[k].second.c_str(),
                             double(order[k].first) / count, 100.0 * double(order[k].first) / total,
                             double(calls[order[k].second]) / count);
+        } else if (command == "linehist") {
+            // linehist SYM N: run N TV frames; the raster lines (by 8) at which
+            // the PC reached SYM
+            const std::uint16_t at = symbol(next());
+            const int count = std::stoi(next());
+            const auto target = m.vdp.frames() + std::uint64_t(count);
+            std::map<int, int> hist;
+            while (m.vdp.frames() < target) {
+                if (m.cpu.pc.w == at) ++hist[m.vdp.line() / 8];
+                m.step();
+            }
+            for (const auto& [l, n] : hist) std::printf("line=%d %d\n", l * 8, n);
+        } else if (command == "flagtrace") {
+            // flagtrace SYM N: for N TV frames, when the PC reaches SYM later
+            // than raster line 216, where the CPU was (and its IFF1) at each
+            // 1000 T from the frame flag (line 192) on
+            const std::uint16_t at = symbol(next());
+            const int count = std::stoi(next());
+            std::vector<std::pair<std::uint16_t, std::string>> labels;
+            for (const auto& [name, address] : symbols)
+                if (address >= 0x0100) labels.emplace_back(address, name);
+            std::sort(labels.begin(), labels.end());
+            auto name_of = [&](std::uint16_t pc) {
+                auto it = std::upper_bound(labels.begin(), labels.end(), std::make_pair(pc, std::string("\x7f")));
+                return it == labels.begin() ? std::string("(below)") : std::prev(it)->second;
+            };
+            const auto target = m.vdp.frames() + std::uint64_t(count);
+            std::vector<std::string> trail;     // (the last 100: every 1000 T)
+            std::uint64_t mark = m.tstates;
+            const std::uint16_t isr = symbol("EinIsr"), seen = symbol("EinIsr.seen");
+            while (m.vdp.frames() < target) {
+                const int line = m.vdp.line();
+                if (m.cpu.pc.w == isr || m.cpu.pc.w == seen) {
+                    trail.push_back(std::to_string(line) + (m.cpu.pc.w == isr ? " ISR" : " SEEN"));
+                    if (trail.size() > 600) trail.erase(trail.begin());
+                }
+                if (m.tstates >= mark) {
+                    trail.push_back(std::to_string(line) + " " + name_of(m.cpu.pc.w) + (m.cpu.iff1 ? "" : "(di)"));
+                    if (trail.size() > 600) trail.erase(trail.begin());
+                    mark += 1000;
+                }
+                if (m.cpu.pc.w == at && line > 216) {
+                    std::printf("late at line %d:\n", line);
+                    for (const auto& t : trail) std::printf("  %s\n", t.c_str());
+                }
+                m.step();
+            }
+        } else if (command == "fastpc") {
+            // fastpc N: run N TV frames; the routines (by symbol) whose VRAM
+            // writes came too fast, with counts
+            std::vector<std::pair<std::uint16_t, std::string>> labels;
+            for (const auto& [name, address] : symbols)
+                if (address >= 0x0100) labels.emplace_back(address, name);
+            std::sort(labels.begin(), labels.end());
+            std::map<std::string, int> where;
+            std::map<int, int> lines;   // (by 16 lines of the raster)
+            const int count = std::stoi(next());
+            const auto target = m.vdp.frames() + std::uint64_t(count);
+            while (m.vdp.frames() < target) {
+                const auto pc = m.cpu.pc.w;
+                const auto before = m.vdp.fast_accesses();
+                m.step();
+                if (m.vdp.fast_accesses() != before) {
+                    ++lines[m.vdp.line() / 16];
+                    auto it = std::upper_bound(labels.begin(), labels.end(), std::make_pair(pc, std::string("\x7f")));
+                    ++where[it == labels.begin() ? std::string("(below)") : std::prev(it)->second];
+                }
+            }
+            for (const auto& [l, n] : lines) std::printf("fastline=%d %d\n", l * 16, n);
+            for (const auto& [name, n] : where) std::printf("fastpc=%s %d\n", name.c_str(), n);
         } else if (command == "stats") {
             std::printf("vdp_frames=%llu\nfast_vram_accesses=%llu\ninterrupts=%llu\npc=%04X\nrom_enabled=%d\nvdp_mode=%d\n",
                         (unsigned long long)m.vdp.frames(),

@@ -28,19 +28,32 @@ MASK_ROW        EQU 4               ; bytes of a mask row: a bit a column
 EinSprCells:
         ld hl, EMaskN           ; U = last frame's N
         ld de, EMaskU
-        ld bc, 24 * MASK_ROW
-        ldir
-        ld hl, EMaskN
-        ld de, EMaskN + 1
-        ld bc, 24 * MASK_ROW - 1
-        ld (hl), 0
-        ldir
-        ld hl, CmdListB         ; (each cell into U too: EinMaskSetNU)
-        ld ix, EMaskN
+        ld a, 24 * MASK_ROW / 16
+.u:     DUP 16
+        ldi
+        EDUP
+        dec a
+        jr nz, .u
+        ld hl, EMaskN           ; N clear (interrupts on: a late frame
+        xor a                   ; interrupt would leave less of the blank)
+        ld b, 24 * MASK_ROW / 16
+.z:     DUP 16
+        ld (hl), a
+        inc hl
+        EDUP
+        djnz .z
+        ld hl, CmdListB         ; (each cell into U too)
         call .cmds
         ld b, 0                 ; the sky's rows: mirrored
         ld hl, EMaskU
 .mr:    ld c, 0
+        call EinMaskAny
+        jr nz, .mb
+        inc hl                  ; (none in the row)
+        inc hl
+        inc hl
+        inc hl
+        jr .mrn
 .mb:    ld a, (hl)
         inc hl
         or a
@@ -58,12 +71,12 @@ EinSprCells:
 .mnext: ld a, c
         cp 32
         jr nz, .mb
-        inc b
+.mrn:   inc b
         ld a, b
         cp MIRROR_ROWS
         jr nz, .mr
         ret
-; HL = a command list (a count, then commands), IX = a mask: set the cells
+; HL = a command list (a count, then commands): set the cells in N and U
 .cmds:  ld a, (hl)
         or a
         ret z
@@ -101,17 +114,49 @@ EinSprCells:
         cp 24
         jr nc, .done
         push bc
-        ld d, e                 ; D = columns to go
-.col:   ld a, c
+        push de
+        ld a, b                 ; IX: the row's byte of column C in N (U
+        add a, a                ; 96 on), D: its bit
+        add a, a
+        ld d, a
+        ld a, c
+        rrca
+        rrca
+        rrca
+        and 3
+        add a, d
+        add a, low EMaskN
+        ld ixl, a
+        ld a, high EMaskN
+        adc a, 0
+        ld ixh, a
+        ld a, c
+        and 7
+        push hl
+        add a, low EBitTab
+        ld l, a
+        ld a, high EBitTab
+        adc a, 0
+        ld h, a
+        ld d, (hl)
+        pop hl
+.col:   ld a, c                 ; E columns from C
         cp 32
         jr nc, .rowDone
-        push hl
-        call EinMaskSetNU
-        pop hl
-        inc c
-        dec d
+        ld a, (ix + 0)
+        or d
+        ld (ix + 0), a
+        ld a, (ix + 24 * MASK_ROW)
+        or d
+        ld (ix + 24 * MASK_ROW), a
+        rlc d
+        jr nc, .cs
+        inc ix
+.cs:    inc c
+        dec e
         jr nz, .col
 .rowDone:
+        pop de
         pop bc
         ld a, b
         inc b
@@ -126,25 +171,6 @@ EinSprCells:
 EinMaskSet:
         push de
         call EinMaskBit
-        or (hl)
-        ld (hl), a
-        pop de
-        ret
-
-; the same in EMaskN (IX) and EMaskU (24 rows on)
-EinMaskSetNU:
-        push de
-        call EinMaskBit
-        ld e, a
-        or (hl)
-        ld (hl), a
-        ld a, l
-        add a, low (24 * MASK_ROW)
-        ld l, a
-        ld a, h
-        adc a, high (24 * MASK_ROW)
-        ld h, a
-        ld a, e
         or (hl)
         ld (hl), a
         pop de
@@ -315,15 +341,18 @@ EinSprMask:
         ld l, a
         ld de, ESprM
         push bc
-        ld bc, 8 * 256
-.ln:    ld a, (hl)
+        ld c, 0
+        DUP 7
+        ld a, (hl)
         ld (de), a
         or c
         ld c, a
-        inc de
+        inc e
         inc h
-        djnz .ln
-        ld a, c
+        EDUP
+        ld a, (hl)
+        ld (de), a
+        or c
         pop bc
         or a
         ret
@@ -538,7 +567,42 @@ EinSprCell:
         ldir
         pop af
         jr .commit
-.slot:  sub SLOT_FIRST          ; a slot: its index, its pattern and colour
+.slot:  ld e, a                  ; a ready-made kerb edge (its third's)?
+        ld a, b
+        cp 16
+        ld a, e
+        jr nc, .b3
+        sub KERB_T1
+        jr .st
+.b3:    sub KERB_T2
+.st:    jr c, .dyn0
+        cp KERB_N
+        jr nc, .dyn0
+        ld l, a                 ; its byte on all 8 lines, its colour
+        ld h, 0
+        push hl
+        ld de, EStatByte
+        add hl, de
+        ld e, (hl)
+        ld hl, ESprM
+        push bc
+        ld bc, EPat
+        ld d, 8
+.xs:    ld a, (hl)
+        xor e
+        ld (bc), a
+        inc hl
+        inc bc
+        dec d
+        jr nz, .xs
+        pop bc
+        pop hl
+        ld de, EStatCol
+        add hl, de
+        ld a, (hl)
+        jr .commit
+.dyn0:  ld a, e
+        sub SLOT_FIRST          ; a slot: its index, its pattern and colour
         ld l, a
         ld a, b
         cp 16
@@ -583,6 +647,7 @@ EinSprCell:
 EComposePtr:    dw 0
 ESprName:       dw 0
 ESprM:          ds 8
+        ASSERT high ESprM == high (ESprM + 7)
 ERoadPaperT:    db 0            ; the road's paper and ink (TMS)
 ERoadInkT:      db 0
 EPanoCol:       db 0            ; the panorama's column at the left edge

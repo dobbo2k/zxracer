@@ -46,13 +46,23 @@ VRAM_SPRPAT     EQU $3800           ; sprite patterns
 ;     (4 pixels apart) sent once a stage; it scrolls by its names alone.
 ;   rows 12-23, the road: names 0-15 are solid cells of TMS colours 0-15
 ;     (pattern 0, the colour behind it) in the middle and bottom thirds, and
-;     the road's own patterns are slots from 16: rows 12-15 12 each, rows
-;     16-23 24 each.
-SLOTS_T1        EQU 12
-SLOTS_T2        EQU 24
+;     slots from 16, patterns made each frame (silhouettes', and the road's
+;     where it is drawn the exact way: a fork's row, a tunnel's, one whose
+;     road is in one cell): rows 12-15 5 each, rows 16-23 22 each. The kerb's
+;     edges are ready-made patterns (EinStaticInit), 7 left edges and 7 right
+;     in the open road's light and dark kerb: the middle third's KERB_T1 on,
+;     the bottom third's KERB_T2 on. The player's car is CAR_PAT on (224).
+;   the centre line: sprites, one a road row (src/einstein/roadgfx.asm
+;     EinDashRow), its pixels exact at any x.
+SLOTS_T1        EQU 5
+SLOTS_T2        EQU 22
 SLOT_FIRST      EQU 16
-N_SLOTS         EQU 4 * SLOTS_T1 + 8 * SLOTS_T2     ; 240 in all
+N_SLOTS         EQU 4 * SLOTS_T1 + 8 * SLOTS_T2     ; 196 in all
 SLOT_SIZE       EQU 9               ; 8 pattern bytes, the colour byte
+KERB_N          EQU 2 * 14                          ; kerb edges: light, dark
+KERB_T1         EQU SLOT_FIRST + 4 * SLOTS_T1       ; 36: the middle third's
+KERB_T2         EQU SLOT_FIRST + 8 * SLOTS_T2       ; 192: the bottom third's
+        ASSERT KERB_T1 + KERB_N <= SKY_PAT_T1
 EPicBuf         EQU THEME_CACHE + 4352  ; a picture from the disc, after the front end's
                                         ; code (make_stages.py FRONTEND_RESERVE)
 SKY_PAT_T1      EQU 64              ; rows 8-9's patterns in the middle third
@@ -67,7 +77,21 @@ DirtyList       EQU SlotShadow + N_SLOTS * SLOT_SIZE    ; (slot, what) per chang
 EMirrorBits     EQU DirtyList + 2 * N_SLOTS     ; the sky's cells to be sent: a bit each
 EIN_CMDLISTB    EQU EMirrorBits + MIRROR_ROWS * 4   ; the Spectrum's buffer B commands
 EIN_BUF_END     EQU EIN_CMDLISTB + 1 + MAX_SPR * CMD_SIZE
-        ASSERT EIN_BUF_END <= $EC00
+; The centre line's sprites, per road row (EinDashRow, EinDashFinish)
+EDashX          EQU EIN_BUF_END                 ; its leftmost pixel ($FF: none)
+EDashNew        EQU EDashX + 12                 ; drawn again this frame
+EDashB          EQU EDashNew + 12               ; its road cells' range when drawn
+EDashC          EQU EDashB + 12
+EDashSend       EQU EDashC + 12                 ; its patterns to be sent
+EDashOut        EQU EDashSend + 12              ; its pixels as VRAM holds them: lines
+                                                ; 0-3's left and right bytes, 4-7's
+EDashQ          EQU (EDashOut + 12 * 4 + 31) & $FFE0    ; the same as its sprite's
+                                                ; first 24 bytes (32 a row): what
+                                                ; EinDashSend sends
+EDashAttr       EQU EDashQ + 12 * 32            ; the attributes, as VRAM holds them
+EDashEnd        EQU EDashAttr + 12 * 4 + 1      ; (then $D0: no more sprites)
+ECarCol         EQU EDashEnd                    ; the car's colours, a new frame's
+        ASSERT ECarCol + 4 * CAR_W * 8 <= $EC00
 
 ; Buffers in the Spectrum's screen A ($4000-$5AFF), around the resident stage
 ; overlay: every one is made afresh by EinResetDisplay, which follows every

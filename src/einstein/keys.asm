@@ -27,8 +27,11 @@ EinSpecIn:
         call nz, EinKeyScan
         ld e, $FF               ; E: the answer
         ld b, 0                 ; B: the half-row
-.h:     rrc c
-        jr c, .n
+        ld a, c                 ; C: those wanted, as 1s (done when none are
+        cpl                     ; left)
+        ld c, a
+.h:     srl c
+        jr nc, .n
         ld a, b                 ; its keys: SpecKeys + B * 10
         add a, a
         ld l, a
@@ -52,29 +55,29 @@ EinSpecIn:
         jr nz, .have
         ex (sp), hl             ; (the half-row's keys)
         push hl
-        ld d, 1
-        ld a, $FF
-.key:   push af
-        ld a, (hl)              ; the key's Einstein row (8: none)
+        push bc
+        ld c, $FF               ; C: its answer
+        ld d, 1                 ; D: the key's bit
+.key:   ld a, (hl)              ; the key's Einstein row (8: none)
+        inc hl
+        add a, low EKeyRows
+        ld b, a
+        ld a, (hl)              ; its column
         inc hl
         push hl
-        add a, low EKeyRows
-        ld l, a
-        ld a, high EKeyRows
-        adc a, 0
-        ld h, a
-        ld a, (hl)
+        ld l, b
+        ld h, high EKeyRows
+        and (hl)
         pop hl
-        and (hl)                ; its column
-        inc hl
         jr z, .up
-        pop af
+        ld a, c
         xor d                   ; pressed: its bit 0
-        push af
-.up:    pop af
-        sla d
+        ld c, a
+.up:    sla d
         bit 5, d
         jr z, .key
+        ld a, c
+        pop bc
         pop hl
         ex (sp), hl
         ld (hl), a
@@ -82,8 +85,8 @@ EinSpecIn:
         ld e, a
         pop hl
 .n:     inc b
-        ld a, b
-        cp 8
+        ld a, c
+        or a
         jr nz, .h
         ld a, e
         pop hl
@@ -124,6 +127,7 @@ EinKeyScan:
 
 EKeyAns:        ds 8            ; per half-row, this TV frame's answer (0: not yet)
 EKeyRows:       ds 9             ; (the ninth: none, for the shifts)
+        ASSERT high EKeyRows == high (EKeyRows + 8)
 EKeyFrame:      db $FF          ; (the TV frame they were read in)
 
 ; Per Spectrum half-row ($FE, $FD .. $7F) and key (bit 0-4): where the key

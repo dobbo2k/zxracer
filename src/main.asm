@@ -45,6 +45,7 @@ MainLoop:
         call EraseSprites       ; traffic and scenery into screen B, as ever
         call DrawSprites
         call DrawCar            ; (into screen B: its cells are sent)
+        call EinCarPrep         ; (a new frame of it: made ready to send whole)
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
         call EinSprCells        ; the cells they cover (src/einstein/sprites.asm)
         call EinPortal          ; and the portal's (src/einstein/portal.asm)

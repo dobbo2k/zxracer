@@ -103,7 +103,7 @@ EinDraw:
         xor a
         ld (EinShape), a
         ld (EinForce), a
-        ret
+        jp EinDashFinish        ; the centre line's sprites
 
 ; The row (ERow): has what its cells come from changed since it was drawn?
 ; Its 4 line pairs' D, E, centre line and depth line, its last line's D, E
@@ -248,49 +248,63 @@ EinRow:
         ld (ESlotTop), a
         jr EinRowBase
 
-; The row's slots (ERow): the first (a SlotShadow index) and how many
+; The row's slots (ERow): the first (a SlotShadow index), how many, the
+; first's bytes in SlotShadow and its name (ERowSlotTab)
 EinRowSlots:
         ld a, (ERow)
-        cp 4
-        jr nc, .t2
-        add a, a
-        add a, a                ; x 4
-        ld b, a
-        add a, a                ; x 8
-        add a, b                ; x 12 (SLOTS_T1)
-        ASSERT SLOTS_T1 == 12
-        ld (ESlot0), a
-        add a, SLOT_FIRST       ; (the middle third's names)
-        ld b, SLOTS_T1
-        jr .ts
-.t2:    sub 4
-        add a, a
-        add a, a
-        add a, a                ; x 8
-        ld b, a
-        add a, a                ; x 16
-        add a, b                ; x 24 (SLOTS_T2)
-        ASSERT SLOTS_T2 == 24
-        add a, 4 * SLOTS_T1
-        ld (ESlot0), a
-        add a, SLOT_FIRST - 4 * SLOTS_T1    ; (the bottom third's names)
-        ld b, SLOTS_T2
-.ts:    ld (ESlotName0), a
-        ld a, b
-        ld (ESlotMax), a
-        ld a, (ESlot0)          ; SlotShadow + ESlot0 * 9
         ld l, a
-        ld h, 0
-        ld d, h
-        ld e, l
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, de
-        ld de, SlotShadow
-        add hl, de
-        ld (ESlotPtr), hl
+        add a, a
+        add a, a
+        add a, l                ; x 5
+        add a, low ERowSlotTab
+        ld l, a
+        ld a, high ERowSlotTab
+        adc a, 0
+        ld h, a
+        ld de, ESlot0
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
         ret
+ERowSlotTab:                    ; per row: ESlot0, ESlotMax, ESlotPtr, ESlotName0
+        db 0 * SLOTS_T1, SLOTS_T1
+        dw SlotShadow + 0 * SLOTS_T1 * SLOT_SIZE
+        db SLOT_FIRST + 0 * SLOTS_T1
+        db 1 * SLOTS_T1, SLOTS_T1
+        dw SlotShadow + 1 * SLOTS_T1 * SLOT_SIZE
+        db SLOT_FIRST + 1 * SLOTS_T1
+        db 2 * SLOTS_T1, SLOTS_T1
+        dw SlotShadow + 2 * SLOTS_T1 * SLOT_SIZE
+        db SLOT_FIRST + 2 * SLOTS_T1
+        db 3 * SLOTS_T1, SLOTS_T1
+        dw SlotShadow + 3 * SLOTS_T1 * SLOT_SIZE
+        db SLOT_FIRST + 3 * SLOTS_T1
+        db 4 * SLOTS_T1 + 0 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 0 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 0 * SLOTS_T2
+        db 4 * SLOTS_T1 + 1 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 1 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 1 * SLOTS_T2
+        db 4 * SLOTS_T1 + 2 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 2 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 2 * SLOTS_T2
+        db 4 * SLOTS_T1 + 3 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 3 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 3 * SLOTS_T2
+        db 4 * SLOTS_T1 + 4 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 4 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 4 * SLOTS_T2
+        db 4 * SLOTS_T1 + 5 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 5 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 5 * SLOTS_T2
+        db 4 * SLOTS_T1 + 6 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 6 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 6 * SLOTS_T2
+        db 4 * SLOTS_T1 + 7 * SLOTS_T2, SLOTS_T2
+        dw SlotShadow + (4 * SLOTS_T1 + 7 * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + 7 * SLOTS_T2
 
 EinRowBase:
         ; its names in BaseNames (rows from PANO_ROW0)
@@ -313,6 +327,7 @@ EinRowBase:
         add hl, de
         ld (hl), 1
         call EinRowRanges
+        call EinStaticRanges    ; (rows 16-23: ready-made edges, ERB / ERC moved)
         call EinRowColours
         ; ---- names: grass, kerb, road, kerb, grass
         ld hl, (ERowPtr)
@@ -377,7 +392,13 @@ EinRowBase:
         pop hl
         ret
 .noLamp:
-        ; ---- both of the fork's branches on the row: its own way
+        ld a, (EStatic)         ; ---- rows 16-23: the ready-made patterns
+        or a
+        jr z, .exact
+        call EinStaticCells
+        call EinDashRow
+        jr .slotsUsed
+.exact: ; ---- both of the fork's branches on the row: its own way
         ld a, (ERow)
         add a, low RowFork
         ld l, a
@@ -386,6 +407,7 @@ EinRowBase:
         or a
         jr z, .one
         call EinForkCells
+        call EinDashNone        ; (no centre line on a fork's row)
         jr .slotsUsed
 .one:   ; ---- the kerb cells, then the centre line
         call EinLineEdges
@@ -410,7 +432,7 @@ EinRowBase:
         ld a, (hl)
 .r0:    ld (EColEnd), a
         call EinKerbCells
-        call EinCentreLine
+        call EinDashRow
 .slotsUsed:
         ld a, (ERow)            ; the row's slots in use: the road's, the
         ld e, a                 ; centre line's (silhouettes take those between)
@@ -469,6 +491,211 @@ EinCockpit:
         cp CAR_COL + CAR_W
         jr nz, .c
         ret
+
+; ---------------------------------------------------------------------------
+; A row (not a fork's, nor a tunnel's, nor one whose road is in one cell):
+; the kerb's edges from ready-made patterns (EinStaticInit). Each edge is
+; upright in the row, at the mean of its top and bottom lines' (the exact
+; way: a slope of 2-line steps). A kerb edge's cell is one name: nothing is
+; sent but the names.
+; After EinRowRanges: EStatic, and if set, ERB / ERC for the edges' cells.
+EinStaticRanges:
+        xor a
+        ld (EStatic), a
+        ld a, (ERBand)
+        rla
+        ret c                   ; (a tunnel's row: its walls' colours, the exact way)
+        ld a, (ERow)
+        add a, low RowFork
+        ld l, a
+        ld h, high RowFork
+        ld a, (hl)
+        or a
+        ret nz                  ; (a fork's row: its own way)
+        ld a, (ERD)
+        or a
+        jr z, .take             ; no road: all grass
+        ld bc, (ERDE0)          ; B = D0, C = E0
+        ld de, (ERDE1)          ; D = D1, E = E1
+        ld a, b
+        add a, d
+        rra                     ; (the carry: the sum's bit 8)
+        ld (EDm), a
+        rrca
+        rrca
+        rrca
+        and 31
+        ld b, a                 ; B = the left edge's cell
+        ld a, c
+        add a, e
+        rra
+        ld (EEm), a
+        rrca
+        rrca
+        rrca
+        and 31                  ; the right edge's
+        cp b
+        ret z                   ; (both in one cell: the exact way)
+        ret c
+        ld (ERC), a             ; kerb from the right edge's cell
+        ld a, b
+        inc a
+        ld (ERB), a             ; kerb to the left edge's cell
+.take:  ld a, 1
+        ld (EStatic), a
+        ret
+
+; The names of the edges' cells (after the row's fill: [ERA, ERB) and
+; [ERC, ERD) kerb)
+EinStaticCells:
+        ld a, (ERD)
+        or a
+        ret z                   ; (no road)
+        ld c, KERB_T2           ; C: the set's first (7 left edges, 7 right):
+        ld a, (ERow)            ; the row's third's,
+        cp 4
+        jr nc, .t2
+        ld c, KERB_T1
+.t2:    ld a, (ERBand)          ; light or dark
+        and $40
+        jr z, .lt
+        ld a, c
+        add a, 14
+        ld c, a
+.lt:
+        ld hl, (ERowPtr)        ; (32-aligned: a column is L's low bits)
+        ld a, (EDm)             ; the left edge: road from pixel D & 7 on
+        ld b, a
+        rrca
+        rrca
+        rrca
+        and 31
+        or l
+        ld l, a
+        ld a, b
+        and 7
+        ld a, (ECR)             ; (from pixel 0: all road)
+        jr z, .l
+        ld a, b
+        and 7
+        dec a
+        add a, c
+.l:     ld (hl), a
+        ld a, (EEm)             ; the right edge: road to pixel E & 7
+        ld b, a
+        rrca
+        rrca
+        rrca
+        and 31
+        ld e, a
+        ld a, l
+        and $E0
+        or e
+        ld l, a
+        ld a, b
+        and 7
+        cp 7
+        ld a, (ECR)             ; (to pixel 7: all road)
+        jr z, .r
+        ld a, b
+        and 7
+        add a, 7
+        add a, c
+.r:     ld (hl), a
+        ret
+
+; The ready-made kerb edges into VRAM, the middle and bottom thirds (the
+; display off, at a display reset: the stage's colours), and their pixels
+; and colours for silhouettes (EStatByte, EStatCol)
+EinStaticInit:
+        call EinColourSets
+        ld b, 0                 ; ---- the open road's light and dark kerb
+        ld c, 0                 ; C: the pattern (0 .. KERB_N - 1)
+.set:   ld a, b                 ; its colour byte: EKC
+        add a, a
+        add a, a
+        add a, a
+        sub b
+        add a, low (ERowSets + 5)
+        ld l, a
+        ld a, high (ERowSets + 5)
+        adc a, 0
+        ld h, a
+        ld a, (hl)
+        ld (EStatC), a
+        ld e, $7F               ; left edges: road from pixel 1 .. 7
+.le:    ld a, e
+        call .put
+        srl e
+        jr nz, .le
+        ld e, $80               ; right edges: road to pixel 0 .. 6
+.re:    ld a, e
+        call .put
+        sra e
+        ld a, e
+        inc a
+        jr nz, .re
+        inc b
+        ld a, b
+        cp 2
+        jr nz, .set
+        ret
+; A = the pattern's byte (on all 8 lines), EStatC its colour: pattern C of
+; both thirds (C then the next); BC, DE kept
+.put:   push bc
+        push de
+        ld (EStatB), a
+        ld l, c
+        ld h, 0
+        ld de, EStatByte
+        add hl, de
+        ld (hl), a
+        ld de, EStatCol - EStatByte
+        add hl, de
+        ld a, (EStatC)
+        ld (hl), a
+        ld a, c
+        add a, KERB_T1          ; the middle third's
+        ld bc, VRAM_PAT + $800
+        call .one
+        pop de
+        pop bc
+        push bc
+        push de
+        ld a, c
+        add a, KERB_T2          ; the bottom third's
+        ld bc, VRAM_PAT + $1000
+        call .one
+        pop de
+        pop bc
+        inc c
+        ret
+; A = name, BC = its third: its 8 bytes (EStatB) and colours (EStatC)
+.one:   ld l, a
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, bc
+        ex de, hl
+        push de
+        ld a, (EStatB)
+        ld l, a
+        ld bc, 8
+        call VdpFill
+        pop de
+        ld a, d
+        add a, high VRAM_COL
+        ld d, a
+        ld a, (EStatC)
+        ld l, a
+        ld bc, 8
+        jp VdpFill
+
+EStatC:         db 0
+EStatB:         db 0
+EStatByte:      ds KERB_N       ; per ready-made pattern: its byte,
+EStatCol:       ds KERB_N       ; its colour byte
 
 ; A = value, B = count (0-32), HL = destination in a row of BaseNames
 ; (32-aligned: L advances, H stays): the unrolled fill (src/screen.asm)
@@ -533,6 +760,8 @@ EinRowRanges:
         ld (ERD), a
         jr .band
 .haveRoad:
+        ld (ERDE0), bc          ; (the top and bottom lines' edges: EinStaticRanges)
+        ld (ERDE1), de
         ; a = min(D - RW) >> 3 (clamped at 0)
         ld a, (ERW0)
         ld h, a
@@ -1009,59 +1238,260 @@ EinForkCells:
         ret
 
 ; ---------------------------------------------------------------------------
-; The centre line (light bands only, in road cells [b, c-1) as on the
-; Spectrum), per line pair: its cell and the two bytes (ECL, ECM1, ECM2),
-; the leftmost and rightmost of those cells; then each cell from the
-; leftmost to one past the rightmost built once and given a slot if the
-; line is in it.
-EinCentreLine:
-        ld a, $FF
-        ld (ECLo), a
-        xor a
-        ld (ECHi), a
+; The centre line: a 16x16 sprite a road row (sprite k for row 12 + k, its
+; patterns 4k on; the top two quarters used), so its pixels are exact at
+; any x and cost no slot. Per row drawn (EinDashRow): the dashes of its
+; line pairs 0 and 2, each for 4 lines (light bands only, in road cells
+; [b, c-1) as the Spectrum), from its leftmost dash pixel, the cells the
+; car, a silhouette or a tunnel's mouth covers taken out. A row not drawn
+; again is done again only if what covers it changed (EinDashFinish). What
+; changed is sent at the start of the next vertical blank (EinDashSend).
+EinDashRow:
+        ld a, (ERow)
+        ld e, a
+        ld d, 0
+        ld hl, EDashNew
+        add hl, de
+        ld (hl), 1
+        ld hl, EDashB
+        add hl, de
+        ld a, (ERB)
+        ld (hl), a
+        ld hl, EDashC
+        add hl, de
+        ld a, (ERC)
+        ld (hl), a
+EinDashRedo:                    ; (ERow, EI, ERB, ERC)
+        ld a, (ERC)             ; its x in [ERB * 8, (ERC - 1) * 8)
+        sub 1
+        jp c, .none             ; (no road on the row)
+        ld hl, ERB
+        cp (hl)
+        jp c, .none
+        jp z, .none
+        add a, a
+        add a, a
+        add a, a
+        ld e, a                 ; E: the end
+        ld a, (hl)
+        add a, a
+        add a, a
+        add a, a
+        ld d, a                 ; D: the start
         ld a, (EI)
-        ld c, a                 ; C = the pair's line
-        ld ix, ECL
+        ld c, a                 ; C: the line (pairs 0 and 2)
+        ld hl, EDashP
+        ld b, $FF               ; B: the leftmost x
+        call .pair
+        ld a, c
+        add a, 4
+        ld c, a
+        call .pair
+        ld a, b
+        cp $FF
+        jp z, .none
+        ld (EDashXk), a
+        call EinDashHideRow     ; (EDashHideNow, EDashHideAny: B kept)
+        ld de, $FFFF            ; D, E: the left and right bytes' masks
+        ld a, (EDashHideAny)
+        or a
+        jr z, .full
+        ld a, b                 ; the three cells under its 16 pixels
+        rrca
+        rrca
+        rrca
+        and 31
+        ld c, a
+        call .cell
+        ld d, a
+        inc c
+        call .cell
+        ld e, a
+        inc c
+        call .cell
+        ld l, a                 ; D E L, shifted left by x & 7
+        ld a, b
+        and 7
+        jr z, .full
+        ld b, a
+.sh:    sla l
+        rl e
+        rl d
+        djnz .sh
+.full:  ld a, d
+        ld (EDashML), a
+        ld a, e
+        ld (EDashMR), a
+        ld hl, EDashP           ; ---- its 4 bytes into EDashV
+        ld de, EDashV
+        call .pat
+        call .pat
+        ld hl, EDashV           ; any shown?
+        ld a, (hl)
+        inc hl
+        or (hl)
+        inc hl
+        or (hl)
+        inc hl
+        or (hl)
+        ld (EDashAnyB), a
+        ld a, (ERow)            ; ---- against VRAM's
+        add a, a
+        add a, a
+        ld l, a
+        ld h, 0
+        ld bc, EDashOut
+        add hl, bc
+        ld de, EDashV
         ld b, 4
-.cl:    ld (ix + 0), $FF
+.cmp:   ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        inc hl
+        djnz .cmp
+        jr .same
+.diff:  ld (hl), a              ; (the rest copied)
+        inc de
+        inc hl
+        djnz .cp
+        jr .sent
+.cp:    ld a, (de)
+        ld (hl), a
+        inc de
+        inc hl
+        djnz .cp
+.sent:  ld a, (ERow)            ; its sprite's bytes: EDashQ + row * 32
+        ld l, a                 ; (lines 0-7 left, 8 clear, 0-7 right)
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld de, EDashQ
+        add hl, de
+        ld de, (EDashV)         ; E: lines 0-3 left, D: right
+        ld bc, (EDashV + 2)     ; C: 4-7 left, B: right
+        ld (hl), e
+        inc l
+        ld (hl), e
+        inc l
+        ld (hl), e
+        inc l
+        ld (hl), e
+        inc l
+        ld (hl), c
+        inc l
+        ld (hl), c
+        inc l
+        ld (hl), c
+        inc l
+        ld (hl), c
+        ld a, l
+        add a, 9
+        ld l, a
+        ld (hl), d
+        inc l
+        ld (hl), d
+        inc l
+        ld (hl), d
+        inc l
+        ld (hl), d
+        inc l
+        ld (hl), b
+        inc l
+        ld (hl), b
+        inc l
+        ld (hl), b
+        inc l
+        ld (hl), b
+        ld a, (ERow)
+        ld c, a
+        ld b, 0
+        ld hl, EDashSend
+        add hl, bc
+        ld (hl), 1
+        ld a, 1
+        ld (EDashAny2), a
+.same:  ld a, (ERow)            ; ---- where it is, and what hides it
+        ld c, a
+        ld b, 0
+        ld hl, EDashX
+        add hl, bc
+        ld a, (EDashXk)
+        ld (hl), a
+        ld a, (EDashAnyB)
+        or a
+        jr z, .hide
+        ld a, (ERow)
+        add a, ROAD_ROW0
+        add a, a
+        add a, a
+        add a, a
+        dec a                   ; Y: the line above its top
+        ld d, a
+        ld a, (EDashXk)
+        ld e, a
+        jr .attr
+.none:  ld a, (ERow)
+        ld c, a
+        ld b, 0
+        ld hl, EDashX
+        add hl, bc
+        ld (hl), $FF
+.hide:  ld de, 192 * 256        ; (below the picture)
+.attr:  ld a, (ERow)
+        add a, a
+        add a, a
+        ld c, a
+        ld b, 0
+        ld hl, EDashAttr
+        add hl, bc
+        ld a, (hl)
+        cp d
+        jr nz, .newA
+        inc hl
+        ld a, (hl)
+        cp e
+        jr nz, .newA1
+        inc hl
+        inc hl
+        ld a, (ERoadInkT)       ; (its colour: the road's ink)
+        cp (hl)
+        ret z
+        jr .newA3
+.newA:  ld (hl), d
+        inc hl
+.newA1: ld (hl), e
+        inc hl
+        inc hl
+.newA3: ld a, (ERoadInkT)
+        ld (hl), a
+        ld a, 1
+        ld (EDashAttrNew), a
+        ret
+; C = the line, D/E = the start / end of its x, B = the leftmost so far,
+; HL = its x and width (x 8) to be noted ($FF: none)
+.pair:  push hl
         ld a, c
         add a, low Band
         ld l, a
         ld h, high Band
         bit 6, (hl)             ; (STRIPE_BIT: a dark band)
-        jr nz, .none
+        jr nz, .pn
         ld l, c
         ld h, high LaneX
-        ld a, (hl)
-        cp $FF
-        jr z, .none
-        ld e, a                 ; E = x
-        rrca
-        rrca
-        rrca
-        and 31
-        ld d, a                 ; D = its cell
-        ld hl, ERB
-        cp (hl)
-        jr c, .none
-        ld a, (ERC)
-        dec a
+        ld a, (hl)              ; ($FF, none: past the end)
         cp d
-        jr c, .none
-        jr z, .none
-        ld (ix + 0), d
-        ld a, (ECLo)
-        cp d
-        jr c, .lo
-        ld a, d
-        ld (ECLo), a
-.lo:    ld a, (ECHi)
-        cp d
-        jr nc, .hi
-        ld a, d
-        ld (ECHi), a
-.hi:    ld l, c                 ; width: LaneW of the depth line shown
-        set 7, l
+        jr c, .pn
+        cp e
+        jr nc, .pn
+        cp b
+        jr nc, .pw
+        ld b, a
+.pw:    ex af, af'
+        set 7, l                ; width: LaneW of the depth line shown
         ld h, high SrcLine
         ld a, (hl)
         or $80
@@ -1071,98 +1501,320 @@ EinCentreLine:
         add a, a
         add a, a
         add a, a
-        ld d, a
-        ld a, e
-        and 7
-        add a, d
+        pop hl
+        ex af, af'
+        ld (hl), a
+        inc hl
+        ex af, af'
+        ld (hl), a
+        inc hl
+        ret
+.pn:    pop hl
+        ld (hl), $FF
+        inc hl
+        inc hl
+        ret
+; HL = a pair's x and width: its 4 lines' left and right bytes, masked,
+; into DE (then DE on 2)
+.pat:   ld a, (EDashXk)
+        ld c, a
+        ld a, (hl)
+        inc hl
+        cp $FF
+        jr z, .p0
+        sub c                   ; its offset from the leftmost
+        cp 8
+        jr nc, .pfar
+        add a, (hl)             ; + width x 8
+        inc hl
+        push hl
         add a, low LaneM1
         ld l, a
         ld h, high LaneM1
-        ld a, (hl)
-        ld (ix + 4), a
-        ld a, l
+        ld c, (hl)              ; C: left
         add a, low LaneM2 - low LaneM1
         ld l, a
-        ld a, (hl)
-        ld (ix + 8), a
-.none:  inc ix
-        inc c
-        inc c
-        djnz .cl
-        ld a, (ECLo)            ; the cells, leftmost to rightmost + 1
-        cp $FF
-        ret z
-.cell:  ld (ECol), a
-        call EinCentreCell
-        ld a, (ECHi)
-        inc a
-        ld hl, ECol
-        cp (hl)
-        ret z
-        ld a, (hl)
-        inc a
-        jr .cell
-
-; ECol: the centre line's pixels in it, per pair (the first byte if the
-; pair's cell is this one, the second if it is the one before); a slot if
-; there are any
-EinCentreCell:
-        ld a, (ECol)
-        ld c, a
-        ld hl, ECL
-        ld de, EPat
-        ld b, 4
-        ld ixl, 0               ; (any pixels)
-.ln:    ld a, (hl)
-        cp c
-        jr z, .m1
-        inc a
-        cp c
-        jr z, .m2
-        xor a
-        jr .put
-.m1:    push hl
+        ld b, (hl)              ; B: right
+        jr .pm
+.pfar:  sub 8                   ; (8 or more on: its first byte on the right)
+        add a, (hl)
         inc hl
-        inc hl
-        inc hl
-        inc hl
-        ld a, (hl)
-        pop hl
-        jr .put
-.m2:    push hl
-        ld a, l
-        add a, 8
+        push hl
+        add a, low LaneM1
         ld l, a
-        jr nc, .m2h
-        inc h
-.m2h:   ld a, (hl)
-        pop hl
-.put:   ld (de), a
-        inc de
+        ld h, high LaneM1
+        ld b, (hl)
+        ld c, 0
+        jr .pm
+.p0:    inc hl
+        push hl
+        ld bc, 0
+.pm:    ld a, (EDashML)
+        and c
         ld (de), a
         inc de
-        inc hl
-        push af
-        or ixl
-        ld ixl, a
-        pop af
-        djnz .ln
-        ld a, ixl
-        or a
-        ret z                   ; none of it in this cell: plain road
-        ld a, (ELC)
-        call EinCommitTop
-        cp $FF
-        ret z
-        ld e, a
-        ld a, (ECol)
-        ld hl, (ERowPtr)
-        add a, l
-        ld l, a
-        jr nc, .nm
-        inc h
-.nm:    ld (hl), e
+        ld a, (EDashMR)
+        and b
+        ld (de), a
+        inc de
+        pop hl
         ret
+; C = a cell -> A: its pixels' mask, FF if shown, 0 if hidden (or past 31)
+.cell:  ld a, c
+        cp 32
+        ld a, 0
+        ret nc
+        push hl
+        push de
+        ld a, c
+        rrca
+        rrca
+        rrca
+        and 3
+        add a, low EDashHideNow
+        ld l, a
+        ld a, high EDashHideNow
+        adc a, 0
+        ld h, a
+        ld a, c
+        and 7
+        add a, low EBitTab
+        ld e, a
+        ld a, high EBitTab
+        adc a, 0
+        ld d, a
+        ld a, (de)
+        and (hl)
+        pop de
+        pop hl
+        ld a, 0
+        ret nz
+        dec a
+        ret
+
+; The row (ERow): no centre line
+EinDashNone:
+        ld a, (ERow)
+        ld e, a
+        ld d, 0
+        ld hl, EDashNew
+        add hl, de
+        ld (hl), 1
+        jp EinDashRedo.none
+
+; ERow -> EDashHideNow: its cells this frame's silhouettes, the portal or
+; the car cover; EDashHideAny: any
+EinDashHideRow:
+        ld a, (ERow)
+        add a, ROAD_ROW0
+        add a, a
+        add a, a                ; x MASK_ROW
+        ld e, a
+        ld d, 0
+        ld hl, EMaskN
+        add hl, de
+        push hl
+        ld hl, EMaskP
+        add hl, de
+        ex de, hl
+        pop hl
+        ld bc, EDashHideNow
+        ld a, (de)
+        or (hl)
+        ld (bc), a
+        inc hl
+        inc de
+        inc bc
+        ld a, (de)
+        or (hl)
+        ld (bc), a
+        inc hl
+        inc de
+        inc bc
+        ld a, (de)
+        or (hl)
+        ld (bc), a
+        inc hl
+        inc de
+        inc bc
+        ld a, (de)
+        or (hl)
+        ld (bc), a
+        ld a, (ERow)            ; the car's (rows 20-23: columns 12-19)
+        cp CAR_ROW - ROAD_ROW0
+        jr c, .any
+        ASSERT (CAR_COL & 7) == 4 && CAR_W == 8
+        ld hl, EDashHideNow + CAR_COL / 8
+        ld a, (hl)
+        or $F0
+        ld (hl), a
+        inc hl
+        ld a, (hl)
+        or $0F
+        ld (hl), a
+.any:   ld hl, EDashHideNow
+        ld a, (hl)
+        inc hl
+        or (hl)
+        inc hl
+        or (hl)
+        inc hl
+        or (hl)
+        ld (EDashHideAny), a
+        ret
+
+; Each frame, after the rows: a row not drawn again that something covers
+; now or covered last frame is done again
+EinDashFinish:
+        xor a
+.row:   ld (ERow), a
+        ld e, a
+        ld d, 0
+        ld hl, EDashNew
+        add hl, de
+        ld a, (hl)
+        ld (hl), 0
+        or a
+        jr nz, .next            ; (done as it was drawn)
+        ld hl, EDashX
+        add hl, de
+        ld a, (hl)
+        cp $FF
+        jr z, .next             ; (none: nothing to hide)
+        ld a, (ERow)            ; anything over it now or last frame?
+        add a, ROAD_ROW0        ; (silhouettes: EMaskU; the portal: EMaskP,
+        add a, a                ; EMaskPOld)
+        add a, a
+        ld e, a
+        ld d, 0
+        ld hl, EMaskU
+        add hl, de
+        call EinMaskAny
+        jr nz, .redo
+        ld hl, EMaskP
+        add hl, de
+        call EinMaskAny
+        jr nz, .redo
+        ld hl, EMaskPOld
+        add hl, de
+        call EinMaskAny
+        jr z, .next
+.redo:  ld a, (ERow)            ; its line, its range as drawn
+        ld e, a
+        ld d, 0
+        add a, a
+        add a, a
+        add a, a
+        ld (EI), a
+        ld hl, EDashB
+        add hl, de
+        ld a, (hl)
+        ld (ERB), a
+        ld hl, EDashC
+        add hl, de
+        ld a, (hl)
+        ld (ERC), a
+        call EinDashRedo
+.next:  ld a, (ERow)
+        inc a
+        cp 12
+        jr nz, .row
+        ret
+
+; In the vertical blank (EinUpload): the sprites' patterns and attributes
+; that changed
+EinDashSend:
+        ld a, (EDashAny2)
+        or a
+        jr z, .attr
+        xor a
+        ld (EDashAny2), a
+        ld c, 0
+.k:     ld b, 0
+        ld hl, EDashSend
+        add hl, bc
+        ld a, (hl)
+        or a
+        jr z, .nk
+        ld (hl), 0
+        push bc
+        ld l, c                 ; EDashQ + k * 32 -> VRAM_SPRPAT + k * 32:
+        ld h, b                 ; its first 24 bytes (the right quarter's
+        add hl, hl              ; top the last 8)
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        push hl
+        ld de, VRAM_SPRPAT
+        add hl, de
+        ex de, hl
+        pop hl
+        ld bc, EDashQ
+        add hl, bc
+        ld b, 24
+        call EinWrite
+        pop bc
+.nk:    inc c
+        ld a, c
+        cp 12
+        jr nz, .k
+.attr:  ld a, (EDashAttrNew)
+        or a
+        ret z
+        xor a
+        ld (EDashAttrNew), a
+        ld hl, EDashAttr
+        ld de, VRAM_SPRATTR
+        ld b, 12 * 4 + 1
+        jp EinWrite
+
+; At a display reset (VRAM cleared): every row's sprite hidden, its
+; patterns clear; the attributes sent
+EinDashReset:
+        ld hl, EDashX
+        ld b, 12
+.x:     ld (hl), $FF
+        inc hl
+        djnz .x
+        ld hl, EDashNew         ; (and EDashB, C, Send, Out, Q)
+        ld de, EDashNew + 1
+        ld bc, EDashAttr - EDashNew - 1
+        ld (hl), 0
+        ldir
+        ld hl, EDashAttr
+        ld b, 0
+.a:     ld (hl), 192            ; Y: below the picture
+        inc hl
+        ld (hl), 0
+        inc hl
+        ld (hl), b              ; pattern 4k
+        inc hl
+        ld (hl), 15
+        inc hl
+        ld a, b
+        add a, 4
+        ld b, a
+        cp 12 * 4
+        jr nz, .a
+        ld (hl), $D0            ; (no more sprites)
+        xor a
+        ld (EDashAny2), a
+        inc a
+        ld (EDashAttrNew), a
+        ret
+
+EDashP:         ds 4            ; pairs 0 and 2: x ($FF: none), width x 8
+EDashXk:        db 0
+EDashML:        db 0            ; the masks of its left and right bytes
+EDashMR:        db 0
+EDashAnyB:      db 0            ; any of its pixels shown
+EDashAny2:      db 0            ; any row's patterns to be sent
+EDashAttrNew:   db 0            ; the attributes to be sent
+EDashHideAny:   db 0
+EDashHideNow:   ds 4
+EDashV:         ds 4            ; a row's bytes: lines 0-3 left, right; 4-7
+        ASSERT MASK_ROW == 4
 
 ; ---------------------------------------------------------------------------
 ; EPat (8 pattern bytes) and A (the colour byte) into the row's next slot:
@@ -1180,17 +1832,6 @@ EinCommitSlot:
         inc a
         ld (ESlotN), a
         jr EinCommitAt
-; the same, the next of the centre line's slots (from the row's last down)
-EinCommitTop:
-        ld c, a
-        ld a, (ESlotN)
-        ld hl, ESlotTop
-        cp (hl)
-        jr c, .ok
-        ld a, $FF
-        ret
-.ok:    dec (hl)
-        ld b, (hl)
 ; B = the slot in the row, C = the colour -> A = its name
 EinCommitAt:
         ld a, b                 ; HL = its SlotShadow bytes
@@ -1268,15 +1909,20 @@ EinCommitAt:
 ERow:           db 0            ; road row 0-11 (screen row 12-23)
 EI:             db 0            ; its top line
 ERowPtr:        dw 0            ; its names in NameBuf
-ESlot0:         db 0            ; its first slot, how many it has, how many used
-ESlotMax:       db 0
-ESlotN:         db 0
-ESlotTop:       db 0            ; the centre line's lowest slot so far
-ESlotPtr:       dw 0            ; its first slot's bytes in SlotShadow
-ESlotName0:     db 0            ; its first slot's name
+ESlot0:         db 0            ; its first slot, how many it has, the first's
+ESlotMax:       db 0            ; bytes in SlotShadow, its name (in this order:
+ESlotPtr:       dw 0            ; EinRowSlots)
+ESlotName0:     db 0
+ESlotN:         db 0            ; how many used
+ESlotTop:       db 0            ; (the slots from the row's last down: free)
 EDirtyEnd:      dw 0            ; DirtyList's end
 ERW0:           db 0            ; kerb widths of its top and bottom lines
 ERW1:           db 0
+ERDE0:          dw 0            ; the top line's E, D; the bottom line's
+ERDE1:          dw 0
+EStatic:        db 0            ; the row drawn with the ready-made patterns
+EDm:            db 0            ; then: its edges (the mean of the two lines')
+EEm:            db 0
 ERA:            db 0            ; cell ranges
 ERB:            db 0
 ERC:            db 0
@@ -1305,11 +1951,6 @@ EDMin:          db 0
 EEMax:          db 0
 ELines:         ds 4 * 4        ; per pair: D's cell and mask, E's cell and mask
         ASSERT high ELines == high (ELines + 15)
-ECL:            ds 4            ; centre line per pair: cell ($FF: none),
-ECM1:           ds 4            ; its first byte,
-ECM2:           ds 4            ; its second
-ECLo:           db 0            ; the centre line's leftmost and rightmost cells
-ECHi:           db 0
 DirtyN:         db 0
 EinShape:       db 1            ; pass 1 ran: rows whose shape changed again
 EinForce:       db 1            ; every row again

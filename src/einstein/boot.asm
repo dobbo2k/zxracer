@@ -27,6 +27,10 @@ EinBoot:
 ; starts a TV frame: the Spectrum's 50 Hz interrupt, at most 1 ms late.
 ; Channel 3 (MOS's clock) is stopped.
 ELongWait:      db 0            ; (the CTC on its 16 ms wait)
+EFirstPoll:     db 0            ; (this poll: the first after that wait)
+        IFNDEF EIN_MIN_FRAMES   ; (-D: the benchmark measures the work unlocked)
+EIN_MIN_FRAMES  EQU 4           ; a frame sent at most every 4 TV frames: a
+        ENDIF                   ; steady 12.5 fps (the Spectrum: MIN_FRAMES)
 
 EinCtcInit:
         xor a
@@ -51,6 +55,8 @@ EinIsr:
         jr z, .tick
         xor a
         ld (ELongWait), a
+        inc a
+        ld (EFirstPoll), a      ; (this poll: the first after it)
         ld a, %10000111
         out (EIN_CTC2), a
         ld a, 250
@@ -61,6 +67,8 @@ EinIsr:
         in a, (EIN_VDP_CTRL)
         rla
         jr c, .seen
+        xor a
+        ld (EFirstPoll), a
 .out:   pop af
         ei
         reti
@@ -72,12 +80,17 @@ EinIsr:
 .tk:    ld (ETick), a
         jr nz, .out
         jr .frame
-.seen:  ld a, %10100111         ; a frame seen: the next is ~19.9 ms on, so
-        out (EIN_CTC2), a       ; no polls for 16 ms (timer /256, 250, reset)
+.seen:  ld a, (EFirstPoll)       ; a frame seen: the next is ~19.9 ms on, so
+        or a                    ; no polls for 16 ms (timer /256, 250, reset);
+        jr nz, .late            ; but not if it was there at the first poll
+        ld a, %10100111         ; after a wait (it may have been waiting a
+        out (EIN_CTC2), a       ; while: the next poll 1 ms on, as ever)
         ld a, 250
         out (EIN_CTC2), a
         ld a, 1
         ld (ELongWait), a
+.late:  xor a
+        ld (EFirstPoll), a
 .frame: push hl
         push bc
         push de
@@ -91,7 +104,7 @@ EinIsr:
         ld a, (hl)
         ld hl, LastFlip
         sub (hl)
-        cp MIN_FRAMES
+        cp EIN_MIN_FRAMES
         jr c, .snd
         ld a, (FrameCount)
         ld (hl), a
@@ -99,7 +112,23 @@ EinIsr:
         xor a
         ld (FlipPending), a
 .snd:   call SoundTick
-        pop iy
+.over:  ld a, (EFrontOn)        ; a frame begun meanwhile (a long one: a full
+        or a                    ; car, a tunnel's sky)? Counted, with its sound;
+        jr nz, .done            ; and 1 ms polls again (the phase lost)
+        in a, (EIN_VDP_CTRL)
+        rla
+        jr nc, .done
+        ld hl, FrameCount
+        inc (hl)
+        xor a
+        ld (ELongWait), a
+        ld a, %10000111
+        out (EIN_CTC2), a
+        ld a, 250
+        out (EIN_CTC2), a
+        call SoundTick
+        jr .over
+.done:  pop iy
         pop ix
         pop de
         pop bc

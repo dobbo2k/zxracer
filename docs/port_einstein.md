@@ -11,9 +11,10 @@ and `make test-einstein` (see "Building and testing" at the end).
 - **Media:** a disc image (the Einstein has no tape port): XtalDOS 1.31's
   system tracks, `SPEEDRUN.COM` and `STAGES.DAT`. At the `0:` prompt, type
   `SPEEDRUN`.
-- **Frame rate:** the Spectrum's 16.7 fps where possible. It's about 9 fps
-  now in the attract demo's worst stretch (steering, curves, hills and
-  scenery every frame): see section 6.
+- **Frame rate:** a steady 12.5 fps (a frame every 4 TV frames) where it
+  can; the Spectrum's is 16.7. In the attract demo's worst stretch
+  (steering, curves, hills and scenery every frame) about 7 frames in 10
+  make it and the rest take 5 TV frames: 11.7 fps on average. See section 6.
 
 ## 2. The hardware, as found
 
@@ -117,13 +118,21 @@ test-einstein`.
   Checkpoints load the next stage, and all 15 stages and 5 themes work.
 - **The road** (`src/einstein/roadgfx.asm`): pass 1 is the Spectrum's
   (`RoadPrepare`). Per character row, as the Spectrum's `DrawRoadRow`, the
-  row is grass, kerb, road, kerb, grass. Solid cells are one name byte;
-  kerb cells with the road's edge in them, and road cells with the centre
-  line, get pattern slots (8 bytes, one colour byte), worked out in line
-  pairs as the Spectrum draws them. A slot is sent only when it differs
-  from what VRAM holds. A row is drawn again only if its bands moved or
-  what its cells come from changed: its line pairs' edges, centre line and
-  depth line, kept per row (`ERowSig`).
+  row is grass, kerb, road, kerb, grass. Solid cells are one name byte.
+  The kerb's edges are ready-made patterns, already in VRAM: each edge is
+  upright within its row, at the mean of the row's top and bottom lines,
+  so a kerb edge costs one name and nothing else is sent (the exact way,
+  in line pairs, made a slope of 2-line steps, at a slot of 8 pattern
+  bytes and a colour byte per cell). A tunnel's rows, a fork's, and a row
+  whose road fits in one cell are still drawn the exact way, in slots,
+  each sent only when it differs from what VRAM holds. A row is drawn
+  again only if its bands moved or what its cells come from changed: its
+  line pairs' edges, centre line and depth line, kept per row (`ERowSig`).
+- **The centre line:** a hardware sprite a road row (16x16, the top half
+  used): its dashes at any pixel, slanted in 4-line steps, from line pairs
+  0 and 2 of the row (light bands only, in road cells, as the Spectrum).
+  Where the car, a silhouette or a tunnel's mouth covers a cell, the
+  sprite's pixels there are taken out. Only what changed is sent.
 - **The fork:** rows with both branches (`RowFork`) get both spans' kerbs
   and road, and kerb cells hold both branches' pixels.
 - **Tunnels and the gantry** (`src/einstein/portal.asm`): the Spectrum's
@@ -162,15 +171,22 @@ test-einstein`.
 - **Game time:** a game frame takes longer than the Spectrum's 4 TV frames
   at most, so `Elapsed` goes up to 8 here and the clock and the car keep
   real time.
-- **The player's car:** the Spectrum's `DrawCar`, its 32 cells mirrored
-  (all of them when the frame changes, otherwise only the cockpit's
-  colours over a new colour underneath).
+- **The player's car:** the Spectrum's `DrawCar`, its 32 cells mirrored.
+  A new frame of it (steering) is made ready by the main code
+  (`EinCarPrep`) and sent as two 256-byte blocks, its patterns and
+  colours; otherwise only the cockpit's colours over a new colour
+  underneath.
 - **Writing VRAM:** a frame goes in during one vertical blank, row by row
   (a row's slots, then its names), so no row shows new names over old
   patterns. What doesn't fit in the blank is written paced (32 T), and the
   harness counts no access that comes too fast. The CTC's 1 ms interrupt
   asks the VDP for the frame; once one is seen, it waits 16 ms before
-  asking again (the next comes 19.9 ms on).
+  asking again (the next comes 19.9 ms on), unless it was seen at the
+  first poll after such a wait (it may have been waiting). A frame that
+  begins while the interrupt is still busy is counted, with its sound, at
+  its end, and the polls go back to every 1 ms. (Without these, one long
+  interrupt left every later frame's sending late for several frames, too
+  late for the blank.)
 
 - **Sound:** the AY runs at 2 MHz, against the Spectrum 128's 1.77, so
   every tone and noise period is 1.128 times the Spectrum's for the same
@@ -192,8 +208,13 @@ As planned, with the details above. Per third (256 patterns each):
 | Third | Patterns |
 |---|---|
 | top (rows 0-7) | rows 0-7 mirrored, one pattern a cell |
-| middle (rows 8-15) | 0-15 solid colours, 16-63 road slots (rows 12-15, 12 each), 64-127 rows 8-9 mirrored, 128-191 the panorama (2 rows x 32), 192-255 the panorama's cells under a silhouette |
-| bottom (rows 16-23) | 0-15 solid colours, 16-207 road slots (24 a row: the road's, then its silhouettes'), 208-239 the player's car, 240-255 free |
+| middle (rows 8-15) | 0-15 solid colours, 16-35 slots (rows 12-15, 5 each: silhouettes', and the road's where it is drawn the exact way), 36-63 the kerb's edges, 64-127 rows 8-9 mirrored, 128-191 the panorama (2 rows x 32), 192-255 the panorama's cells under a silhouette |
+| bottom (rows 16-23) | 0-15 solid colours, 16-191 slots (22 a row), 192-219 the kerb's edges, 220-223 free, 224-255 the player's car |
+
+The kerb's edges: 7 left edges (road from pixel 1-7) and 7 right (road to
+pixel 0-6), in the light kerb and the dark, in each of the road's thirds
+(`EinStaticInit`, at a display reset). The sprites: 12, one a road row,
+their patterns 4k on.
 
 Colours come from the Spectrum's attributes. Each Spectrum colour (with
 bright) maps to the nearest TMS colour (`SpecTms` in
@@ -207,49 +228,63 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 ## 6. Speed
 
-A game frame takes about 5.5 TV frames: 9 fps against the Spectrum's
-16.7 (`make test-einstein` wants at least 7 in the attract demo).
+A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
+`src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
+frame takes longer. In the attract demo about 7 frames in 10 fit; 11.7 fps
+on average (`make test-einstein` wants at least 7).
 
 **The benchmark.** A game's speed changes what it does (the time step, the
 demo driver's steering), so ordinary runs don't compare. Assemble with
 `-DFIXED_ELAPSED=1` (every update counts 3 TV frames: the same game at any
 speed), boot, and time 300 game frames of the attract demo with the
 harness: `wait16 GameFrames 20`, then `wait16 GameFrames 320` prints the
-TV frames they took. Taken so: 1,955 at the start of the speed work,
-1,857 at its first commit, 1,653 now (16% fewer than at the start).
+TV frames they took. With `-DEIN_MIN_FRAMES=3` too, the lock is off and it
+measures the work alone. Taken so:
+
+| | TV frames |
+|---|---|
+| the start of the speed work | 1,955 |
+| the first speed commit | 1,857 |
+| the second | 1,653 (5.5 a game frame, 9.1 fps) |
+| now, locked at 4 | 1,287 (4.29, 11.7 fps) |
+| now, unlocked | 1,193 (3.98: the work) |
 
 `profile N` in the harness gives each routine's T-states and calls over N
-TV frames. A game frame is about 440K T now: the road's rows about 170K,
-writing VRAM about 75K (the paced bytes' 32 T is VRAM's own limit), the
-silhouettes about 45K, and the shared game logic about 130K (pass 1, the
-hill mapping, the projection, the sprites' XOR chain into screen B), which
+TV frames (`profilel N`: local labels apart). A game frame's work is
+about 320K T now: the shared game logic about 130K (pass 1, the hill
+mapping, the projection, the sprites' XOR chain into screen B), which
 costs the same as on the Spectrum and is left alone so the Spectrum's
-build stays the same. In the attract demo the road's shape changes nearly
-every frame, so 11 of the 12 road rows are built again a frame. Tried and
-measured:
+build stays the same; the road's rows about 45K; writing VRAM about 45K
+(the paced bytes' 32 T is VRAM's own limit); the silhouettes about 35K;
+the centre line's sprites about 20K. In the attract demo the road's shape
+changes nearly every frame, so 11 of the 12 road rows are built again a
+frame. Tried and measured:
 
-- kept: a slot's 16 bytes sent in one go, and its own paced path when the
-  blank's budget is spent (no calls between bytes); a row's slot pointer,
-  first name and colours worked out once (the colours once a frame: 4
-  sets, light or dark, open or in a tunnel); slot commits onto the dirty
-  list by pointer; kerb cells' masks with the common cases first; the
-  centre line's cells built once each, not searched per cell; rows with no
-  silhouette or portal cell sent straight from `BaseNames` (the car's
-  names kept there), not copied to `NameBuf`; the row-shape check stopping
-  at the first difference, and skipped (the row marked for a full check
-  next time) when the bands already make it draw; the interrupt's 16 ms
-  wait; the silhouettes' old cells from last frame's mask; whole empty
-  mask bytes skipped; the keyboard read once a TV frame, each half-row
-  worked out only when asked; unrolled slot compares; name rows filled
-  with the Spectrum's unrolled `FillA`
-- dropped: comparing each row of names with what VRAM holds; sending what
+- cut, for 12.5 fps: the kerb's exact edges (2-line steps) for ready-made
+  ones (upright in each row: 8-line steps), in all rows but a tunnel's or
+  a fork's
+- kept: the centre line as sprites (exact, slanted in 4-line steps); the
+  car's new frames as two blocks, made ready outside the interrupt (one
+  every 8 frames or so had taken 37 ms in it, the cells one by one);
+  silhouettes' cells set a row's run at a time; a row's slots from a
+  table; the key reads stopping after the last half-row asked for; a
+  slot's 16 bytes in one go, and its own paced path; a row's colours once
+  a frame (4 sets); slot commits onto the dirty list by pointer; rows with
+  no silhouette or portal cell sent straight from `BaseNames`; the
+  row-shape check stopping at the first difference; the interrupt's 16 ms
+  wait; whole empty mask bytes and rows skipped; unrolled slot compares;
+  name rows filled with the Spectrum's unrolled `FillA`
+- dropped: the centre line as ready-made cells too (upright in each row,
+  a dash on a bend became separate squares; the sprites cost about 15K
+  more, and look as the exact way did); clearing a mask with the stack
+  (interrupts off for 600 T made the frame's interrupt late: writes in the
+  picture); comparing each row of names with what VRAM holds; sending what
   doesn't fit in one blank in the next (the main loop waits for the frame
-  to be sent before drawing the next: 1,772 became 3,006); a bigger blank
-  budget (1,000 units: 4 frames fewer in 1,700, with less margin; 1,250
-  writes too fast)
+  to be sent: 1,772 became 3,006); a bigger blank budget (1,000 units: 4
+  frames fewer in 1,700, with less margin; 1,250 writes too fast)
 
-What would still make a difference is building a row's cells in fewer
-passes (ranges, edges, kerb masks and slots together).
+What would still help: a row's setup in fewer passes (its ranges, colours,
+names and edges: about 2.7K T a row now), for the last 3 frames in 10.
 
 **Memory.** The Spectrum's drawing code that the Einstein never calls
 (road pass 2, the fork's row drawer, the panorama's bitmap, the rolling
@@ -259,7 +294,8 @@ code in bank 2. The Einstein's own buffers (the names, the sky's
 attributes, the masks, the panorama's sprite cells, the rows' signatures)
 are in screen A's memory, above the stage overlay ($4800-$5AFF): the game
 code never writes screen A here (`Ceiling` and `TimeWarn` skip it). Left:
-about 1K in bank 2, 750 bytes in bank 5, 1.4K under $4000 and 320 bytes in
+about 1K in bank 2, 750 bytes in bank 5, 60 bytes under $4000 (new code
+goes in bank 2), 460 in the Einstein's buffers ($DB00-$EBFF) and 320 bytes in
 screen A (assertions check each).
 
 ## 7. Building and testing
@@ -280,7 +316,11 @@ commands...`) boots the disc and runs commands. Its header lists them:
 `boot` (to the main loop, after the title screens), `frames`, `hold`, `joy`, `wait16`, `peek8`, `vram`, `shot`, `record` (pictures and
 sound), `rec_start`/`rec_stop` (record whatever runs between them, the
 boot too), `type`, `until`, `profile` (T-states and calls per routine, the
-80 costliest) and `stats` (VRAM accesses that came too fast).
+80 costliest; `profilel` with local labels), `fastpc` (where VRAM writes
+came too fast, and on which raster lines), `linehist SYM` (the raster
+lines the PC reaches SYM on), `flagtrace SYM` (the interrupts and the CPU
+before SYM is reached late in the blank) and `stats` (VRAM accesses that
+came too fast).
 
 For a tunnel, assemble with `-DAUTOPLAY=1 -DFIRST_STAGE=3` (the first
 alpine stage; the demo driver plays the game) and record from about TV

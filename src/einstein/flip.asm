@@ -63,6 +63,7 @@ EinUpload:
         ld (EDirtyPtr), hl
         ld a, (DirtyN)
         ld (EDirtyLeft), a
+        call EinDashSend        ; (the centre line's sprites)
         call EinPanoSend        ; (the panorama's cells under silhouettes)
         ld c, MIRROR_ROWS       ; (the panorama's and the road's rows)
 .row:   push bc
@@ -334,6 +335,14 @@ EinResetDisplay:
         call .solids
         ld de, VRAM_COL + $1000
         call .solids
+        call EinStaticInit      ; the bottom third's ready-made patterns
+        call EinDashReset       ; the centre line's sprites
+        ld hl, EDashAttr
+        ld de, VRAM_SPRATTR
+        ld b, 12 * 4 + 1
+        call VdpWrite
+        xor a
+        ld (EDashAttrNew), a
         call EinMirrorAll
         call EinPanoUpload
         ; the names: rows 0-7 the top third's patterns in order, rows 8-9
