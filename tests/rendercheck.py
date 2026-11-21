@@ -15,6 +15,7 @@ import sys
 
 LOOPS = [300, 600, 900, 1200, 1500, 1800]
 KEYS = ["-k", "250:Q", "-k", "256:none"]
+ZXSIM = "./build/zxsim.exe" if os.name == "nt" else "build/zxsim"
 REGIONS = {"screen A": (5, 0, 6912), "screen B": (7, 0, 6912)}
 
 
@@ -40,7 +41,7 @@ def dumps(sna, sym, outdir, tag):
     out = {}
     for n in LOOPS:
         f = os.path.join(outdir, f"{tag}{n}.ram")
-        subprocess.run(["build/zxsim", sna, "-n", "60000", "-q", "-H", f"{addr}:{n}", "-D", f] + KEYS,
+        subprocess.run([ZXSIM, sna, "-n", "60000", "-q", "-H", f"{addr}:{n}", "-D", f] + KEYS,
                        check=True, capture_output=True)
         out[n] = open(f, "rb").read()
     return out

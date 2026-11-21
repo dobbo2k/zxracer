@@ -29,7 +29,7 @@ zxsim game.sna [options]
   -D FILE         write all eight RAM banks (128 KB) to FILE at exit
   -d ADDR:LEN     hex-dump memory at exit
   -a              print the AY registers at exit
-  -v FILE         write every frame as raw RGB24 320x288 (video capture)
+  -v FILE         write every frame as raw RGB24 320x288 (video capture; - for stdout)
   -y FILE         write the 14 AY registers at the end of every frame
   -q              no summary line
   -T file.tap     tape boot instead of a snapshot (see below)

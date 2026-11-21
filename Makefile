@@ -5,9 +5,16 @@ PYTHON   ?= python3
 ASMFLAGS ?= --nologo --msg=war --fullpath -Ibuild --lst=build/zxracer.lst --sym=build/zxracer.sym
 
 SRC   := $(wildcard src/*.asm)
-ZXSIM := build/zxsim
+# On Windows (MSYS2) the C compiler writes zxsim.exe; the ./ lets Windows
+# run it from the current directory even when NoDefaultCurrentDirectoryInExePath
+# is set
+EXE   := $(if $(findstring _NT,$(shell uname -s)),.exe)
+ZXSIM := ./build/zxsim$(EXE)
 
-.PHONY: all clean run test shots profile video tap release cover leaflet
+# Machine-specific settings (emulator paths); see CLAUDE.md
+-include local.mk
+
+.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet
 all: build/zxracer.sna
 
 build:
@@ -94,8 +101,28 @@ build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm bui
 video: $(ZXSIM) build/video.sna
 	$(PYTHON) tools/make_video.py $(ZXSIM) build/video.sna build/gameplay.mp4 2400
 
+# Real emulators. Set FUSE / ZESARUX to their paths in local.mk (not in git)
+# if they are not on PATH. MACHINE is Fuse's (128, plus2, plus2a, plus3, 48);
+# ZX_MACHINE is ZEsarUX's (128k, P2, P2A41, P341, 48k).
+FUSE       ?= fuse
+ZESARUX    ?= zesarux
+MACHINE    ?= 128
+ZX_MACHINE ?= 128k
+TAPE       ?= build/speedrun.tzx
+# FUSE_OPTS="--no-accelerate-loader --no-fastload --no-traps" loads at real speed
+FUSE_OPTS  ?=
+
+# the development snapshot, in Fuse
 run: build/zxracer.sna
-	fuse --machine 128 build/zxracer.sna
+	"$(FUSE)" --machine $(MACHINE) build/zxracer.sna
+
+# a tape image (TAPE=build/speedrun.tap for the standard one) through the ROM's loader, in Fuse
+run-tape: build/speedrun.tap
+	"$(FUSE)" --machine $(MACHINE) $(FUSE_OPTS) --tape $(TAPE)
+
+# the same in ZEsarUX as a real tape (audio-level timing, as a real machine sees it)
+run-realtape: build/speedrun.tap
+	"$(ZESARUX)" --noconfigfile --machine $(ZX_MACHINE) --realtape "$(abspath $(TAPE))"
 
 clean:
 	rm -rf build

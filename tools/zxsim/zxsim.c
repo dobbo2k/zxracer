@@ -19,7 +19,8 @@
  *   -w ADDR[:N]     print registers when PC reaches ADDR (first N hits, default 20)
  *   -p F:file       from frame F, accumulate T-states per PC; write "addr T" lines to file
  *   -a              print the AY registers at exit
- *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture)
+ *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture;
+ *                   "-" for stdout)
  *   -y FILE         write the 14 AY registers at the end of every frame to FILE
  *                   (register 13's bit 7 set: it was written that frame)
  *   -q              quiet summary
@@ -38,6 +39,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
 #include <ctype.h>
 
 #define FRAME_T   70908
@@ -807,7 +812,12 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "-q")) quiet = 1;
         else if (!strcmp(a, "-a")) show_ay = 1;
         else if (!strcmp(a, "-v") && i + 1 < argc) {
-            if (!(vid = fopen(argv[++i], "wb"))) { perror(argv[i]); return 1; }
+            if (!strcmp(argv[++i], "-")) {          /* stdout, binary */
+#ifdef _WIN32
+                _setmode(_fileno(stdout), _O_BINARY);
+#endif
+                vid = stdout;
+            } else if (!(vid = fopen(argv[i], "wb"))) { perror(argv[i]); return 1; }
         } else if (!strcmp(a, "-y") && i + 1 < argc) {
             if (!(aylog = fopen(argv[++i], "wb"))) { perror(argv[i]); return 1; }
         }

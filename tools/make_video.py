@@ -105,7 +105,7 @@ def main():
          "-vf", "scale=iw*2:ih*2:flags=neighbor", "-c:v", "libx264",
          "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", video],
         stdin=subprocess.PIPE)
-    sim = subprocess.Popen([zxsim, sna, "-n", str(frames), "-q", "-v", "/dev/stdout",
+    sim = subprocess.Popen([zxsim, sna, "-n", str(frames), "-q", "-v", "-",
                             "-y", aylog] + keys, stdout=enc.stdin)
     sim.wait()
     enc.stdin.close()
