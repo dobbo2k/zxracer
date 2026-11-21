@@ -340,8 +340,10 @@ DemoTraffic:
 TimeWarn:
         ld a, (PalTime)
         or $80
+        IFNDEF EINSTEIN         ; (the Einstein: screen B only)
         ld hl, $5800 + 32 + 14
         call .cells
+        ENDIF
         ld hl, $D800 + 32 + 14
 .cells: ld c, 2
 .row:   ld b, 4

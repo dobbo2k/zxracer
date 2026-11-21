@@ -26,8 +26,11 @@ EinBoot:
 ; status. Its frame flag (set as the picture ends, cleared by the read)
 ; starts a TV frame: the Spectrum's 50 Hz interrupt, at most 1 ms late.
 ; Channel 3 (MOS's clock) is stopped.
+ELongWait:      db 0            ; (the CTC on its 16 ms wait)
+
 EinCtcInit:
         xor a
+        ld (ELongWait), a
         out (EIN_CTC0), a       ; the vector (bit 0 clear: not a control word)
         ld a, %00000011         ; channel 3: reset, no interrupt
         out (EIN_CTC3), a
@@ -43,12 +46,21 @@ EinCtcInit:
 ; vertical blank, at least MIN_FRAMES after the last), and the sound.
 EinIsr:
         push af
-        ld a, (EFrontOn)        ; (the front end: the VDP is the main code's,
+        ld a, (ELongWait)       ; the 16 ms wait over: 1 ms ticks again
+        or a
+        jr z, .tick
+        xor a
+        ld (ELongWait), a
+        ld a, %10000111
+        out (EIN_CTC2), a
+        ld a, 250
+        out (EIN_CTC2), a
+.tick:  ld a, (EFrontOn)        ; (the front end: the VDP is the main code's,
         or a                    ; a frame every 20 ticks)
         jr nz, .front
         in a, (EIN_VDP_CTRL)
         rla
-        jr c, .frame
+        jr c, .seen
 .out:   pop af
         ei
         reti
@@ -59,6 +71,13 @@ EinIsr:
         xor a
 .tk:    ld (ETick), a
         jr nz, .out
+        jr .frame
+.seen:  ld a, %10100111         ; a frame seen: the next is ~19.9 ms on, so
+        out (EIN_CTC2), a       ; no polls for 16 ms (timer /256, 250, reset)
+        ld a, 250
+        out (EIN_CTC2), a
+        ld a, 1
+        ld (ELongWait), a
 .frame: push hl
         push bc
         push de

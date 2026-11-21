@@ -263,6 +263,7 @@ ScnEnd:
         OUTPUT "build/einstein/stageov.bin"     ; (into STAGES.DAT too: the front
         INCLUDE "stageov.asm"                   ; end draws over it)
         OUTEND
+        ASSERT $ <= STAGEOV_END                 ; (the Einstein's buffers above)
 ; The front end: run at THEME_CACHE, from STAGES.DAT (assembled here, out of
 ; the COM file's way, for its own file)
         ORG $C000

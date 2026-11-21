@@ -13,15 +13,20 @@ Ceiling:
         ldi
         ldi
         jr z, .sky
-        ld hl, $4840            ; going in: the backdrop's pixels cleared (both
-        call .clear             ; screens; drawn again on the way out)
+        IFNDEF EINSTEIN         ; (the Einstein: screen B only; screen A's memory
+        ld hl, $4840            ; holds its buffers) going in: the backdrop's pixels
+        call .clear             ; cleared (both screens; drawn again on the way out)
+        ENDIF
         ld hl, $C840
         call .clear
         ld a, $FF
         ld (PanoLastA), a
         ld (PanoLastB), a
-.sky:   ld hl, $5800 + 3 * 32   ; both screens' sky and backdrop rows
+.sky:
+        IFNDEF EINSTEIN
+        ld hl, $5800 + 3 * 32   ; both screens' sky and backdrop rows
         call .paint
+        ENDIF
         ld hl, $D800 + 3 * 32
 .paint: jp PaintRaceSky
 ; HL = the backdrop's first byte (character rows 10-11): its 8 pixel lines

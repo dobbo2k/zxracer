@@ -26,10 +26,20 @@ EinSpecIn:
         cp (hl)
         call nz, EinKeyScan
         ld e, $FF               ; E: the answer
-        ld hl, SpecKeys
         ld b, 0                 ; B: the half-row
 .h:     rrc c
         jr c, .n
+        ld a, b                 ; its keys: SpecKeys + B * 10
+        add a, a
+        ld l, a
+        add a, a
+        add a, a
+        add a, l
+        add a, low SpecKeys
+        ld l, a
+        ld a, high SpecKeys
+        adc a, 0
+        ld h, a
         push hl
         ld a, b                 ; its answer this TV frame, worked out once
         add a, low EKeyAns
@@ -71,12 +81,7 @@ EinSpecIn:
 .have:  and e
         ld e, a
         pop hl
-.n:     ld a, l                 ; the next half-row's keys
-        add a, 10
-        ld l, a
-        jr nc, .hn
-        inc h
-.hn:    inc b
+.n:     inc b
         ld a, b
         cp 8
         jr nz, .h

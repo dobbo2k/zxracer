@@ -18,12 +18,24 @@
 ; ---------------------------------------------------------------------------
 
 ; Every road row into NameBuf, changed slots into SlotShadow and DirtyList
-; A row is drawn again only if the road's shape changed (pass 1 ran:
-; EinShape) or its bands moved (the band bytes of its four line pairs).
+; A row is drawn again only if its bands moved (the band bytes of its four
+; line pairs) or, pass 1 having run (EinShape), its shape did: what its
+; cells come from (EinRowSame). EinForce: every row (a display reset, in or
+; out of a tunnel).
 EinDraw:
+        ld hl, DirtyList
+        ld (EDirtyEnd), hl
         xor a
         ld (DirtyN), a
         ld (ERow), a
+        ld a, (TunInside)       ; (in or out of a tunnel: every row, for the lamps)
+        ld hl, ELastTun
+        cp (hl)
+        jr z, .tun
+        ld (hl), a
+        ld a, 1
+        ld (EinForce), a
+.tun:
         ld a, (PalRoad)         ; (the road's colours, for silhouettes)
         push af
         call AttrPaper
@@ -31,6 +43,7 @@ EinDraw:
         pop af
         call AttrInk
         ld (ERoadInkT), a
+        call EinColourSets
         call EinPanoCompose     ; the panorama's rows (src/einstein/sprites.asm)
 .lp:    ld a, (ERow)            ; the row's bands as last drawn
         add a, a
@@ -47,8 +60,7 @@ EinDraw:
         add a, low Band
         ld l, a
         ld h, high Band
-        ld a, (EinShape)
-        ld c, a                 ; C: draw it
+        ld c, 0                 ; C: draw it
         ld b, 4
 .bd:    ld a, (de)
         cp (hl)
@@ -60,7 +72,26 @@ EinDraw:
         inc l
         inc l
         djnz .bd
+        ld a, (EinShape)        ; pass 1 ran: has the row's shape changed?
+        or a
+        jr z, .drawn
         ld a, c
+        or a
+        jr nz, .inval
+        push bc
+        call EinRowSame
+        pop bc
+        jr z, .drawn
+        ld c, 1
+        jr .drawn
+.inval: ld a, (ERow)            ; drawn for its bands anyway: its shape is
+        add a, low ERowFk       ; checked in full next time (not stored now)
+        ld l, a
+        ld a, high ERowFk
+        adc a, 0
+        ld h, a
+        ld (hl), 1
+.drawn: ld a, c
         or a
         call nz, EinRow
         call EinRoadCompose     ; then its silhouettes and the car
@@ -71,6 +102,137 @@ EinDraw:
         jr nz, .lp
         xor a
         ld (EinShape), a
+        ld (EinForce), a
+        ret
+
+; The row (ERow): has what its cells come from changed since it was drawn?
+; Its 4 line pairs' D, E, centre line and depth line, its last line's D, E
+; and depth line (ERowSig, 20 bytes a row). Z: the same; NZ: changed (and
+; stored), or a fork row or the first after one (ERowFk), or EinForce.
+SIG_SIZE        EQU 20
+EinRowSame:
+        ld a, (ERow)            ; a fork row: always (and the next time)
+        ld e, a
+        add a, low RowFork
+        ld l, a
+        ld h, high RowFork
+        ld a, (hl)
+        ld hl, ERowFk
+        ld d, 0
+        add hl, de
+        ld c, (hl)              ; C: changed (drawn as a fork last time)
+        ld (hl), a
+        or a
+        ret nz
+        ld a, (EinForce)        ; (or forced)
+        or c
+        ld c, a
+        call .sig               ; DE = its signature, L = its top line (C kept)
+        ld a, c
+        or a
+        jr nz, .store
+        push de
+        push hl
+        ld b, 4                 ; compared to the first difference
+.p:     ld h, high DEPage
+        ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        set 7, l
+        ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        res 7, l
+        ld h, high LaneX
+        ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        set 7, l
+        ld h, high SrcLine
+        ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        res 7, l
+        inc l
+        inc l
+        djnz .p
+        dec l                   ; the last line
+        ld h, high DEPage
+        ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        set 7, l
+        ld a, (de)
+        cp (hl)
+        jr nz, .diff
+        inc de
+        ld h, high SrcLine
+        ld a, (de)
+        cp (hl)
+        pop hl
+        pop de
+        ret z                   ; the same
+        jr .store
+.diff:  pop hl
+        pop de
+.store: ld b, 4                 ; changed: stored
+.s:     ld h, high DEPage
+        ld a, (hl)
+        ld (de), a
+        inc de
+        set 7, l
+        ld a, (hl)
+        ld (de), a
+        inc de
+        res 7, l
+        ld h, high LaneX
+        ld a, (hl)
+        ld (de), a
+        inc de
+        set 7, l
+        ld h, high SrcLine
+        ld a, (hl)
+        ld (de), a
+        inc de
+        res 7, l
+        inc l
+        inc l
+        djnz .s
+        dec l
+        ld h, high DEPage
+        ld a, (hl)
+        ld (de), a
+        inc de
+        set 7, l
+        ld a, (hl)
+        ld (de), a
+        inc de
+        ld h, high SrcLine
+        ld a, (hl)
+        ld (de), a
+        or 1                    ; (NZ)
+        ret
+; -> DE = ERowSig + ERow * 20, L = the row's top line
+.sig:   ld a, (ERow)
+        add a, a
+        add a, a
+        ld l, a                 ; x 4
+        add a, a
+        add a, a                ; x 16
+        add a, l                ; x 20
+        add a, low ERowSig
+        ld e, a
+        ld a, high ERowSig
+        adc a, 0
+        ld d, a
+        ld a, l
+        add a, a                ; the top line: row * 8
+        ld l, a
         ret
 
 EinRow:
@@ -82,7 +244,6 @@ EinRow:
         call EinRowSlots
         xor a
         ld (ESlotN), a
-        ld (ECDoneN), a
         ld a, (ESlotMax)        ; the centre line's slots from the row's last down
         ld (ESlotTop), a
         jr EinRowBase
@@ -99,7 +260,8 @@ EinRowSlots:
         add a, b                ; x 12 (SLOTS_T1)
         ASSERT SLOTS_T1 == 12
         ld (ESlot0), a
-        ld a, SLOTS_T1
+        add a, SLOT_FIRST       ; (the middle third's names)
+        ld b, SLOTS_T1
         jr .ts
 .t2:    sub 4
         add a, a
@@ -111,8 +273,23 @@ EinRowSlots:
         ASSERT SLOTS_T2 == 24
         add a, 4 * SLOTS_T1
         ld (ESlot0), a
-        ld a, SLOTS_T2
-.ts:    ld (ESlotMax), a
+        add a, SLOT_FIRST - 4 * SLOTS_T1    ; (the bottom third's names)
+        ld b, SLOTS_T2
+.ts:    ld (ESlotName0), a
+        ld a, b
+        ld (ESlotMax), a
+        ld a, (ESlot0)          ; SlotShadow + ESlot0 * 9
+        ld l, a
+        ld h, 0
+        ld d, h
+        ld e, l
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, de
+        ld de, SlotShadow
+        add hl, de
+        ld (ESlotPtr), hl
         ret
 
 EinRowBase:
@@ -246,11 +423,18 @@ EinRowBase:
         add hl, de
         ld a, (ESlotTop)
         ld (hl), a
-        ld a, (ERow)            ; the car's rows: its attributes again
-        cp CAR_ROW - ROAD_ROW0
+        ld a, (ERow)            ; the car's rows: its attributes again, and
+        cp CAR_ROW - ROAD_ROW0  ; its names over the road's
         ret c
         ld a, 1
         ld (CarAttrDirty), a
+        ld a, (ERow)
+        add a, ROAD_ROW0
+        ld b, a
+        ld hl, (ERowPtr)
+        call EinCarNames
+        ld a, (ERow)
+        cp CAR_ROW - ROAD_ROW0
         ret nz
 ; Row 20: the attributes under the car's open cockpit (columns 12-19, as
 ; src/fork.asm SaveCockpit keeps them for DrawCar)
@@ -435,6 +619,44 @@ EinRowRanges:
 ; ECK kerb, ECR road (TMS colours), EKC a kerb cell's colour byte (the road
 ; over the kerb), ELC a centre-line cell's (white over the road)
 EinRowColours:
+        ld a, (ERBand)          ; its set: tunnel (bit 7), dark (bit 6)
+        rlca
+        rlca
+        and 3
+        ld l, a
+        add a, a
+        add a, a
+        add a, a
+        sub l                   ; x 7
+        add a, low ERowSets
+        ld l, a
+        ld a, high ERowSets
+        adc a, 0
+        ld h, a
+        ld de, EAG
+        ld bc, 7
+        ldir
+        ret
+
+; A frame's 4 colour sets (ERowSets: open / tunnel, light / dark bands)
+EinColourSets:
+        ld de, ERowSets
+        xor a
+.set:   push af
+        push de
+        ld (ERBand), a
+        call EinRowColour
+        pop de
+        ld hl, EAG
+        ld bc, 7
+        ldir
+        pop af
+        add a, $40
+        jr nc, .set
+        ret
+
+; ERBand -> the row's colours (EAG ... ELC)
+EinRowColour:
         ld a, (ERBand)
         ld bc, (PalGrassL)      ; C = light grass, B = dark grass
         ld de, (PalKerbL)       ; E = light kerb, D = dark kerb
@@ -617,41 +839,47 @@ EinCellMasks:
         ld de, EPat
         ld b, 4
 .ln:    ld a, c
-        sub (hl)                ; the cell - D's cell
-        jr c, .left             ; left of the road
-        inc hl
-        ld a, $FF
-        jr nz, .r               ; right of D's cell
-        ld a, (hl)              ; D's cell: its mask
-.r:     inc hl
-        ex af, af'
-        ld a, (hl)
-        sub c                   ; E's cell - the cell
-        inc hl
-        jr c, .right            ; right of the road
-        jr z, .em
-        ex af, af'
-        jr .st
-.em:    ex af, af'
-        and (hl)                ; E's cell: its mask too
-.st:    inc hl
+        cp (hl)                 ; D's cell
+        jr c, .zero4            ; left of the road (or none on the pair)
+        jr z, .atD
+        inc l
+        inc l
+        cp (hl)                 ; E's cell
+        jr c, .full             ; between: all road
+        jr z, .atE
+        xor a                   ; right of the road
+        jr .put2
+.full:  ld a, $FF
+.put2:  inc l
+        inc l
+.put:   ld (de), a
+        inc e
         ld (de), a
-        inc de
-        ld (de), a
-        inc de
+        inc e
         djnz .ln
         ret
-.left:  inc hl
-        inc hl
-        inc hl
-.right: inc hl
-        xor a
-        ld (de), a
-        inc de
-        ld (de), a
-        inc de
-        djnz .ln
-        ret
+.atE:   inc l
+        ld a, (hl)              ; E's mask
+        inc l
+        jr .put
+.zero4: xor a
+        inc l
+        inc l
+        jr .put2
+.atD:   inc l
+        ld a, (hl)              ; D's mask
+        inc l
+        ex af, af'
+        ld a, c
+        cp (hl)                 ; E's cell too?
+        jr nz, .dOnly
+        ex af, af'
+        inc l
+        and (hl)                ; and its mask
+        inc l
+        jr .put
+.dOnly: ex af, af'
+        jr .put2
 
 ; ---------------------------------------------------------------------------
 ; A row with both of the fork's branches on it (RowFork; their spans in
@@ -783,21 +1011,24 @@ EinForkCells:
 ; ---------------------------------------------------------------------------
 ; The centre line (light bands only, in road cells [b, c-1) as on the
 ; Spectrum), per line pair: its cell and the two bytes (ECL, ECM1, ECM2),
-; then a slot for each cell it touches.
+; the leftmost and rightmost of those cells; then each cell from the
+; leftmost to one past the rightmost built once and given a slot if the
+; line is in it.
 EinCentreLine:
+        ld a, $FF
+        ld (ECLo), a
+        xor a
+        ld (ECHi), a
         ld a, (EI)
-        ld (ELine), a
+        ld c, a                 ; C = the pair's line
         ld ix, ECL
         ld b, 4
-.cl:    push bc
-        ld (ix + 0), $FF
-        ld a, (ELine)
-        ld c, a
+.cl:    ld (ix + 0), $FF
+        ld a, c
         add a, low Band
         ld l, a
         ld h, high Band
-        ld a, (hl)
-        and STRIPE_BIT
+        bit 6, (hl)             ; (STRIPE_BIT: a dark band)
         jr nz, .none
         ld l, c
         ld h, high LaneX
@@ -815,12 +1046,21 @@ EinCentreLine:
         jr c, .none
         ld a, (ERC)
         dec a
-        ld l, a
-        ld a, d
-        cp l
-        jr nc, .none
+        cp d
+        jr c, .none
+        jr z, .none
         ld (ix + 0), d
-        ld l, c                 ; width: LaneW of the depth line shown
+        ld a, (ECLo)
+        cp d
+        jr c, .lo
+        ld a, d
+        ld (ECLo), a
+.lo:    ld a, (ECHi)
+        cp d
+        jr nc, .hi
+        ld a, d
+        ld (ECHi), a
+.hi:    ld l, c                 ; width: LaneW of the depth line shown
         set 7, l
         ld h, high SrcLine
         ld a, (hl)
@@ -846,51 +1086,33 @@ EinCentreLine:
         ld a, (hl)
         ld (ix + 8), a
 .none:  inc ix
-        ld hl, ELine
-        inc (hl)
-        inc (hl)
-        pop bc
+        inc c
+        inc c
         djnz .cl
-        ; each cell a pair touches: its own and the next
-        ld ix, ECL
-        ld b, 4
-.cc:    ld a, (ix + 0)
+        ld a, (ECLo)            ; the cells, leftmost to rightmost + 1
         cp $FF
-        jr z, .ccn
-        push bc
-        push af
-        call EinCentreCell
-        pop af
-        inc a
-        call EinCentreCell
-        pop bc
-.ccn:   inc ix
-        djnz .cc
-        ret
-
-; A = a cell the centre line touches: its slot (once a row)
-EinCentreCell:
-        ld c, a
-        ld hl, ECDone           ; done already?
-        ld a, (ECDoneN)
-        or a
-        jr z, .new
-        ld b, a
-.dn:    ld a, (hl)
-        cp c
         ret z
-        inc hl
-        djnz .dn
-.new:   ld (hl), c
-        ld hl, ECDoneN
-        inc (hl)
-        ld a, c
-        ld (ECol), a
-        ; per pair: the first byte if the pair's cell is this one, the
-        ; second if it is the one before
+.cell:  ld (ECol), a
+        call EinCentreCell
+        ld a, (ECHi)
+        inc a
+        ld hl, ECol
+        cp (hl)
+        ret z
+        ld a, (hl)
+        inc a
+        jr .cell
+
+; ECol: the centre line's pixels in it, per pair (the first byte if the
+; pair's cell is this one, the second if it is the one before); a slot if
+; there are any
+EinCentreCell:
+        ld a, (ECol)
+        ld c, a
         ld hl, ECL
         ld de, EPat
         ld b, 4
+        ld ixl, 0               ; (any pixels)
 .ln:    ld a, (hl)
         cp c
         jr z, .m1
@@ -900,12 +1122,11 @@ EinCentreCell:
         xor a
         jr .put
 .m1:    push hl
-        ld a, l
-        add a, 4
-        ld l, a
-        jr nc, .m1h
-        inc h
-.m1h:   ld a, (hl)
+        inc hl
+        inc hl
+        inc hl
+        inc hl
+        ld a, (hl)
         pop hl
         jr .put
 .m2:    push hl
@@ -921,15 +1142,14 @@ EinCentreCell:
         ld (de), a
         inc de
         inc hl
+        push af
+        or ixl
+        ld ixl, a
+        pop af
         djnz .ln
-        ld hl, EPat             ; none of it in this cell: plain road
-        ld b, 8
-        xor a
-.any:   or (hl)
-        inc hl
-        djnz .any
+        ld a, ixl
         or a
-        ret z
+        ret z                   ; none of it in this cell: plain road
         ld a, (ELC)
         call EinCommitTop
         cp $FF
@@ -971,31 +1191,27 @@ EinCommitTop:
         ret
 .ok:    dec (hl)
         ld b, (hl)
-; B = the slot in the row, C = the colour
+; B = the slot in the row, C = the colour -> A = its name
 EinCommitAt:
-        ld a, c
-        ld (EColour), a
-        ld a, (ESlot0)
-        add a, b
-        ld (ES), a              ; the SlotShadow index
+        ld a, b                 ; HL = its SlotShadow bytes
+        add a, a
+        add a, a
+        add a, a
+        add a, b                ; x 9 (SLOT_SIZE; a row's 24 slots: < 256)
+        ASSERT SLOT_SIZE == 9
+        ld hl, (ESlotPtr)
+        add a, l
         ld l, a
-        ld h, 0
-        ld d, h
-        ld e, l
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, de              ; x 9
-        ld de, SlotShadow
-        add hl, de
-        push hl
+        jr nc, .h
+        inc h
+.h:     push hl
         ld de, EPat             ; the same pixels? (unrolled)
         DUP 7
         ld a, (de)
         cp (hl)
         jr nz, .newPat
         inc hl
-        inc de
+        inc e
         EDUP
         ld a, (de)
         cp (hl)
@@ -1011,7 +1227,7 @@ EinCommitAt:
         pop de
         push de
         ld hl, EPat
-        ldi                     ; (BC's count is spent: C reloaded below)
+        push bc                 ; (LDI spends BC)
         ldi
         ldi
         ldi
@@ -1019,9 +1235,9 @@ EinCommitAt:
         ldi
         ldi
         ldi
+        ldi
+        pop bc
         ex de, hl
-        ld a, (EColour)
-        ld c, a
         ld a, (hl)
         ld (hl), c
         cp c
@@ -1033,27 +1249,19 @@ EinCommitAt:
         add a, a
         or e
         ld e, a
-        ld a, (DirtyN)
-        cp N_SLOTS - 1
-        jr nc, .same            ; (cannot happen: each slot once a frame)
-        ld l, a
-        inc a
-        ld (DirtyN), a
-        ld h, 0
-        add hl, hl
-        ld bc, DirtyList
-        add hl, bc
-        ld a, (ES)
+        ld a, (ESlot0)          ; (slot, what) onto DirtyList (each slot at
+        add a, b                ; most once a frame: it never fills)
+        ld hl, (EDirtyEnd)
         ld (hl), a
         inc hl
         ld (hl), e
+        inc hl
+        ld (EDirtyEnd), hl
+        ld hl, DirtyN
+        inc (hl)
 .same:  pop hl
-        ld a, (ES)              ; its name: the middle third's slots from
-        cp 4 * SLOTS_T1         ; SLOT_FIRST, the bottom third's after theirs
-        jr nc, .t2
-        add a, SLOT_FIRST
-        ret
-.t2:    add a, SLOT_FIRST - 4 * SLOTS_T1
+        ld a, (ESlotName0)      ; its name
+        add a, b
         ret
 
 ; ---------------------------------------------------------------------------
@@ -1064,8 +1272,9 @@ ESlot0:         db 0            ; its first slot, how many it has, how many used
 ESlotMax:       db 0
 ESlotN:         db 0
 ESlotTop:       db 0            ; the centre line's lowest slot so far
-ES:             db 0
-EColour:        db 0
+ESlotPtr:       dw 0            ; its first slot's bytes in SlotShadow
+ESlotName0:     db 0            ; its first slot's name
+EDirtyEnd:      dw 0            ; DirtyList's end
 ERW0:           db 0            ; kerb widths of its top and bottom lines
 ERW1:           db 0
 ERA:            db 0            ; cell ranges
@@ -1073,6 +1282,7 @@ ERB:            db 0
 ERC:            db 0
 ERD:            db 0
 ERBand:         db 0
+ERowSets:       ds 4 * 7        ; EAG ... ELC for each band (EinColourSets)
 EAG:            db 0            ; attributes: grass, kerb
 EAK:            db 0
 ECG:            db 0            ; colours (TMS): grass, kerb, road
@@ -1086,18 +1296,24 @@ EX0:            db 0
 ELine:          db 0
         ASSERT high EPat == high (EPat + 7)   ; (EinKerbName steps L)
 EPat:           ds 8
+        ASSERT high EPat == high (EPat + 7)
 EFA:            ds 4            ; a fork row: the left branch's cell ranges
 EPat2:          ds 8
 ELines2:        ds 4 * 4        ; the right branch's line pairs
+        ASSERT high ELines2 == high (ELines2 + 15)
 EDMin:          db 0
 EEMax:          db 0
 ELines:         ds 4 * 4        ; per pair: D's cell and mask, E's cell and mask
+        ASSERT high ELines == high (ELines + 15)
 ECL:            ds 4            ; centre line per pair: cell ($FF: none),
 ECM1:           ds 4            ; its first byte,
 ECM2:           ds 4            ; its second
-ECDone:         ds 16           ; cells given a slot this row
-ECDoneN:        db 0
+ECLo:           db 0            ; the centre line's leftmost and rightmost cells
+ECHi:           db 0
 DirtyN:         db 0
-EinShape:       db 1            ; pass 1 ran: every row again
+EinShape:       db 1            ; pass 1 ran: rows whose shape changed again
+EinForce:       db 1            ; every row again
+ELastTun:       db 0
+
 ERowBands:      ds 4 * 12       ; per row, the bands it was drawn with
 ERowDrawn:      ds 24           ; per screen row: its names to be sent

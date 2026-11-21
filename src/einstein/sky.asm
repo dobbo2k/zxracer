@@ -33,23 +33,8 @@ EinMarkCell:
         and 31
         ld l, a                 ; H = row, L = column
         push de
-        ld a, (EMirrorN)
-        cp EMIRROR_MAX
-        jr nc, .full
-        ld e, a
-        inc a
-        ld (EMirrorN), a
-        ld d, 0
-        ex de, hl
-        add hl, hl
-        push bc
-        ld bc, EMirror
-        add hl, bc
-        pop bc
-        ld (hl), d
-        inc hl
-        ld (hl), e
-.full:  pop de
+        call EinMarkHL
+        pop de
 .x:     pop hl
         pop af
         ret
@@ -58,21 +43,43 @@ EinMarkCell:
 EinMarkRC:
         push hl
         push de
-        ld a, (EMirrorN)
-        cp EMIRROR_MAX
-        jr nc, .full
-        ld l, a
-        inc a
-        ld (EMirrorN), a
-        ld h, 0
-        add hl, hl
-        ld de, EMirror
-        add hl, de
-        ld (hl), b
-        inc hl
-        ld (hl), c
-.full:  pop de
+        ld h, b
+        ld l, c
+        call EinMarkHL
+        pop de
         pop hl
+        ret
+
+; H = row (0-9), L = column: its bit in EMirrorBits set (a cell noted any
+; number of times is sent once; none is ever dropped). A, DE, HL spent.
+EinMarkHL:
+        ld a, l
+        and 7
+        add a, low EBitTab
+        ld e, a
+        ld a, high EBitTab
+        adc a, 0
+        ld d, a                 ; (DE): its bit
+        ld a, h
+        add a, a
+        add a, a
+        ld h, a                 ; row * 4
+        ld a, l
+        rrca
+        rrca
+        rrca
+        and 3
+        add a, h
+        add a, low EMirrorBits
+        ld l, a
+        ld a, high EMirrorBits
+        adc a, 0
+        ld h, a
+        ld a, (de)
+        or (hl)
+        ld (hl), a
+        ld a, 1
+        ld (EMirrorN), a
         ret
 
 ; The starting lights' cells (src/lampdraw.asm): 2 x 2 cells each, at
@@ -149,37 +156,54 @@ EinMirror:
         ld a, (EMirrorN)
         or a
         ret z
-        cp MIRROR_FRAME + 1
-        jr c, .all
-        sub MIRROR_FRAME        ; the rest: kept for the next frames
-        ld (EMirrorN), a
-        add a, a
-        ld c, a
-        ld b, 0
-        push bc
-        ld hl, EMirror          ; these first
-        ld b, MIRROR_FRAME
-        call .send
-        pop bc                  ; then the rest to the front
-        ld hl, EMirror + 2 * MIRROR_FRAME
-        ld de, EMirror
-        ldir
-        ret
-.all:   ld b, a
         xor a
-        ld (EMirrorN), a
-        ld hl, EMirror
-.send:
-.c:     push bc
-        ld b, (hl)
-        inc hl
-        ld c, (hl)
-        inc hl
+        ld (EMirrorN), a        ; (noted again if some are left)
+        ld a, MIRROR_FRAME
+        ld (EMirrorLeft), a
+        ld hl, EMirrorBits
+        ld b, 0                 ; B = row, C = column
+.r:     ld c, 0
+.byte:  ld a, (hl)
+        or a
+        jr nz, .bits
+        ld a, c                 ; (none in these 8)
+        add a, 8
+        ld c, a
+        jr .nb
+.bits:  ld e, 1                 ; E: the column's bit
+.bit:   ld a, (hl)
+        and e
+        jr z, .nx
+        ld a, (EMirrorLeft)
+        or a
+        jr z, .more
+        dec a
+        ld (EMirrorLeft), a
+        ld a, e
+        cpl
+        and (hl)
+        ld (hl), a
+        push bc
+        push de
         push hl
         call EinMirrorCell
         pop hl
+        pop de
         pop bc
-        djnz .c
+.nx:    inc c
+        sla e
+        jr nz, .bit
+.nb:    inc hl
+        ld a, c
+        cp 32
+        jr nz, .byte
+        inc b
+        ld a, b
+        cp MIRROR_ROWS
+        jr nz, .r
+        ret
+.more:  ld a, 1                 ; (this frame's share sent: the rest later)
+        ld (EMirrorN), a
         ret
 
 ; Every cell of rows 0-9 (a new stage, the display off)
@@ -197,7 +221,12 @@ EinMirrorAll:
         ld a, b
         cp MIRROR_ROWS
         jr nz, .r
+        ld hl, EMirrorBits      ; (none left to send)
+        ld b, MIRROR_ROWS * 4
         xor a
+.z:     ld (hl), a
+        inc hl
+        djnz .z
         ld (EMirrorN), a
         ret
 
@@ -572,5 +601,6 @@ EFlashOn:       db 0            ; FLASH cells: ink and paper swapped now
 EinCarDirty:    db 1
 EinCarFull:     db 1
 EinCarAttr:     ds 4 * CAR_W    ; the car's attributes in VRAM
-EMirrorN:       db 0
+EMirrorN:       db 0            ; any cells noted in EMirrorBits
+EMirrorLeft:    db 0            ; (EinMirror: this frame's share left)
 EPanoLast:      db $FF

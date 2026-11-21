@@ -101,8 +101,8 @@ EinUpload:
         or a
         jr z, .next
         ld (hl), 0
-        ld l, c                 ; NameBuf + row * 32 -> VRAM_NAMES + row * 32
-        ld h, 0
+        ld l, c                 ; VRAM_NAMES + row * 32, from NameBuf's row (2:
+        ld h, 0                 ; put together) or BaseNames' (1)
         add hl, hl
         add hl, hl
         add hl, hl
@@ -114,7 +114,10 @@ EinUpload:
         ex de, hl
         pop hl
         ld bc, NameBuf
-        add hl, bc
+        dec a
+        jr nz, .nb
+        ld bc, BaseNames - PANO_ROW0 * 32
+.nb:    add hl, bc
         ld b, 32
         call EinWrite
 .next:  pop bc
@@ -178,9 +181,15 @@ EinFill:
 .f:     out (c), a
         djnz .f
         ret
-.paced: ld c, b
-        ld b, 0
-        jp VdpFill
+.paced: call VdpAddr            ; (paced: 37 T a byte)
+        ld a, l
+        ld c, EIN_VDP_DATA
+.p:     out (c), a
+        nop
+        nop
+        nop
+        djnz .p
+        ret
 
 EBudget:        dw 0
 EDirtyPtr:      dw 0
@@ -219,23 +228,38 @@ EinSendSlot:
         ld de, SlotShadow
         add hl, de
         pop de
-        ld a, c                 ; both, and the blank's budget for them: at once
-        cp 3
-        jr nz, .one
-        push hl
+        push hl                 ; its cost: 8 units a part, and ITEM_UNITS
         ld hl, (EBudget)
-        push de
-        ld de, -(16 + ITEM_UNITS)
-        add hl, de
+        ld a, c
+        cp 3
+        ld a, low -(8 + ITEM_UNITS)
+        jr nz, .c1
+        ld a, low -(16 + ITEM_UNITS)
+.c1:    push de
+        ld e, a
+        ld d, $FF
+        add hl, de              ; (carry: it fits)
         pop de
-        jr nc, .slow            ; (spent: the paced way)
+        jr nc, .paced
         ld (EBudget), hl
         pop hl
+        bit 0, c                ; ---- at full speed
+        jr z, .fc
+        push bc
         call VdpAddr
         ld c, EIN_VDP_DATA
         DUP 8
         outi
         EDUP
+        pop bc
+        jr .fc2
+.fc:    ld a, l                 ; (past the pixels)
+        add a, 8
+        ld l, a
+        jr nc, .fc2
+        inc h
+.fc2:   bit 1, c
+        ret z
         ld a, d                 ; the colour, on all 8 lines
         add a, high VRAM_COL
         ld d, a
@@ -245,28 +269,45 @@ EinSendSlot:
         out (EIN_VDP_DATA), a
         EDUP
         ret
-.slow:  pop hl
-.one:   bit 0, c
-        jr z, .col
-        push bc
-        push de
-        push hl
-        ld b, 8
-        call EinWrite
+.paced: ld hl, 0                ; ---- the budget spent: paced, 32 T a byte
+        ld (EBudget), hl
         pop hl
-        pop de
+        bit 0, c
+        jr z, .pc
+        push bc
+        call VdpAddr
+        ld c, EIN_VDP_DATA
+        DUP 8
+        outi
+        nop
+        nop
+        nop
+        nop
+        EDUP
         pop bc
-.col:   bit 1, c
-        ret z
-        ld bc, 8
-        add hl, bc
-        ld a, (hl)              ; the colour, on all 8 lines
+        jr .pc2
+.pc:    ld a, l
+        add a, 8
         ld l, a
+        jr nc, .pc2
+        inc h
+.pc2:   bit 1, c
+        ret z
         ld a, d
         add a, high VRAM_COL
         ld d, a
-        ld b, 8
-        jp EinFill
+        call VdpAddr
+        ld a, (hl)
+        ld c, EIN_VDP_DATA
+        DUP 8
+        out (c), a
+        nop
+        nop
+        nop
+        nop
+        nop
+        EDUP
+        ret
 
 ; ---------------------------------------------------------------------------
 ; The display afresh (the end of OvResetDisplay, at a new stage, once the
@@ -318,6 +359,27 @@ EinResetDisplay:
         ld a, (PalGrassL)
         ld b, (24 - ROAD_ROW0) * 32 / 2
         call .fill
+        ld b, CAR_ROW           ; the car's names (they stay)
+.cn:    push bc
+        ld a, b
+        sub PANO_ROW0
+        rrca
+        rrca
+        rrca
+        ld l, a
+        and $E0
+        ld e, a
+        ld a, l
+        and 3
+        ld d, a
+        ld hl, BaseNames
+        add hl, de
+        call EinCarNames
+        pop bc
+        inc b
+        ld a, b
+        cp 24
+        jr nz, .cn
         ld hl, BaseNames
         ld de, NameBuf + PANO_ROW0 * 32
         ld bc, (24 - PANO_ROW0) * 32
@@ -368,6 +430,7 @@ EinResetDisplay:
         ld (DirtyN), a
         inc a
         ld (EinShape), a        ; every row to be drawn
+        ld (EinForce), a
         call VdpOn
         ei
         ret

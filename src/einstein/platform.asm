@@ -58,17 +58,38 @@ EPicBuf         EQU THEME_CACHE + 4352  ; a picture from the disc, after the fro
 SKY_PAT_T1      EQU 64              ; rows 8-9's patterns in the middle third
 PANO_PAT        EQU 128             ; the panorama's
 MIRROR_ROWS     EQU 10
-EMIRROR_MAX     EQU 240             ; cells waiting to be sent (a tunnel's ceiling: 224)
 
 ; Buffers (not in the COM file)
 EIN_BUF         EQU $DB00
 NameBuf         EQU EIN_BUF                     ; the names as drawn (768)
 SlotShadow      EQU NameBuf + 768               ; the slots in VRAM (N_SLOTS x 9)
 DirtyList       EQU SlotShadow + N_SLOTS * SLOT_SIZE    ; (slot, what) per changed slot
-EMirror         EQU DirtyList + 2 * N_SLOTS     ; (row, column) per sky cell written
-EIN_CMDLISTB    EQU EMirror + 2 * EMIRROR_MAX   ; the Spectrum's buffer B commands
+EMirrorBits     EQU DirtyList + 2 * N_SLOTS     ; the sky's cells to be sent: a bit each
+EIN_CMDLISTB    EQU EMirrorBits + MIRROR_ROWS * 4   ; the Spectrum's buffer B commands
 EIN_BUF_END     EQU EIN_CMDLISTB + 1 + MAX_SPR * CMD_SIZE
         ASSERT EIN_BUF_END <= $EC00
+
+; Buffers in the Spectrum's screen A ($4000-$5AFF), around the resident stage
+; overlay: every one is made afresh by EinResetDisplay, which follows every
+; stage load (whose scratch, ART_INPUT on, they share) and the front end
+; (which draws over all of screen A). Nothing else writes screen A in play
+; (Ceiling and TimeWarn write screen B alone here).
+STAGEOV_END     EQU $4800               ; (the overlay below: src/main.asm)
+BaseNames       EQU $4800               ; rows 10-23 as the road and panorama draw them
+        ASSERT (BaseNames & 31) == 0    ; (a row never crosses a page: EinFillRun)
+ESkyAttr        EQU $4A00               ; sky rows 3-9's attributes sent (portal.asm)
+EMaskP          EQU ESkyAttr + (PANO_ROW0 - 3) * 32     ; the portal's cells, this frame
+EMaskPOld       EQU EMaskP + 24 * MASK_ROW              ; and the last
+EMaskN          EQU EMaskPOld + 24 * MASK_ROW           ; the silhouettes' cells
+EMaskU          EQU EMaskN + 24 * MASK_ROW              ; and last frame's with them
+EPanoSpr        EQU $5680               ; the panorama's cells under silhouettes (64 x 8)
+EPanoList       EQU EPanoSpr + 64 * 8   ; (64)
+ERowSig         EQU EPanoList + 64      ; per road row: what it was drawn from
+ERowFk          EQU ERowSig + 12 * SIG_SIZE ; per road row: drawn as a fork
+        ASSERT BaseNames + (24 - PANO_ROW0) * 32 <= ESkyAttr
+        ASSERT EMaskU + 24 * MASK_ROW <= EPanoSpr
+        ASSERT ERowFk + 12 <= $5B00
+        ASSERT ART_BITMAP + 512 + 640 <= EPanoSpr
 
         ORG $0100
         jp EinBoot              ; (the theme cache follows at THEME_CACHE)

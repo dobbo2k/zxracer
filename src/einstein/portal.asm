@@ -188,6 +188,4 @@ EinPortalReset:
 
 EPortalAny:     db 0
 EBaseRoad:      db 0
-ESkyAttr:       ds (PANO_ROW0 - 3) * 32     ; sky rows 3-9's attributes sent
-EMaskP:         ds 24 * MASK_ROW            ; the portal's cells, this frame
-EMaskPOld:      ds 24 * MASK_ROW            ; and the last
+

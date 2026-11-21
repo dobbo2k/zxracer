@@ -29,7 +29,7 @@
 //   until SYM S        run until the PC reaches SYM (at most S seconds)
 //   wait16 SYM VALUE   run until the word at SYM reaches VALUE; prints the
 //                      TV frames it took (with -DFIXED_ELAPSED: a benchmark)
-//   profile N          T-states per routine over N frames, costliest first
+//   profile N          T-states per routine over N frames, the 80 costliest
 //   stats              VDP frames, fast VRAM accesses since the game began,
 //                      interrupts, PC
 //
@@ -336,7 +336,7 @@ int main(int argc, char** argv) {
             for (const auto& [name, address] : symbols)
                 if (name.find('.') == std::string::npos && address >= 0x0100) labels.emplace_back(address, name);
             std::sort(labels.begin(), labels.end());
-            std::map<std::string, std::uint64_t> spent;
+            std::map<std::string, std::uint64_t> spent, calls;
             const int count = std::stoi(next());
             const auto target = m.vdp.frames() + std::uint64_t(count);
             const auto start = m.tstates;
@@ -347,14 +347,16 @@ int main(int argc, char** argv) {
                 auto it = std::upper_bound(labels.begin(), labels.end(), std::make_pair(pc, std::string("\x7f")));
                 const std::string name = (it == labels.begin()) ? std::string("(below)") : std::prev(it)->second;
                 spent[name] += m.tstates - before;
+                if (it != labels.begin() && std::prev(it)->first == pc) ++calls[name];
             }
             std::vector<std::pair<std::uint64_t, std::string>> order;
             for (const auto& [name, t] : spent) order.emplace_back(t, name);
             std::sort(order.rbegin(), order.rend());
             const double total = double(m.tstates - start);
-            for (std::size_t k = 0; k < order.size() && k < 30; ++k)
-                std::printf("profile=%-24s %9.0f T a frame %5.1f%%\n", order[k].second.c_str(),
-                            double(order[k].first) / count, 100.0 * double(order[k].first) / total);
+            for (std::size_t k = 0; k < order.size() && k < 80; ++k)
+                std::printf("profile=%-24s %9.0f T a frame %5.1f%% %8.2f calls a frame\n", order[k].second.c_str(),
+                            double(order[k].first) / count, 100.0 * double(order[k].first) / total,
+                            double(calls[order[k].second]) / count);
         } else if (command == "stats") {
             std::printf("vdp_frames=%llu\nfast_vram_accesses=%llu\ninterrupts=%llu\npc=%04X\nrom_enabled=%d\nvdp_mode=%d\n",
                         (unsigned long long)m.vdp.frames(),

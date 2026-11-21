@@ -34,7 +34,8 @@ def main(harness, rom, dsk, sym, outdir):
             "frames", "100", "peek16", "GameFrames", "frames", "500", "peek16", "GameFrames",
             "peek8", "GameState", "shot", os.path.join(outdir, "einstein_attract.ppm"),
             "hold", "UP", "frames", "20", "release", "frames", "300",
-            "hold", "UP", "frames", "600", "peek8", "GameState", "peek8", "Time", "peek8", "Speed",
+            "hold", "UP", "frames", "200", "peek8", "Speed", "frames", "200", "peek8", "Speed",
+            "frames", "200", "peek8", "GameState", "peek8", "Time", "peek8", "Speed",
             "record", "150", wav, "shot", os.path.join(outdir, "einstein_game.ppm"), "stats")
     failures = []
     if v.get("main_loop") != ["1"]:
@@ -47,8 +48,10 @@ def main(harness, rom, dsk, sym, outdir):
     state = [int(x) for x in v["GameState"]]
     if state != [0, 1]:
         failures.append(f"game states {state}: attract (0), then playing (1) after a key")
-    time, speed = int(v["Time"][0]), int(v["Speed"][0])
-    print(f"einstein_check: in the game, time {time:02X}, speed {speed}")
+    # (the speed at three moments: accelerating blind, the car may have just
+    # hit something at any one of them)
+    time, speed = int(v["Time"][0]), max(int(x) for x in v["Speed"])
+    print(f"einstein_check: in the game, time {time:02X}, top speed {speed}")
     if not (0 < time < 0x68 and speed > 0):
         failures.append("the clock did not run or the car did not move")
     with wave.open(wav + ".wav") as w:

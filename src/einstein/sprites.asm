@@ -35,18 +35,9 @@ EinSprCells:
         ld bc, 24 * MASK_ROW - 1
         ld (hl), 0
         ldir
-        ld hl, CmdListB
+        ld hl, CmdListB         ; (each cell into U too: EinMaskSetNU)
         ld ix, EMaskN
         call .cmds
-        ld hl, EMaskN           ; U |= N
-        ld de, EMaskU
-        ld b, 24 * MASK_ROW
-.u:     ld a, (de)
-        or (hl)
-        ld (de), a
-        inc hl
-        inc de
-        djnz .u
         ld b, 0                 ; the sky's rows: mirrored
         ld hl, EMaskU
 .mr:    ld c, 0
@@ -115,7 +106,7 @@ EinSprCells:
         cp 32
         jr nc, .rowDone
         push hl
-        call EinMaskSet
+        call EinMaskSetNU
         pop hl
         inc c
         dec d
@@ -134,6 +125,33 @@ EinSprCells:
 ; B = row, C = column, IX = a mask: set its bit (BC, DE, IX kept)
 EinMaskSet:
         push de
+        call EinMaskBit
+        or (hl)
+        ld (hl), a
+        pop de
+        ret
+
+; the same in EMaskN (IX) and EMaskU (24 rows on)
+EinMaskSetNU:
+        push de
+        call EinMaskBit
+        ld e, a
+        or (hl)
+        ld (hl), a
+        ld a, l
+        add a, low (24 * MASK_ROW)
+        ld l, a
+        ld a, h
+        adc a, high (24 * MASK_ROW)
+        ld h, a
+        ld a, e
+        or (hl)
+        ld (hl), a
+        pop de
+        ret
+
+; B = row, C = column, IX = a mask -> HL = its byte, A = its bit
+EinMaskBit:
         ld a, b
         add a, a
         add a, a
@@ -151,17 +169,14 @@ EinMaskSet:
         add hl, de
         ld a, c
         and 7
+        add a, low EBitTab
         ld e, a
-        ld a, 1
-        inc e
-.sh:    dec e
-        jr z, .set
-        rlca
-        jr .sh
-.set:   or (hl)
-        ld (hl), a
-        pop de
+        ld a, high EBitTab
+        adc a, 0
+        ld d, a
+        ld a, (de)
         ret
+EBitTab:        db 1, 2, 4, 8, 16, 32, 64, 128
 
 ; (EinMarkRC, keeping A: for the bit loop above)
 EinMarkRCa:
@@ -252,17 +267,14 @@ EinComposeStart:
         ld ix, EMaskU
         call EinMaskRow
         call EinMaskAny
-        ld c, a
+        ret z                   ; none: its names straight from BaseNames
         ld a, b
         add a, low ERowDrawn
         ld l, a
         ld a, high ERowDrawn
         adc a, 0
         ld h, a
-        ld a, (hl)
-        or c
-        ret z
-        ld (hl), 1
+        ld (hl), 2              ; (sent from NameBuf)
         ld a, b                 ; NameBuf + row * 32, BaseNames + (row - 10) * 32
         rrca
         rrca
@@ -465,16 +477,16 @@ EinRoadCompose:
         cp 32
         jr nz, .cb
         ld hl, (EComposePtr)    ; the portal's cells
-        call EinPortalCells
-        ld a, b                 ; the car's names
-        cp CAR_ROW
-        ret c
+        jp EinPortalCells
+
+; B = a car row (20-23), HL = its names: the car's (CAR_COL on)
+EinCarNames:
+        ld a, b
         sub CAR_ROW
         add a, a
         add a, a
         add a, a
         add a, CAR_PAT
-        ld hl, (EComposePtr)
         ld de, CAR_COL
         add hl, de
         ld c, CAR_W
@@ -576,11 +588,5 @@ ERoadInkT:      db 0
 EPanoCol:       db 0            ; the panorama's column at the left edge
 EPanoIdx:       db 0
 EPanoN:         db 0
-EPanoList:      ds 64
-EPanoSpr:       ds 64 * 8
 ERowLo:         ds 12           ; per road row: its road's slots end, its
 ERowHi:         ds 12           ; centre line's begin
-EMaskN:         ds 24 * MASK_ROW
-EMaskU:         ds 24 * MASK_ROW
-        ALIGN 32                ; (a row never crosses a page: EinFillRun)
-BaseNames:      ds (24 - PANO_ROW0) * 32    ; rows 10-23 as the road and panorama draw them
