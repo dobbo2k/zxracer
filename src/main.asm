@@ -43,7 +43,7 @@ MainLoop:
         call DrawPortal         ; (a tunnel's mouth or way out)
         BORDER 3                ; magenta: sprites
         call DrawSprites
-        call DrawTyres          ; (the car, then its rolling tyres)
+        call DrawCar
         BORDER 5                ; cyan: HUD
         call DrawHud
         call RequestFlip

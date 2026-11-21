@@ -38,7 +38,8 @@ Isr:
         out (c), a
         xor a
         ld (FlipPending), a
-.done:  call SoundTick              ; after the flip, which must beat the beam
+.done:  call TyreTick              ; after the flip, which must beat the beam:
+                                   ; the rolling tyres, then the sound
         pop de
         pop bc
         pop hl

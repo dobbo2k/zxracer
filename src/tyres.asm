@@ -1,55 +1,104 @@
 ; ---------------------------------------------------------------------------
 ; Rolling tyres: the rear tyres' tread (the dashed row under the rear lights)
-; rolls up their faces as the car moves, a row per 64 depth units travelled
-; (at most one a frame: about 16 rows a second at full speed, so the faster
-; the car, the faster the tread). There are two tread rows, three rows apart,
-; in the tyres' six pixel rows (26-31).
+; rolls up their faces as the car moves. There are two tread rows, three
+; rows apart, in the tyres' six pixel rows (26-31): three positions.
 ;
-; After DrawCar, every frame, the tyres' bytes (the car's columns 0-1 and
-; 6-7, where tools/make_car.py keeps the tread) are written from the frame's
-; own tread and plain rows: so both buffers stay right whether or not DrawCar
-; redrew the car. Only the steering frames: the smoke frames' smoke hides the
-; tyres. Lives in the gap between the lookup tables and the panorama's chain.
+; The game draws a frame every 3 TV frames, too slowly to show a fast tread
+; (a step of two rows looks like one row backwards), so the tread moves in
+; the 50 Hz interrupt, on the buffer on show: by the speed each TV frame, a
+; row per TYRE_STEP depth units, up to nearly a row every TV frame at full
+; speed (about 48 rows a second), slower as the car slows, still when it
+; stops.
+;
+; The interrupt only writes over a tyre: while the game loop runs (a flip in
+; the last TYRE_LIVE frames: not while paused), with the game's paging (bank
+; 7 at $C000), in a steering frame (the smoke frames' smoke hides the tyres),
+; and only if every tyre row on screen already starts as that frame's tread or
+; plain row. So it never draws into a picture of the front end or a loading
+; screen. It writes the tyres' bytes (the car's columns 0-1 and 6-7, where
+; tools/make_car.py keeps the tread), long before the beam reaches them.
+; Lives in the gap between the lookup tables and the panorama's chain.
 ; ---------------------------------------------------------------------------
 TYRE_TOP        EQU 2               ; the bottom part's first tyre row (pixel row 26)
 TREAD_LINE      EQU 3               ; ... its tread row (27)
 PLAIN_LINE      EQU 4               ; ... a plain one (28)
+TYRE_STEP       EQU 21              ; depth units a row (MAX_SPEED 20 a TV frame)
+TYRE_LIVE       EQU 8               ; TV frames since the game's last flip
 
-DrawTyres:
-        call DrawCar
-        ld hl, (Pos)            ; H = distance / 64
-        add hl, hl
-        add hl, hl
-        ld a, (TyreLast)
-        cp h
-        jr z, .draw
-        ld a, h
-        ld (TyreLast), a
-        ld a, (TyrePhase)       ; moved on: the tread rolls up a row
+; From the interrupt (instead of SoundTick, which it ends with): AF, BC, DE
+; and HL are saved there.
+TyreTick:
+        ld a, (FrameCount)      ; the game loop is running
+        ld hl, LastFlip
+        sub (hl)
+        cp TYRE_LIVE
+        jp nc, SoundTick
+        ld a, (Port7FFD)        ; with the game's paging
+        and ~P7FFD_SHADOW
+        cp P7FFD_ROM48 | 7
+        jp nz, SoundTick
+        ld a, (Speed)           ; roll on by the speed
+        ld hl, TyreAcc
+        add a, (hl)
+        cp TYRE_STEP
+        jr c, .acc
+        sub TYRE_STEP           ; (at most a row: Speed < TYRE_STEP)
+        ld (hl), a
+        ld a, (TyrePhase)       ; the tread rolls up a row
         dec a
         jp p, .ph
         ld a, 2
 .ph:    ld (TyrePhase), a
-.draw:  ld hl, (CarShown)
-        ld a, (hl)              ; the frame on show in this buffer
+        jr .shown
+.acc:   ld (hl), a
+.shown: ld a, (Port7FFD)        ; the buffer on show and its car's frame
+        and P7FFD_SHADOW
+        ld hl, CarShownA
+        ld d, $40 | ((CAR_ROW + 3) & $18) | TYRE_TOP
+        jr z, .bufA
+        ld hl, CarShownB
+        ld d, $C0 | ((CAR_ROW + 3) & $18) | TYRE_TOP
+.bufA:  ld e, (((CAR_ROW + 3) & 7) << 5) + CAR_COL
+        ld a, (hl)
         cp 3
-        ret nc
-        ld ix, (CarBotSrc)
-        ld a, (BufHiOr)         ; HL -> pixel row 26 of the car's columns
-        or $40 | ((CAR_ROW + 3) & $18) | TYRE_TOP
+        jp nc, SoundTick        ; (smoke, or $FF: none yet)
+        add a, a                ; its bottom part's tread row
+        add a, a
+        add a, low (CarGfxFrames + 2)
+        ld l, a
+        adc a, high (CarGfxFrames + 2)
+        sub l
         ld h, a
-        ld l, (((CAR_ROW + 3) & 7) << 5) + CAR_COL
+        ld a, (hl)
+        inc hl
+        ld h, (hl)
+        ld l, a
+        ld bc, TREAD_LINE * CAR_W
+        add hl, bc
+        push ix
+        push hl
+        pop ix                  ; IX = the tread row, IX + 8 a plain row
+        ex de, hl               ; HL -> pixel row 26 of the car's columns
+        push hl
+        ld b, 8 - TYRE_TOP      ; a tyre there? Each row's first byte is
+.chk:   ld a, (hl)              ; the tread's or a plain row's
+        cp (ix + 0)
+        jr z, .chkOk
+        cp (ix + CAR_W)
+        jr nz, .none
+.chkOk: inc h
+        djnz .chk
+        pop hl
         ld a, (TyrePhase)
         ld c, a                 ; C = rows to the next tread row
         ld b, 8 - TYRE_TOP
-.row:   ld de, TREAD_LINE * CAR_W
+.row:   push ix
         ld a, c
         or a
         jr z, .src
-        ld e, PLAIN_LINE * CAR_W
-.src:   push ix
+        ld de, (PLAIN_LINE - TREAD_LINE) * CAR_W
         add ix, de
-        ld a, (ix + 0)
+.src:   ld a, (ix + 0)
         ld (hl), a
         inc l
         ld a, (ix + 1)
@@ -71,7 +120,11 @@ DrawTyres:
         jp p, .next
         ld c, 2
 .next:  djnz .row
-        ret
+        pop ix
+        jp SoundTick
+.none:  pop hl
+        pop ix
+        jp SoundTick
 
-TyreLast:       db 0            ; distance / 64 when the tread last moved
+TyreAcc:        db 0            ; depth units towards the next row
 TyrePhase:      db 1            ; 0-2: the first tread row (1: as drawn, row 27)
