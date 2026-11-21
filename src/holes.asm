@@ -21,8 +21,8 @@ ArpTab:         db 4, 7,  3, 7,  4, 10,  3, 10,  4, 11,  5, 7,  7, 12,  12, 12
 CrewSay1a: db "< ARE YOU BLIND?!   ", 0
 CrewSay1b: db "  THE SUN WAS LOW! >", 0
 ; Envelopes: start volume, the volume it fades to, fade every (mask+1)
-; 0 pluck, 1 sustained lead, 2 soft, 3 bass, 4 heavy bass
-EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3
+; 0 pluck, 1 sustained lead, 2 soft, 3 bass, 4 heavy bass, 5 echo
+EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3,  9, 4, 3
         ASSERT $ <= ScrHi + 256
         ORG X1Page + $60
         ASSERT RoadX1_end <= X1Page + $60
@@ -61,6 +61,14 @@ TunSky:         db C_, C_           ; the ceiling (white ink: the message line; 
         ORG LWPage + $E0
         ASSERT Band_end <= LWPage + $E0
 CrewSay3b: db "   NOT A CHANCE... >", 0
+; (src/extend.asm JingleTick's: moved here for room)
+JingleHold:     db 0
+; A new stage begins: a short high beep (C) on its first frame (extended
+; play: the flourish instead, src/gap4.asm)
+JingleGo:
+        dw 106
+        db 8
+        dw 0
         ASSERT $ <= LWPage + 256
         ORG ZPage + $60
         ASSERT ZLo_end <= ZPage + $60
@@ -69,6 +77,14 @@ CrewSay4a: db "< NICE ONE, GENIUS! ", 0
         ORG ZPage + $E0
         ASSERT LaneW_end <= ZPage + $E0
 CrewSay4b: db "    IT JUMPED OUT! >", 0
+; (src/stage.asm StageOv's: moved here for room)
+OvEntry:        dw 0
+OvArg:          db 0
+OvBlank:        db 0
+; Difficulty (the options screen): 0 easy, 1 normal, 2 hard. The overlay
+; reads it for the starting time, the checkpoint bonus, the par times and
+; the weaving (src/stageov.asm DiffTable).
+Difficulty:     db 1
         ASSERT $ <= ZPage + 256
         ORG DEPage + $60
         ASSERT RoadD_end <= DEPage + $60
@@ -588,4 +604,16 @@ UpdateTunnel:
 .none:  xor a
         ld (TunJN), a
         jp Ceiling
+; The open hi-hat (src/music.asm DrumTab): moved here for room
+DrumOpen:       db 11, 1
+                dw 0
+                db 9, 1
+                dw 0
+                db 7, 1
+                dw 0
+                db 5, 1
+                dw 0
+                db 3, 1
+                dw 0
+                db 0
         ASSERT $ <= FILL_END - 64

@@ -11,6 +11,8 @@ per bar a chord and the melody. Melody tokens, lengths in sixteenths:
   @A5.m:8   an arpeggio: the chord (quality after the dot: '' major, m, 7,
             m7, maj7, sus4, 5 power, 8 octave) rooted on A5, cycling fast
   !1        envelope: 0 pluck, 1 sustained lead, 2 soft (no length)
+A tune may set its own steps per bar (e.g. 24: triplet sixteenths) and an
+echo: the bass channel replays the melody in its rests (tune_opts).
 Long melody notes get vibrato (the player starts it a little into a note).
 
 Encoding, per channel (a byte stream, looping):
@@ -23,6 +25,7 @@ Encoding, per channel (a byte stream, looping):
   $B0+n       envelope n (EnvTab)
   $C0+s       the next note slides in over 2^s interrupts
   $D0+s       vibrato depth: period >> s (0: off)
+  $E0+n       detune: n added to the tone period (a little flat)
   $FF         back to the start
 Tune: dw bass, melody, drums.
 
@@ -40,7 +43,7 @@ AY_CLOCK = 1773400
 ARPS = {"": 1, "m": 2, "7": 3, "m7": 4, "maj7": 5, "sus4": 6, "5": 7, "8": 8}
 DRUM_IDS = {"K": 1, "S": 2, "H": 3, "T": 4, "O": 5}
 LEAD_VIB = 6                        # melody vibrato depth: period >> 6
-ENV_BASS, ENV_HEAVY = 3, 4
+ENV_BASS, ENV_HEAVY, ENV_ECHO = 3, 4, 5
 
 
 def note_index(name):
@@ -79,6 +82,9 @@ BASS = {
     "funk":    [(0, 2), (0, 1), (12, 1, 1), (0, 2), (10, 2), (0, 1), (0, 1), (12, 2, 1), (7, 2), (10, 2)],
     "slap":    [(0, 1), (0, 1), (12, 2, 1), (0, 1), (12, 1), (0, 2), (7, 2), (0, 1), (12, 1, 1), (10, 2), (12, 2)],
     "epic":    [(0, 8), (7, 4), (12, 4, 2)],
+    # 24 steps a bar (triplet sixteenths): a sparse sub bass, its rests for the echo
+    "dub":     [(0, 9), (None, 15)],
+    "dub2":    [(0, 6), (None, 6), (12, 3), (None, 9)],
 }
 
 # Drum patterns (one bar) and fills
@@ -90,6 +96,13 @@ DRUMS = {
     "epic":  "K---S---K-K-S---",
     "half":  "K-H-S-H-K-H-S-HH",
 }
+# 24 steps a bar (triplet sixteenths): drum and bass, the hi-hats in triplets
+DRUMS.update({
+    "hats": "H-H-H-H-H-H-H-H-H-H-HHHH",
+    "dnb":  "K-H-H-S-H-H-H--KH-S-H-HH",
+    "dnb2": "K-H-H-S-HKH-HSH-H-S-HSHH",
+})
+TRIPFILL = "S-SS-SS-ST-TT-TT-SSSSSS-"
 FILL = "K-H-S-H-S-SSS-SS"
 TOMS = "S-S-T-T-TTT-TTSS"
 ROLL = "TTT-TT-TT-TTSSSS"
@@ -190,41 +203,43 @@ TUNES = {
             ("B", "@B4.:8 @B4.7:8 !0"),
         ]),
     ]),
-    # an 80s montage anthem with a funk bass and beat: E minor / G major
-    "country": (6, [
-        ("slap", ENV_BASS, "funk", FILL, [
-            ("Em7", "@E5.m7:2 -:2 @E5.m7:1 -:1 @E5.m7:2 -:4 @E5.m7:2 -:2"),
-            ("Cmaj7", "@C5.maj7:2 -:2 @C5.maj7:1 -:1 @C5.maj7:2 -:4 @C5.maj7:2 -:2"),
-            ("G", "@G4.:2 -:2 @G4.:1 -:1 @G4.:2 -:4 @G4.:2 -:2"),
-            ("D", "@D5.:2 -:2 @D5.:1 -:1 @D5.:2 -:4 /F#5:2 A5:2"),
+    # drum and bass, F minor: rolling triplet hi-hats, a sparse sub bass and a
+    # sparse lead, echoed (later, quieter, a little flat) in the bass's rests.
+    # 24 steps a bar of 3 interrupts: 167 bpm
+    "country": (3, [
+        ("dub", ENV_BASS, "hats", DRUMS["dnb"], [
+            ("Fm7", "!2 C6:6 G#5:6 -:12"),
+            ("C#maj7", "F5:6 G#5:6 -:12"),
+            ("A#m7", "C#6:6 C6:6 -:12"),
+            ("C7", "A#5:6 E5:6 -:12"),
         ]),
-        ("funk", ENV_BASS, "funk", FILL, [
-            ("Em", "E5:2 -:1 G5:1 -:1 B5:3 A5:2 G5:2 E5:2 G5:2"),
-            ("C", "C5:2 -:1 E5:1 -:1 G5:3 !1 /C6:8 !0"),
-            ("G", "B5:2 -:1 A5:1 -:1 G5:3 D5:2 G5:2 A5:2 B5:2"),
-            ("D", "A5:2 -:1 F#5:1 -:1 D5:3 !1 //A5:6 !0 -:2"),
-            ("Em", "G5:2 -:1 B5:1 -:1 E6:3 D6:2 B5:2 A5:2 G5:2"),
-            ("C", "E6:2 -:1 D6:1 -:1 C6:3 G5:2 E5:2 G5:2 C6:2"),
-            ("G", "D6:2 -:1 B5:1 -:1 G5:3 B5:2 D6:2 G6:2 F#6:2"),
-            ("D", "@D5.:2 -:1 @D5.:1 -:1 @D5.sus4:3 @D5.:4 @D5.7:4"),
+        ("dub", ENV_BASS, "dnb", TRIPFILL, [
+            ("Fm7", "!1 C6:9 D#6:3 C6:6 -:6"),
+            ("C#maj7", "G#5:9 F5:3 G#5:6 -:6"),
+            ("A#m7", "C#6:9 C6:3 A#5:6 -:6"),
+            ("C7", "G5:9 E5:3 G5:6 -:6"),
+            ("Fm7", "F6:6 D#6:3 C6:3 G#5:6 -:6"),
+            ("C#maj7", "/G#6:9 F6:3 C#6:6 -:6"),
+            ("A#m7", "F6:6 C#6:6 A#5:6 -:6"),
+            ("C7", "@C5.7:6 -:6 /E6:6 G6:6"),
         ]),
-        ("slap", ENV_BASS, "disco", TOMS, [
-            ("C", "!1 //G6:8 !0 E6:2 -:1 D6:1 -:1 C6:3"),
-            ("D", "!1 //F#6:8 !0 D6:2 -:1 A5:1 -:1 D6:3"),
-            ("Em", "!1 //E6:12 !0 -:1 D6:1 E6:2"),
-            ("Em", "@E5.m:4 @E5.m:2 -:2 G6:2 -:1 F#6:1 E6:2 D6:2"),
-            ("C", "!1 //C6:6 !0 E6:2 G6:4 E6:2 C6:2"),
-            ("D", "D6:2 -:1 F#6:1 -:1 A6:3 !1 //F#6:8 !0"),
-            ("G", "!1 //G6:12 !0 D6:2 B5:2"),
-            ("D", "@D5.:4 @D5.sus4:4 @D5.:4 @D5.7:4"),
+        ("dub2", ENV_BASS, "dnb2", TRIPFILL, [
+            ("Fm7", "C6:3 F6:3 G#6:6 -:3 G6:3 F6:6"),
+            ("C#maj7", "F6:12 -:6 C#6:6"),
+            ("A#m7", "C#6:3 F6:3 A#6:6 -:3 G#6:3 F6:6"),
+            ("C7", "E6:12 -:6 C6:6"),
+            ("Fm7", "F6:6 G6:6 G#6:9 -:3"),
+            ("C#maj7", "G#6:6 F6:6 C#6:9 -:3"),
+            ("A#m7", "A#6:12 G#6:6 F6:6"),
+            ("C7", "@C5.7:3 -:3 @C5.7:3 -:3 @E5.:6 @G5.7:6"),
         ]),
-        ("epic", ENV_HEAVY, "epic", ROLL, [
-            ("C", "!1 //E6:8 G6:8"),
-            ("D", "//F#6:8 A6:8"),
-            ("Em", "//B6:12 =:4"),
-            ("D", "@D5.:4 @D5.:4 @D5.7:4 !0 A5:4"),
+        ("dub", ENV_BASS, "hats", TRIPFILL, [
+            ("C#maj7", "//F6:18 -:6"),
+            ("D#", "//G6:18 -:6"),
+            ("Fm7", "//G#6:18 -:6"),
+            ("C7", "//E6:12 -:6 G5:6"),
         ]),
-    ]),
+    ], {"steps": 24, "echo": (9, 4)}),
     # night-time funk on sevenths, D dorian
     "sunset": (6, [
         ("slap", ENV_BASS, "funk", FILL, [
@@ -282,25 +297,39 @@ def bars_of(tune):
     return [bar for sec in TUNES[tune][1] for bar in sec[4]]
 
 
+def tune_opts(tune):
+    """A tune's options (its third element): steps per bar (default 16: the
+    lengths, bass and drum patterns are in those steps) and echo (delay in
+    steps, detune): the bass channel plays the melody again in its rests,
+    later, quieter (envelope ENV_ECHO) and a little flat."""
+    t = TUNES[tune]
+    return dict({"steps": 16, "echo": None}, **(t[2] if len(t) > 2 else {}))
+
+
 def events(tune):
     """-> (bass, melody, drums): lists of events (kind, ...)."""
-    tick, sections = TUNES[tune]
-    bass = [("vib", 0)]
+    tick, sections = TUNES[tune][:2]
+    opts = tune_opts(tune)
+    steps = opts["steps"]
     melody = [("env", 0), ("vib", LEAD_VIB)]
     drums = []
+    mel_notes = []                  # (start step, steps, note): plain melody notes, for the echo
+    bass_plan = []                  # per section: (env, [(start step, steps, note or None)])
+    at = 0
     for pattern, env, dpat, fill, bars in sections:
-        bass.append(("env", env))
+        plan = []
         for k, (chord, line) in enumerate(bars):
             root, minor = chord_parts(chord)
             base = note_index(root + "2")
+            t = at
             for step in BASS[pattern]:
                 iv, length = step[0], step[1]
-                if iv is None:
-                    bass.append(("rest", length * tick))
-                    continue
                 if iv == "T":
                     iv = 3 if minor else 4
-                bass.append(("note", base + iv, length * tick, step[2] if len(step) > 2 else 0, 0))
+                plan.append((t, length, None if iv is None else base + iv,
+                             step[2] if len(step) > 2 else 0))
+                t += length
+            assert t - at == steps, (tune, pattern)
             total = 0
             for tok in line.split():
                 if tok.startswith("!"):
@@ -310,18 +339,22 @@ def events(tune):
                 assert m, (tune, tok)
                 slide, arp, name, quality, length = m.groups()
                 length = int(length)
-                total += length
                 ticks = length * tick
                 if name == "-":
                     melody.append(("rest", ticks))
                 elif name == "=":
                     melody.append(("tie", ticks))
+                    if mel_notes and mel_notes[-1][0] + mel_notes[-1][1] == at + total:
+                        mel_notes[-1] = (mel_notes[-1][0], mel_notes[-1][1] + length, mel_notes[-1][2])
                 else:
                     melody.append(("note", note_index(name), ticks, len(slide) + (1 if slide else 0),
                                    ARPS[quality or ""] if arp else 0))
-            assert total == 16, (tune, chord, line, total)
+                    if not arp:
+                        mel_notes.append((at + total, length, note_index(name)))
+                total += length
+            assert total == steps, (tune, chord, line, total)
             bar = DRUMS[dpat] if k < len(bars) - 1 or not fill else fill
-            assert len(bar) == 16, bar
+            assert len(bar) == steps, bar
             for ch in bar:
                 if ch == "-":
                     if drums:
@@ -330,6 +363,48 @@ def events(tune):
                         drums.append(("drum", 0, tick))
                 else:
                     drums.append(("drum", DRUM_IDS[ch], tick))
+            at += steps
+        bass_plan.append((env, plan))
+
+    # the bass channel: the patterns, and in their rests (with echo) the
+    # melody again, opts["echo"][0] steps later
+    echo = opts["echo"]
+    sounding = {}
+    for s0, n, note in mel_notes:
+        for t in range(s0, s0 + n):
+            sounding[t] = (note, s0)
+    bass = [("vib", 0)]
+    state = {"env": None, "det": None}
+
+    def mode(env, det):
+        if state["env"] != env:
+            bass.append(("env", env))
+            state["env"] = env
+        if echo and state["det"] != det:
+            bass.append(("det", det))
+            state["det"] = det
+    for env, plan in bass_plan:
+        for t0, n, note, slide in plan:
+            if note is not None:
+                mode(env, 0)
+                bass.append(("note", note, n * tick, slide, 0))
+                continue
+            if not echo:
+                bass.append(("rest", n * tick))
+                continue
+            delay, det = echo
+            t = t0
+            while t < t0 + n:           # runs of one echoed note, or of nothing
+                key = sounding.get(t - delay)
+                u = t + 1
+                while u < t0 + n and sounding.get(u - delay) == key:
+                    u += 1
+                if key:
+                    mode(ENV_ECHO, det)
+                    bass.append(("note", key[0], (u - t) * tick, 0, 0))
+                else:
+                    bass.append(("rest", (u - t) * tick))
+                t = u
     return bass, melody, drums
 
 
@@ -357,6 +432,8 @@ def encode(evs):
             out.append(0xB0 + ev[1])
         elif kind == "vib":
             out.append(0xD0 + ev[1])
+        elif kind == "det":
+            out.append(0xE0 + ev[1])
         elif kind == "rest":
             timed(0, ev[1], 0)
         elif kind == "tie":

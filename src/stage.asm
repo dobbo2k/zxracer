@@ -105,10 +105,7 @@ StageOvE:
         ld (MusicWait), a
         ret
 .go:    jp (hl)
-OvEntry:        dw 0
-OvArg:          db 0
-OvBlank:        db 0
-OvMusic:        db 0
+OvMusic:        db 0                ; (OvEntry, OvArg, OvBlank: src/holes.asm)
 STAGEOV_AT      EQU $4000
 
 ; A = bank, HL = source (in $C000-$FFFF), DE = destination, BC = length:

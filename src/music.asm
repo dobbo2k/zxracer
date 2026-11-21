@@ -12,7 +12,8 @@
 ;
 ; Tunes (tools/make_music.py): dw bass, melody, drums; each a byte stream:
 ; $00 rest, $01-$5E note (drums: 1 kick, 2 snare, 3 hi-hat), $5F tie,
-; $60-$9F length, $FF loop. Each theme has its own tune (in its theme pack:
+; $60-$9F length, $A0+ arpeggio, $B0+ envelope, $C0+ slide, $D0+ vibrato,
+; $E0+n detune (n periods flat), $FF loop. Each theme has its own tune (in its theme pack:
 ; it changes with the road), the front end has the title tune.
 ; SoundMode (the options screen): 0 music and effects, 1 the engine.
 ; Not time-critical (bank 5).
@@ -39,7 +40,8 @@ CH_SLPEND       EQU 22              ; a slide into the next note: 2^this interru
 CH_SLLEFT       EQU 23              ; interrupts left of a slide
 CH_STEP         EQU 24              ; its step per interrupt (word)
 CH_BASE         EQU 26              ; the note (1-60)
-CH_SIZE         EQU 27
+CH_DET          EQU 27              ; detune: added to the tone period (flat)
+CH_SIZE         EQU 28
 VIB_DELAY       EQU 10              ; vibrato starts this far into a note
 
 ChanA:  dw 0, 0                     ; drums
@@ -282,19 +284,7 @@ DrumTom:        db 14, 0
                 db 3, 0
                 dw 1150
                 db 0
-DrumOpen:       db 11, 1
-                dw 0
-                db 10, 1
-                dw 0
-                db 8, 1
-                dw 0
-                db 6, 1
-                dw 0
-                db 4, 1
-                dw 0
-                db 2, 1
-                dw 0
-                db 0
+; (DrumOpen: src/holes.asm)
 
 
 ; IX = channel: one interrupt of its tune
@@ -393,7 +383,11 @@ MusicStep:
         jr nc, .vib
         ld (ix + CH_SLPEND), b
         jp .ev
-.vib:   ld (ix + CH_VIB), b
+.vib:   cp $E0
+        jr nc, .det
+        ld (ix + CH_VIB), b
+        jp .ev
+.det:   ld (ix + CH_DET), b
         jp .ev
 .note:  ld (ix + CH_PTR), l
         ld (ix + CH_PTR + 1), h
@@ -529,10 +523,17 @@ Pitch:  ld a, (ix + CH_NOTE)
 
 ; IX = channel: its tone and volume to the AY
 MusicOut:
-        ld e, (ix + CH_PER)
+        ld e, (ix + CH_DET)
+        ld d, 0
+        ld l, (ix + CH_PER)
+        ld h, (ix + CH_PER + 1)
+        add hl, de
+        push hl
+        ld e, l
         ld a, (ix + CH_TREG)
         call AyWrite
-        ld e, (ix + CH_PER + 1)
+        pop hl
+        ld e, h
         ld a, (ix + CH_TREG)
         inc a
         call AyWrite
@@ -583,6 +584,7 @@ MusicStart:
         ld (ix + CH_VIB), 0
         ld (ix + CH_SLPEND), 0
         ld (ix + CH_SLLEFT), 0
+        ld (ix + CH_DET), 0
         ret
 
 ; (NoteTab, the tone periods, ArpTab, EnvTab and some of the drums are in

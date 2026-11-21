@@ -128,19 +128,7 @@ JingleRun:
         jp BeepOn
 .end:   ld (JinglePtr), de
         ret
-JingleHold:     db 0
-; A new stage begins: a short high beep (C) on its first frame (extended
-; play: the flourish instead, src/gap4.asm)
-JingleGo:
-        dw 106
-        db 8
-        dw 0
-
-; ---------------------------------------------------------------------------
-; Difficulty (the options screen): 0 easy, 1 normal, 2 hard. The overlay
-; reads it for the starting time, the checkpoint bonus, the par times and
-; the weaving (src/stageov.asm DiffTable).
-Difficulty:     db 1
+; (JingleHold, JingleGo, Difficulty: src/holes.asm)
 
 ; ---------------------------------------------------------------------------
 ; A = digit, HL = top-left cell (preserved): the timer's big digit - the
