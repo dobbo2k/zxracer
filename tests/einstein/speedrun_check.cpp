@@ -33,6 +33,7 @@
 //   profilel N         the same, local labels counted apart
 //   fastpc N           run N frames: where VRAM writes came too fast
 //   linehist SYM N     run N frames: the raster lines the PC reached SYM on
+//   fliphist N         run N frames: the TV frames between frames sent
 //   stats              VDP frames, fast VRAM accesses since the game began,
 //                      interrupts, PC
 //
@@ -408,6 +409,44 @@ int main(int argc, char** argv) {
                 }
                 m.step();
             }
+        } else if (command == "fliphist") {
+            // fliphist N: run N TV frames; the TV frames between successive
+            // frames sent (EinUpload entered), as a histogram
+            const std::uint16_t at = symbol("EinUpload");
+            const int count = std::stoi(next());
+            const auto target = m.vdp.frames() + std::uint64_t(count);
+            std::map<int, int> hist;
+            std::uint64_t last = 0;
+            std::vector<std::pair<std::uint16_t, std::string>> labels;
+            for (const auto& [name, address] : symbols)
+                if (name.find('.') == std::string::npos && address >= 0x0100) labels.emplace_back(address, name);
+            std::sort(labels.begin(), labels.end());
+            std::map<std::string, std::uint64_t> spent;     // (since the last frame sent)
+            while (m.vdp.frames() < target) {
+                const auto pc = m.cpu.pc.w;
+                if (pc == at) {
+                    const auto now = m.vdp.frames();
+                    if (last) {
+                        ++hist[int(now - last)];
+                        if (now - last >= 6) {      // a slow one: where its time went
+                            std::vector<std::pair<std::uint64_t, std::string>> order;
+                            for (const auto& [name, t] : spent) order.emplace_back(t, name);
+                            std::sort(order.rbegin(), order.rend());
+                            std::printf("slow=%d:", int(now - last));
+                            for (std::size_t k = 0; k < order.size() && k < 10; ++k)
+                                std::printf(" %s %llu", order[k].second.c_str(), (unsigned long long)order[k].first);
+                            std::printf("\n");
+                        }
+                    }
+                    last = now;
+                    spent.clear();
+                }
+                const auto before = m.tstates;
+                m.step();
+                auto it = std::upper_bound(labels.begin(), labels.end(), std::make_pair(pc, std::string("\x7f")));
+                spent[it == labels.begin() ? std::string("(below)") : std::prev(it)->second] += m.tstates - before;
+            }
+            for (const auto& [d, n] : hist) std::printf("flip_gap=%d %d\n", d, n);
         } else if (command == "fastpc") {
             // fastpc N: run N TV frames; the routines (by symbol) whose VRAM
             // writes came too fast, with counts

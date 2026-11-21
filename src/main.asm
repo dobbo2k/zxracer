@@ -112,6 +112,7 @@ MainLoop:
         INCLUDE "einstein/keys.asm"
         INCLUDE "einstein/disc.asm"
         INCLUDE "einstein/front.asm"
+        INCLUDE "einstein/dash.asm"
         ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES

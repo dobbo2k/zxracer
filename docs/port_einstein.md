@@ -13,8 +13,9 @@ and `make test-einstein` (see "Building and testing" at the end).
   `SPEEDRUN`.
 - **Frame rate:** a steady 12.5 fps (a frame every 4 TV frames) where it
   can; the Spectrum's is 16.7. In the attract demo's worst stretch
-  (steering, curves, hills and scenery every frame) about 7 frames in 10
-  make it and the rest take 5 TV frames: 11.7 fps on average. See section 6.
+  (steering, curves, hills and scenery every frame) about 8 frames in 10
+  make it and most of the rest take 5 TV frames: 11.8 fps on average. See
+  section 6.
 
 ## 2. The hardware, as found
 
@@ -230,8 +231,11 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
 `src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
-frame takes longer. In the attract demo about 7 frames in 10 fit; 11.7 fps
-on average (`make test-einstein` wants at least 7).
+frame takes longer. In the attract demo, over 300 frames sent, 244 come 4
+TV frames after the last, 45 after 5, 10 after 6 and 1 after 7: 11.8 fps on
+average (`make test-einstein` wants at least 7). The harness's `fliphist N`
+gives that histogram, and the costliest routines of each frame that took 6
+or more.
 
 **The benchmark.** A game's speed changes what it does (the time step, the
 demo driver's steering), so ordinary runs don't compare. Assemble with
@@ -246,8 +250,9 @@ measures the work alone. Taken so:
 | the start of the speed work | 1,955 |
 | the first speed commit | 1,857 |
 | the second | 1,653 (5.5 a game frame, 9.1 fps) |
-| now, locked at 4 | 1,287 (4.29, 11.7 fps) |
-| now, unlocked | 1,193 (3.98: the work) |
+| the third, locked at 4 | 1,287 (4.29, 11.7 fps) |
+| now, locked at 4 | 1,268 (4.23, 11.8 fps) |
+| now, unlocked | 1,166 (3.89, of which about 0.1 waits for the flip) |
 
 `profile N` in the harness gives each routine's T-states and calls over N
 TV frames (`profilel N`: local labels apart). A game frame's work is
@@ -283,8 +288,21 @@ frame. Tried and measured:
   to be sent: 1,772 became 3,006); a bigger blank budget (1,000 units: 4
   frames fewer in 1,700, with less margin; 1,250 writes too fast)
 
-What would still help: a row's setup in fewer passes (its ranges, colours,
-names and edges: about 2.7K T a row now), for the last 3 frames in 10.
+A row drawn the ready-made way is made in one pass (`EinRowFast`: its
+ranges, colours, names and kerb edges, about 1.7K T with its fills, where
+the separate routines took 3.1K); a row nothing covers skips the
+silhouettes' compositing outright. Tried and dropped: keeping each row's
+centre-line inputs to skip remaking its sprite (they change nearly every
+frame: the check cost 8K a frame and saved little); a fully covered
+silhouette cell as a solid name (traffic is outlines: few such cells); a
+shorter scenery distance (800, not 1,200: 255 frames in 300 at 4, not 244)
+and fewer scenery objects (6: no change).
+
+The frames that take 6 TV frames are the ones with big objects near the
+car: each silhouette cell costs about 2.2K T (its mask from screen B, the
+cell made, committed to a slot and sent), and the Spectrum's own sprite
+drawing into screen B grows with them. A solid 12.5 would need that path
+made much cheaper, or fewer silhouetted cells.
 
 **Memory.** The Spectrum's drawing code that the Einstein never calls
 (road pass 2, the fork's row drawer, the panorama's bitmap, the rolling
@@ -294,8 +312,9 @@ code in bank 2. The Einstein's own buffers (the names, the sky's
 attributes, the masks, the panorama's sprite cells, the rows' signatures)
 are in screen A's memory, above the stage overlay ($4800-$5AFF): the game
 code never writes screen A here (`Ceiling` and `TimeWarn` skip it). Left:
-about 1K in bank 2, 750 bytes in bank 5, 60 bytes under $4000 (new code
-goes in bank 2), 460 in the Einstein's buffers ($DB00-$EBFF) and 320 bytes in
+140 bytes in bank 2 (the centre line's sprites are there:
+`src/einstein/dash.asm`), 750 bytes in bank 5, 300 under $4000, 460 in the
+Einstein's buffers ($DB00-$EBFF) and 320 bytes in
 screen A (assertions check each).
 
 ## 7. Building and testing
@@ -318,7 +337,8 @@ sound), `rec_start`/`rec_stop` (record whatever runs between them, the
 boot too), `type`, `until`, `profile` (T-states and calls per routine, the
 80 costliest; `profilel` with local labels), `fastpc` (where VRAM writes
 came too fast, and on which raster lines), `linehist SYM` (the raster
-lines the PC reaches SYM on), `flagtrace SYM` (the interrupts and the CPU
+lines the PC reaches SYM on), `fliphist` (above), `flagtrace SYM` (the
+interrupts and the CPU
 before SYM is reached late in the blank) and `stats` (VRAM accesses that
 came too fast).
 

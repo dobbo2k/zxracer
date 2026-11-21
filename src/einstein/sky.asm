@@ -356,6 +356,11 @@ EinCarSync:
         ld de, VRAM_PAT + $1000 + CAR_PAT * 8 + 128
         ld b, 128
         call EinWrite
+        ld a, (ECarColNew)      ; (the colours: if one changed)
+        or a
+        ret z
+        xor a
+        ld (ECarColNew), a
         ld hl, ECarCol
         ld de, VRAM_COL + $1000 + CAR_PAT * 8
         ld b, 128
@@ -399,6 +404,26 @@ EinCarSync:
         add a, c
         add a, CAR_PAT - CAR_COL
         ld e, a
+        ld a, l                 ; (ECarCol too: kept as VRAM holds it)
+        push hl
+        push af
+        ld a, e
+        sub CAR_PAT
+        add a, a
+        add a, a
+        add a, a
+        ld l, a
+        ld h, 0
+        push de
+        ld de, ECarCol
+        add hl, de
+        pop de
+        pop af
+        DUP 8
+        ld (hl), a
+        inc hl
+        EDUP
+        pop hl
         ld d, high ($3000 / 8)
         ex de, hl
         add hl, hl
@@ -449,6 +474,8 @@ EinCarPrep:
         or c
         ld l, a
         ld h, $D0
+        ld a, e                 ; (k * 8: ECarPix is 256-aligned, and E wraps
+        ld (ECarK8), a          ; past the last cell)
         DUP 8
         ld a, (hl)
         ld (de), a
@@ -473,18 +500,21 @@ EinCarPrep:
         push de
         push bc
         ld c, a
-        ld a, e                 ; (its k: ECarPix's low byte / 8 - 1)
+        ld a, (ECarK8)          ; its k
         rrca
         rrca
         rrca
-        dec a
-        and 31
         ld hl, EinCarAttr
         add a, l
         ld l, a
         jr nc, .ah
         inc h
-.ah:    ld (hl), c
+.ah:    ld a, (hl)              ; its colours as they are? (ECarCol kept)
+        cp c
+        jr z, .same
+        ld (hl), c
+        ld a, 1
+        ld (ECarColNew), a
         ld a, c                 ; the colour byte: ink over paper
         call AttrInk
         rlca
@@ -495,15 +525,15 @@ EinCarPrep:
         ld a, c
         call AttrPaper
         or b
-        pop bc
-        pop de
-        push de                 ; ECarCol + k * 8: 8 times
-        ld hl, ECarCol - ECarPix - 8
+        ld hl, (ECarK8)         ; ECarCol + k * 8: 8 times
+        ld h, 0
+        ld de, ECarCol
         add hl, de
         DUP 8
         ld (hl), a
         inc hl
         EDUP
+.same:  pop bc
         pop de
         inc c
         ld a, c
@@ -516,7 +546,9 @@ EinCarPrep:
         ld a, 1
         ld (ECarBlock), a
         ret
-ECarBlock:      db 0            ; (ECarPix, ECarCol to be sent)
+ECarBlock:      db 0            ; (ECarPix to be sent)
+ECarColNew:     db 0            ; (ECarCol too: a colour changed)
+ECarK8:         db 0            ; (the cell's k * 8)
 
 ; ---------------------------------------------------------------------------
 ; The panorama's patterns: row r (0-1), column c is pattern PANO_PAT +
