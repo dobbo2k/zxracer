@@ -19,15 +19,17 @@ LAYOUTS = {
     "portrait": dict(W=1300, H=2000, HZ=1050, sun=(650, 880, 330), clouds=(380, 860), stars=520, grid=22,
                      title=[("SPEED", 120, 90, 1.12), ("RUN", 470, 290, 1.12)],
                      stripes=((210, 5), (230, 7), (252, 9), (400, 5), (420, 7), (442, 9)), logo_grad=(90, 460),
-                     swoosh=((90, 545), (500, 515), (900, 530), (1220, 480)),
-                     tag=("FOR THE ZX SPECTRUM 128K", 118, 1880, 0.3),
+                     swoosh=None,
+                     road=700,           # the road's edges at the bottom: this far past the sides
+                     tag=("FOR THE ZX SPECTRUM 128K", 650, 1922, 50),
                      car=None,
                      palms=[(900, 1086, 880, 890, 0.36, 1), (400, 1086, 420, 880, 0.34, -1),
-                            (1230, 1420, 1010, 610, 1.0, -1), (70, 1400, 290, 640, 1.0, 1)]),
+                            (1288, 1420, 1010, 610, 1.0, -1), (12, 1400, 290, 640, 1.0, 1)]),
     "wide": dict(W=1600, H=1200, HZ=640, sun=(800, 470, 230), clouds=(230, 520), stars=320, grid=27,
                  plain=True,             # (no paper grain, hatching or vignette: it becomes a Spectrum screen)
                  title=[("SPEED RUN", 330, 34, 0.9)],
                  swoosh=((300, 205), (700, 190), (1000, 200), (1320, 180)),
+                 road=260,
                  tag=None,
                  car=(800, 1128, 0.8),
                  palms=[(590, 676, 605, 510, 0.26, -1), (1010, 676, 995, 505, 0.28, 1),
@@ -338,15 +340,21 @@ def ground():
     return "\n".join(out)
 
 
+def road_scale():
+    """The road's width relative to the first drawing's (edges 260 past the sides)."""
+    return (W / 2 + L["road"]) / (W / 2 + 260)
+
+
 def road():
     out = []
+    rs, ro = road_scale(), L["road"]
     lt, rt = (VX - 14, HZ), (VX + 14, HZ)
-    lb, rb = (-260, H + 40), (W + 260, H + 40)
+    lb, rb = (-ro, H + 40), (W + ro, H + 40)
     poly = [lt, rt, rb, lb]
     out.append(fill(poly, "url(#asphalt)", 'filter="url(#wash)"'))
     cid = clip_of(poly)
-    out.append(hatch(cid, -260, HZ, W + 260, H, 4, 16, "#0c0716", 1.8, 0.45, 2))
-    out.append(hatch(cid, -260, HZ + 300, W + 260, H, -70, 22, "#4a3a6a", 1.2, 0.3, 2))
+    out.append(hatch(cid, -ro, HZ, W + ro, H, 4, 16, "#0c0716", 1.8, 0.45, 2))
+    out.append(hatch(cid, -ro, HZ + 300, W + ro, H, -70, 22, "#4a3a6a", 1.2, 0.3, 2))
 
     def edge(t, side):          # x of the road edge at screen y (t: 0 horizon .. 1 bottom)
         a, b = (lt, lb) if side < 0 else (rt, rb)
@@ -360,7 +368,7 @@ def road():
         if y0 > H + 40:
             break
         t0, t1 = (y0 - HZ) / (H + 40 - HZ), (min(y1, H + 40) - HZ) / (H + 40 - HZ)
-        kw0, kw1 = 10 + 120 * t0, 10 + 120 * t1
+        kw0, kw1 = (10 + 120 * t0) * rs, (10 + 120 * t1) * rs
         col = "#e8213a" if k % 2 else "#f4efe4"
         for side in (-1, 1):
             e0, e1 = edge(t0, side), edge(t1, side)
@@ -368,7 +376,7 @@ def road():
             out.append(fill(q, col, 'opacity="0.95"'))
             out.append(sketch(q, 1.3, INK, 1, 0.8, closed=True, opacity=0.6))
         if k % 2 == 0:
-            dw0, dw1 = 2 + 22 * t0, 2 + 22 * t1
+            dw0, dw1 = (2 + 22 * t0) * rs, (2 + 22 * t1) * rs
             q = [(VX - dw0, y0), (VX + dw0, y0), (VX + dw1, y1), (VX - dw1, y1)]
             out.append(fill(q, "#fdf6e0", 'opacity="0.9"'))
             out.append(sketch(q, 1.2, INK, 1, 0.8, closed=True, opacity=0.5))
@@ -829,7 +837,8 @@ def speed_lines():
     for k in range(26):
         side = rnd.choice((-1, 1))
         y = rnd.uniform(HZ + 150, H - 50)
-        x0 = VX + side * rnd.uniform(520, 640) * W / 1300 * (y - HZ) / (H - HZ) + side * rnd.uniform(0, 80)
+        x0 = (VX + side * rnd.uniform(520, 640) * W / 1300 * road_scale() * (y - HZ) / (H - HZ)
+              + side * rnd.uniform(0, 80))
         L = rnd.uniform(80, 220)
         dx = (x0 - VX) / max(1, y - HZ) * L
         out.append(sketch([(x0, y), (x0 + dx, y + L)], rnd.uniform(1.4, 3), "#fff6e0", 1, 0.8,
@@ -843,16 +852,24 @@ def title_and_tag():
         txt, _ = lettering(word, x, y, sc, 30, slant=0.3)
         out.append(txt)
     # swoosh under the title
-    sw = bez(*L["swoosh"], 30)
-    k = L["title"][0][3] / 1.12
-    out.append(sketch(sw, 9 * k, "#ffd23a", 1, 1.4, opacity=0.9))
-    out.append(sketch([(x, y + 14 * k) for x, y in sw], 4 * k, "#ff3d7f", 1, 1.4, opacity=0.9))
-    # bottom tag
-    if L["tag"]:
-        word, x, y, sc = L["tag"]
-        tag, _ = lettering(word, x, y, sc, 16, slant=0.2, grad="tagg", gap=118, wob=0.9, stripes=False)
-        out.append(tag)
+    if L["swoosh"]:
+        sw = bez(*L["swoosh"], 30)
+        k = L["title"][0][3] / 1.12
+        out.append(sketch(sw, 9 * k, "#ffd23a", 1, 1.4, opacity=0.9))
+        out.append(sketch([(x, y + 14 * k) for x, y in sw], 4 * k, "#ff3d7f", 1, 1.4, opacity=0.9))
     return "\n".join(out)
+
+
+def tagline():
+    """The bottom line, set in type (outside the hand-drawn wobble): centred at x, baseline y."""
+    if not L["tag"]:
+        return ""
+    word, x, y, size = L["tag"]
+    font = ('font-family="Inter Display, Inter, DejaVu Sans, sans-serif" font-weight="800" '
+            f'font-style="italic" font-size="{size}" letter-spacing="{f(size * 0.08)}" text-anchor="middle"')
+    return (f'<text x="{x + 5}" y="{y + 5}" {font} fill="{INK}" opacity="0.8">{word}</text>'
+            f'<text x="{x}" y="{y}" {font} fill="url(#tagg)" stroke="{INK}" stroke-width="{f(size * 0.12)}" '
+            f'stroke-linejoin="round" paint-order="stroke">{word}</text>')
 
 
 def defs():
@@ -940,6 +957,7 @@ def build():
         f'<g filter="url(#rough)">{speed_lines()}</g>',
         car_placed(),
         f'<g filter="url(#rough)">{title_and_tag()}</g>',
+        tagline(),
     ] + ([] if L.get("plain") else [
         f'<rect width="{W}" height="{H}" filter="url(#blotch)" style="mix-blend-mode:soft-light" opacity="0.55"/>',
         f'<rect width="{W}" height="{H}" filter="url(#paper)" style="mix-blend-mode:multiply" opacity="0.35"/>',
