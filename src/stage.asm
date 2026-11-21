@@ -61,7 +61,16 @@ StageOvE:
         call MusicStop
         call WaitFlip           ; (no flip may happen meanwhile)
         IFDEF EINSTEIN
-        ld a, (OvArg)           ; the overlay is resident: straight in
+        ld a, (EOvClobbered)    ; the overlay is resident, unless the front
+        or a                    ; end has drawn over it: then from the disc
+        jr z, .ein
+        xor a
+        ld (EOvClobbered), a
+        ld hl, (StageOvPack + 1)
+        ld bc, (StageOvPack + 3)
+        ld de, STAGEOV_AT
+        call EinRead
+.ein:   ld a, (OvArg)
         ld hl, (OvEntry)
         call .go
         jr .after

@@ -62,6 +62,7 @@
         ld (d_ + 1), a
         ENDM
 
+COCKPIT         EQU $60             ; in the row state page (SaveCockpit)
 SpanBuf         EQU CXPage + $60    ; DrawForkRow: per line pair D1 E1 D2 E2 RW
 ForkList        EQU CXPage + $E0    ; DrawForkRow: cells to write (32 bytes)
 
@@ -322,6 +323,7 @@ Span:   push hl
 .none:  ld de, $FF00
         ret
 
+        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
 ; --------------------------------------------------------------------------
 ; A row with both branches on screen. Every cell is classified from the
 ; line pairs' spans (grass, road; kerb where an edge passes), the attributes
@@ -741,7 +743,6 @@ SaveCockpit:
         pop de
         pop hl
         ret
-COCKPIT         EQU $60             ; in the row state page
 
 ; A row DrawForkRow drew goes back to the normal renderer: clear the kerb
 ; cells it left (found by their attributes) on all 8 lines.
@@ -794,6 +795,7 @@ ClearKerbCells:
         djnz .cell
         ret
 
+        ENDIF
 ; --------------------------------------------------------------------------
 ; Player: after the position update. PlayerDx = dx at the car (0 before the
 ; split); the car moves out with its branch.

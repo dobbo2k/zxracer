@@ -13,6 +13,7 @@ EinBoot:
         ld a, 7                 ; the AY: tone and noise off, port A out (the
         ld e, $3F               ; keyboard's rows), port B in
         call AyWrite
+        call EinJoyDetect       ; (a joystick at rest: there)
         call SelectBackBuffer   ; the Spectrum drawing code's pointers: screen B
         ld a, $80
         ld (HudOr), a
@@ -42,12 +43,22 @@ EinCtcInit:
 ; vertical blank, at least MIN_FRAMES after the last), and the sound.
 EinIsr:
         push af
+        ld a, (EFrontOn)        ; (the front end: the VDP is the main code's,
+        or a                    ; a frame every 20 ticks)
+        jr nz, .front
         in a, (EIN_VDP_CTRL)
         rla
         jr c, .frame
-        pop af
+.out:   pop af
         ei
         reti
+.front: ld a, (ETick)
+        inc a
+        cp 20
+        jr c, .tk
+        xor a
+.tk:    ld (ETick), a
+        jr nz, .out
 .frame: push hl
         push bc
         push de

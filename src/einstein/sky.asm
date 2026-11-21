@@ -95,6 +95,31 @@ EinLampCells:
         jr nz, .r
         ret
 
+; Each game frame: FLASH swaps every 16 TV frames (as the Spectrum's); the
+; big timer's cells (TimeWarn flashes them) sent again when it does
+EinFlash:
+        ld a, (FrameCount)
+        and 16
+        ld hl, EFlashOn
+        cp (hl)
+        ret z
+        ld (hl), a
+        ld a, ($D800 + 32 + 14) ; (only while they flash)
+        rla
+        ret nc
+        ld b, 1
+.r:     ld c, 14
+.c:     call EinMarkRC
+        inc c
+        ld a, c
+        cp 18
+        jr nz, .c
+        inc b
+        ld a, b
+        cp 3
+        jr nz, .r
+        ret
+
 ; HL = a big digit's top-left cell (src/extend.asm PrintBig): its four cells
 ; (all kept: A is the digit)
 EinMarkBig:
@@ -208,7 +233,7 @@ EinSendCell:
         push hl
         ld a, b                 ; screen B: $C000 + third * $800 + row in it * 32 + column
         and $18
-        or $C0
+.scr:   or $C0                  ; (patched: $40, screen A, for the front end)
         ld h, a
         ld a, b
         and 7
@@ -236,7 +261,7 @@ EinSendCell:
         ld e, a
         ld a, l
         and 3
-        or $D8
+.att:   or $D8                  ; (patched: $58)
         ld d, a
         ld a, (de)
         push af
@@ -247,9 +272,23 @@ EinSendCell:
         rlca
         ld l, a
         pop af
+        push af
         call AttrPaper
         or l
-        ld (EMCol), a
+        ld l, a
+        pop af                  ; FLASH, in its swapped half: paper over ink
+        rla
+        ld a, l
+        jr nc, .noFl
+        ld a, (EFlashOn)
+        or a
+        ld a, l
+        jr z, .noFl
+        rrca
+        rrca
+        rrca
+        rrca
+.noFl:  ld (EMCol), a
         pop de                  ; the pattern
         push de
         ld hl, EMPat
@@ -482,6 +521,7 @@ EinCeiling:
 
 EMPat:          ds 8
 EMCol:          db 0
+EFlashOn:       db 0            ; FLASH cells: ink and paper swapped now
 EinCarDirty:    db 1
 EinCarFull:     db 1
 EinCarAttr:     ds 4 * CAR_W    ; the car's attributes in VRAM

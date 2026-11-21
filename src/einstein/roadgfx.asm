@@ -500,18 +500,20 @@ EinKerbCells:
 ; EPat = the road's pixels in kerb cell ECol: no road, it stays kerb (as
 ; named); all road, solid road; else a slot
 EinKerbName:
-        ld hl, EPat             ; all clear, all set, or mixed?
-        ld b, 8
-        ld c, 0                 ; OR
-        ld d, $FF               ; AND
-.cls:   ld a, (hl)
+        ld hl, EPat             ; all clear, all set, or mixed? (its line
+        ld a, (hl)              ; pairs: lines 0, 2, 4, 6)
+        ld c, a
+        ld d, a
+        DUP 3
+        inc l
+        inc l
+        ld a, (hl)
         or c
         ld c, a
         ld a, (hl)
         and d
         ld d, a
-        inc hl
-        djnz .cls
+        EDUP
         ld a, c
         or a
         ret z                   ; no road in it: kerb, as named
@@ -977,6 +979,8 @@ EinCommitTop:
         ld b, (hl)
 ; B = the slot in the row, C = the colour
 EinCommitAt:
+        ld a, c
+        ld (EColour), a
         ld a, (ESlot0)
         add a, b
         ld (ES), a              ; the SlotShadow index
@@ -991,14 +995,18 @@ EinCommitAt:
         ld de, SlotShadow
         add hl, de
         push hl
-        ld de, EPat
-        ld b, 8
-.cmp:   ld a, (de)
+        ld de, EPat             ; the same pixels? (unrolled)
+        DUP 7
+        ld a, (de)
         cp (hl)
         jr nz, .newPat
         inc hl
         inc de
-        djnz .cmp
+        EDUP
+        ld a, (de)
+        cp (hl)
+        jr nz, .newPat
+        inc hl
         ld a, (hl)              ; the same pixels: the same colour?
         cp c
         jr z, .same
@@ -1006,17 +1014,20 @@ EinCommitAt:
         ld e, 2                 ; the colour only
         jr .dirty
 .newPat:
-        pop hl
-        push hl
-        ex de, hl
+        pop de
+        push de
         ld hl, EPat
-        ld b, 8
-.cp:    ld a, (hl)
-        ld (de), a
-        inc hl
-        inc de
-        djnz .cp
+        ldi                     ; (BC's count is spent: C reloaded below)
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
         ex de, hl
+        ld a, (EColour)
+        ld c, a
         ld a, (hl)
         ld (hl), c
         cp c
@@ -1060,6 +1071,7 @@ ESlotMax:       db 0
 ESlotN:         db 0
 ESlotTop:       db 0            ; the centre line's lowest slot so far
 ES:             db 0
+EColour:        db 0
 ERW0:           db 0            ; kerb widths of its top and bottom lines
 ERW1:           db 0
 ERA:            db 0            ; cell ranges
@@ -1078,6 +1090,7 @@ ECol:           db 0
 EColEnd:        db 0
 EX0:            db 0
 ELine:          db 0
+        ASSERT high EPat == high (EPat + 7)   ; (EinKerbName steps L)
 EPat:           ds 8
 EFA:            ds 4            ; a fork row: the left branch's cell ranges
 EPat2:          ds 8

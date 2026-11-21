@@ -25,6 +25,7 @@ PLAIN_LINE      EQU 4               ; ... a plain one (28)
 TYRE_STEP       EQU 21              ; depth units a row (MAX_SPEED 20 a TV frame)
 TYRE_LIVE       EQU 8               ; TV frames since the game's last flip
 
+        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
 ; From the interrupt (instead of SoundTick, which it ends with): AF, BC, DE
 ; and HL are saved there.
 TyreTick:
@@ -128,3 +129,4 @@ TyreTick:
 
 TyreAcc:        db 0            ; depth units towards the next row
 TyrePhase:      db 1            ; 0-2: the first tread row (1: as drawn, row 27)
+        ENDIF

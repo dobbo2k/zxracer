@@ -53,6 +53,8 @@ SLOTS_T2        EQU 24
 SLOT_FIRST      EQU 16
 N_SLOTS         EQU 4 * SLOTS_T1 + 8 * SLOTS_T2     ; 240 in all
 SLOT_SIZE       EQU 9               ; 8 pattern bytes, the colour byte
+EPicBuf         EQU THEME_CACHE + 4352  ; a picture from the disc, after the front end's
+                                        ; code (make_stages.py FRONTEND_RESERVE)
 SKY_PAT_T1      EQU 64              ; rows 8-9's patterns in the middle third
 PANO_PAT        EQU 128             ; the panorama's
 MIRROR_ROWS     EQU 10
@@ -79,7 +81,6 @@ EIN_BUF_END     EQU EIN_CMDLISTB + 1 + MAX_SPR * CMD_SIZE
         INCLUDE "sky.asm"
         INCLUDE "sprites.asm"
         INCLUDE "portal.asm"
-        INCLUDE "keys.asm"
-        INCLUDE "disc.asm"
+        ; (keys.asm, disc.asm, front.asm: in bank 2's code, src/main.asm)
 EinArt:                         ; (the end of the platform code)
         ASSERT $ <= $4000              ; (the stage overlay: src/main.asm)

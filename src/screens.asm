@@ -10,14 +10,12 @@ ATTRACT_LOOPS   EQU 360             ; game frames of demo between title screens
 ; From the demo (and at power-on): the title screens; then a game if a key
 ; was pressed, else the demo carries on where it was.
 GoTitle:
-        IFNDEF EINSTEIN         ; (no front end on the Einstein yet: the demo)
         call LoadFrontEnd
         call TitleScreen
         or a
         jp nz, StartGame
         ld a, (Stage)
         call ReloadStage        ; (the overlay is over the theme)
-        ENDIF
 Attract:
         ld hl, ATTRACT_LOOPS
         ld (AttractTimer), hl
@@ -31,12 +29,10 @@ Attract:
 EndGame:
         ld a, ST_ATTRACT
         ld (GameState), a
-        IFNDEF EINSTEIN         ; (no front end on the Einstein yet: the demo)
         call LoadFrontEnd
         call GameOverScreens
         or a
         jp nz, StartGame
-        ENDIF
         call Restart
         jr Attract
 

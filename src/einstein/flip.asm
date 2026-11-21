@@ -250,6 +250,7 @@ EinSendSlot:
 ; panorama's, grass below; no slot in use.
 EinResetDisplay:
         di                      ; (the interrupt reads the VDP's status)
+        call EinFrontOff        ; (the game's display again)
         call VdpInit            ; (a disc read may have let MOS at the VDP)
         call VdpOff
         ld hl, $FFFF            ; (the display off: any speed)

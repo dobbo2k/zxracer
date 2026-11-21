@@ -62,6 +62,25 @@ IN_DOWN         EQU 2
 IN_UP           EQU 3
 IN_FIRE         EQU 4
 
+; Wait for the next TV frame (the Einstein's interrupt comes every 1 ms)
+        MACRO FRAME_WAIT
+        IFDEF EINSTEIN
+        call EinHalt
+        ELSE
+        halt
+        ENDIF
+        ENDM
+
+; A = keyboard half-rows to read (as port $FE's high byte) -> A = their keys
+; (bits 0-4, 0: pressed); the Einstein answers from its own keyboard
+        MACRO KEY_IN
+        IFDEF EINSTEIN
+        call EinSpecIn
+        ELSE
+        in a, ($FE)
+        ENDIF
+        ENDM
+
         MACRO BORDER col
         IF PROFILE
         ld a, col

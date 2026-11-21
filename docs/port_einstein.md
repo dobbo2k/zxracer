@@ -135,6 +135,26 @@ test-einstein`.
 - **The sky and HUD** (`src/einstein/sky.asm`): the Spectrum code's cells
   are mirrored, at most 48 a frame (the rest wait). The panorama is sent
   once a stage and scrolls by its names alone.
+- **The front end** (`src/einstein/front.asm`): the Spectrum's title,
+  high scores, options (key redefinition too), game-over and goal screens,
+  unchanged. They draw into screen A ($4000) as on the Spectrum, and screen
+  A is shown as a full-screen bitmap: each third's 256 patterns are its
+  cells in order. Each frame wait (`FRAME_WAIT`, `EinHalt`) compares 96 of
+  its cells with a copy (in screen B's memory, the game's mirror source,
+  which a display reset makes afresh), and sends the ones that changed.
+  Meanwhile the interrupt counts frames on the CTC alone, so the VDP is
+  the main code's. The front end's code and its pictures are in
+  `STAGES.DAT`. The stage overlay, which the front end draws over, is read
+  back from there (`StageOv`).
+- **Keys and joystick** (`src/einstein/keys.asm`): the Spectrum's key reads
+  (`KEY_IN`: `ReadInput` with its redefinable keys, the front end, the
+  pause key) are answered from the Einstein's keyboard. Each Spectrum key is
+  where the same key sits on the Einstein; the two shifts have none. The
+  analogue joystick (ADC0844) gives the Kempston's bits, and works any
+  time.
+- **Game time:** a game frame takes longer than the Spectrum's 4 TV frames
+  at most, so `Elapsed` goes up to 8 here and the clock and the car keep
+  real time.
 - **The player's car:** the Spectrum's `DrawCar`, its 32 cells mirrored
   (all of them when the frame changes, otherwise only the cockpit's
   colours over a new colour underneath).
@@ -145,13 +165,11 @@ test-einstein`.
 
 Not yet:
 
-- the crew's crash close-ups
-- the timer's flash in the last ten seconds
-- the front end (title, options, high scores, goal screens)
+- the crew's crash close-ups (their portraits are left out of the Einstein
+  build, for room)
 - drum and engine pitches, which are still the Spectrum's periods, so a
   little high at 2 MHz
-- the joystick
-- speed (section 7)
+- speed (section 6)
 
 ## 5. Graphics: the name table does the work
 
@@ -184,9 +202,12 @@ the writes that spill past the vertical blank. Ideas, roughly in order:
 - compare slots in their line pairs (4 bytes, not 8) and unroll the loops
 - fewer writes past the blank: send the colour of a slot only when it
   changes, and spread the sky's cells over frames (done: 48 a frame)
-- memory: the platform code ends just under $4000 (an assertion checks).
-  The Spectrum's own drawing code that the Einstein never calls (road pass
-  2, screen flips, the panorama's bitmap) could go, to make room.
+- memory: the Spectrum's drawing code that the Einstein never calls
+  (road pass 2, the fork's row drawer, the panorama's bitmap, the rolling
+  tyres, the crew's close-ups) is left out of its build (`IFNDEF
+  EINSTEIN`). That made room for the Einstein's keys, disc and front-end
+  code in bank 2. Left: about 1.4K in bank 2, 750 bytes in bank 5 and 440
+  under $4000 (assertions check each).
 
 ## 7. Building and testing
 
@@ -203,15 +224,18 @@ C++ tools (`tests/einstein/build_harness.cmd`).
 
 The harness (`build/einstein/speedrun_check.exe <rom> <dsk> <sym>
 commands...`) boots the disc and runs commands. Its header lists them:
-`boot`, `frames`, `hold`, `peek8`, `vram`, `shot`, `record` (pictures and
+`boot` (to the main loop, after the title screens), `frames`, `hold`, `joy`, `peek8`, `vram`, `shot`, `record` (pictures and
 sound), `rec_start`/`rec_stop` (record whatever runs between them, the
 boot too), `type`, `until`, `profile` (T-states per routine) and `stats`
 (VRAM accesses that came too fast).
 
 The game's Einstein-specific generated files (`packs.asm`, `stages.asm`,
-`stageov_pack.asm`, `music_notes.asm`) and `STAGES.DAT` come from
-`tools/make_einstein.py`, in two steps either side of assembling every
-stage pack (`stagepacks.asm`), into `build/einstein`. It's last on the
+`stageov_pack.asm`, `screens_data.asm`, `music_notes.asm`) and
+`STAGES.DAT` come from `tools/make_einstein.py`, into `build/einstein`.
+It runs in three steps: `gen` before assembling every stage pack
+(`stagepacks.asm`), `dat` after (the packs and pictures, with room for the
+front end and the overlay), and `patch` after the game is assembled (its
+`frontend.bin` and `stageov.bin` into that room). It's last on the
 include path because sjasmplus 1.21 searches the last `-I` first.
 
 For testing a later stage or a place in one, assemble with

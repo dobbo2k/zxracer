@@ -136,8 +136,8 @@ EINSTEIN_REPO   ?= $(subst \,/,$(USERPROFILE))/OneDrive/Documents/GitHub/einstei
 EINSTEIN_SYSTEM ?= $(EINSTEIN_REPO)/roms/disassembled/Einstein/__XTALDOS131/SYSTEM131.CPM
 EINSTEIN_ROM    ?= $(EINSTEIN_REPO)/roms/Tatung X-TAL MOS v1.2 (1983)(Tatung).rom
 EIN_SRC := $(wildcard src/einstein/*.asm)
-EIN_GEN := build/einstein/packs.asm build/einstein/stagepacks.asm build/einstein/stageov_pack.asm build/einstein/music_notes.asm
-EIN_DAT := build/einstein/stages.asm build/einstein/STAGES.DAT
+EIN_GEN := build/einstein/packs.asm build/einstein/stagepacks.asm build/einstein/music_notes.asm
+EIN_DAT := build/einstein/stages.asm build/einstein/stageov_pack.asm build/einstein/screens_data.asm build/einstein/stages_raw.dat build/einstein/reserve.txt
 
 einstein: build/einstein/speedrun.dsk
 
@@ -152,10 +152,14 @@ build/einstein/stagepacks.stamp: build/einstein/stagepacks.asm
 	$(ASM) --nologo --msg=war -Ibuild build/einstein/stagepacks.asm
 	touch $@
 
-$(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py
+$(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py tools/make_screens.py
 	$(PYTHON) tools/make_einstein.py dat assets/stages.yaml build/einstein
 
-build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/tables.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build/einstein
+# the front end and the overlay, assembled with the game, into STAGES.DAT
+build/einstein/STAGES.DAT: build/einstein/speedrun.com build/einstein/stages_raw.dat tools/make_einstein.py
+	$(PYTHON) tools/make_einstein.py patch assets/stages.yaml build/einstein
+
+build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build/einstein
 	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
 
 build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.DAT tools/make_einstein_disk.py

@@ -40,9 +40,15 @@ UpdatePlayer:
         ld (hl), b
         jr nz, .nz
         inc a
+        IFDEF EINSTEIN          ; (its game frames take longer: up to 8, so the
+.nz:    cp 9                    ; clock and the car keep real time)
+        jr c, .el
+        ld a, 8
+        ELSE
 .nz:    cp 5
         jr c, .el
         ld a, 4
+        ENDIF
 .el:    ld (Elapsed), a
         call ForkPlayer         ; past the split: carried along the branch
         ; gear: fire (SPACE) changes between LOW and HIGH

@@ -37,6 +37,7 @@ start:
 ; then, once that buffer is on show, draw the other one and ask for a flip.
         IFDEF EINSTEIN
 MainLoop:
+        call CheckPause
         call ReadInput
         call UpdatePlayer
         call RoadPrepare
@@ -51,6 +52,7 @@ MainLoop:
         call EinHorizon
         call EinDraw            ; the frame into RAM: names, patterns (src/einstein)
         call DrawHud            ; (into screen B: the cells it writes are sent)
+        call EinFlash           ; (the timer's last ten seconds)
         call RequestFlip        ; then into VRAM, in the vertical blank
         jr MainLoop
         ELSE
@@ -86,8 +88,8 @@ MainLoop:
         INCLUDE "einstein/screen.asm"   ; (FillA: the rest is in src/einstein)
         ELSE
         INCLUDE "screen.asm"
-        INCLUDE "input.asm"
         ENDIF
+        INCLUDE "input.asm"
         INCLUDE "player.asm"
         INCLUDE "road.asm"
         INCLUDE "track.asm"
@@ -103,6 +105,14 @@ MainLoop:
         INCLUDE "hills.asm"
         INCLUDE "tunnelb2.asm"
         INCLUDE "vars.asm"
+        IFDEF EINSTEIN          ; (in the room the Spectrum's drawing code leaves)
+        INCLUDE "pause.asm"
+        INCLUDE "beep.asm"
+        INCLUDE "gap4.asm"
+        INCLUDE "einstein/keys.asm"
+        INCLUDE "einstein/disc.asm"
+        INCLUDE "einstein/front.asm"
+        ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES
 
@@ -178,9 +188,11 @@ FillBlock:
         inc l
         EDUP
         ret
+        IFNDEF EINSTEIN
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
         INCLUDE "beep.asm"
         INCLUDE "gap4.asm"
+        ENDIF
         ASSERT $ <= ISR_JP
 
         ORG ISR_JP
@@ -249,7 +261,17 @@ ScnEnd:
 ; The between-stages overlay stays where the Spectrum runs it ($4000: its
 ; screen A, plain RAM here), resident: nothing pages over it.
         ORG $4000
-        INCLUDE "stageov.asm"
+        OUTPUT "build/einstein/stageov.bin"     ; (into STAGES.DAT too: the front
+        INCLUDE "stageov.asm"                   ; end draws over it)
+        OUTEND
+; The front end: run at THEME_CACHE, from STAGES.DAT (assembled here, out of
+; the COM file's way, for its own file)
+        ORG $C000
+        OUTPUT "build/einstein/frontend.bin"
+        DISP THEME_CACHE
+        INCLUDE "frontend.asm"
+        ENT
+        OUTEND
         ; the COM file: $0100 up to the stack
         SAVEBIN "build/einstein/speedrun.com", $0100, STACK_TOP - 256 - $0100
         ELSE

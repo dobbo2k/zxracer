@@ -9,11 +9,13 @@
 //
 // Commands, run in order:
 //   boot NAME          run 7 s for XtalDOS to reach its prompt, type NAME and
-//                      ENTER, run until the game's main loop (MainLoop)
+//                      ENTER, run until the game's main loop (MainLoop: after
+//                      the title screens; at most 120 s)
 //   seconds S          run S emulated seconds
 //   frames N           run N video frames
-//   hold KEYS          hold game keys: comma list of UP,DOWN,LEFT,RIGHT,FIRE
+//   hold KEYS          hold game keys: comma list of UP,DOWN,LEFT,RIGHT,FIRE,PAUSE
 //   release            release all keys
+//   joy X Y FIRE       joystick 1: its axes (0-255, 128 at rest; Y 255 up), fire 1/0
 //   peek8 SYM          print SYM=value (SYM may be NAME+OFFSET)
 //   peek16 SYM
 //   mem ADDR LEN       print mem_ADDR=hex (ADDR in hex)
@@ -60,6 +62,7 @@ const std::map<std::string, KeyPos> kGameKeys = {
     {"DOWN", {6, 6}},   // A
     {"UP", {5, 6}},     // Q
     {"FIRE", {0, 6}},   // SPACE
+    {"PAUSE", {6, 1}},  // H
 };
 
 std::map<std::string, std::uint16_t> load_symbols(const char* path) {
@@ -236,7 +239,7 @@ int main(int argc, char** argv) {
             run_seconds(m, 7.0);
             type_text(m, name + "\n");
             const std::uint16_t pc = symbol("MainLoop");
-            const std::uint64_t limit = m.tstates + std::uint64_t(40.0 * ein::Machine::kCpuClockHz);
+            const std::uint64_t limit = m.tstates + std::uint64_t(120.0 * ein::Machine::kCpuClockHz);
             while (!at_program_pc(m, pc) && m.tstates < limit) step(m);
             g_fast_at_boot = m.vdp.fast_accesses();
             std::printf("main_loop=%d\nboot_seconds=%.1f\n", at_program_pc(m, pc) ? 1 : 0,
@@ -255,6 +258,16 @@ int main(int argc, char** argv) {
             }
         } else if (command == "release") {
             m.keyboard.release_all();
+        } else if (command == "joy") {
+            // joy X Y FIRE: joystick 1 on the ADC0844 (channel 0 X, 0 left and
+            // 255 right; channel 1 Y, 0 down and 255 up; 128 at rest), its fire
+            // on port 20 bit 0 (low when held), as Albert's sticks
+            const int x = std::stoi(next());
+            const int y = std::stoi(next());
+            const int fire = std::stoi(next());
+            m.adc.set_axis(0, static_cast<std::uint8_t>(x));
+            m.adc.set_axis(1, static_cast<std::uint8_t>(y));
+            m.keyboard.set_port20_low(fire ? 0x01 : 0x00);
         } else if (command == "peek8") {
             const std::string name = next();
             std::printf("%s=%u\n", name.c_str(), m.peek(symbol(name)));
