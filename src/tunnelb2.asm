@@ -199,7 +199,7 @@ Cell:   rrca
 PatFace:        db F_, F_, F_, F_, F_
 PatArch:        db F_, A_, A_, A_, F_
 PatSky:         db F_, A_, D_, A_, F_
-PatRoad:        db F_, A_, S_, A_, F_
+PatRoad:        db F_, A_, D_, A_, F_    ; (inside: dark, the road beyond hidden too)
 PatOut:         db C_, C_, 0, C_, C_    ; (the sky, set per frame)
                 db D_, D_, S_, D_, D_
 PatCeil:        db C_, C_, C_, C_, C_   ; (the way out: above the opening)
