@@ -239,7 +239,7 @@ TUNES = {
             ("Fm7", "//G#6:18 -:6"),
             ("C7", "//E6:12 -:6 G5:6"),
         ]),
-    ], {"steps": 24, "echo": (9, 4)}),
+    ], {"steps": 24, "echo": (9, 1)}),
     # night-time funk on sevenths, D dorian
     "sunset": (6, [
         ("slap", ENV_BASS, "funk", FILL, [
