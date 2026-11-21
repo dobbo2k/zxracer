@@ -19,6 +19,8 @@ A_              EQU $76             ; the arch: bright yellow, yellow ink (white
 D_              EQU $00             ; dark
 S_              EQU $FF             ; (left as it is)
 ARCH_MIN        EQU 24              ; the road's width (pixels) at the mouth from which the arch shows
+EXIT_SEE        EQU 1024            ; the way out shows from this near (src/holes.asm UpdateTunnel):
+                                    ; further, the tunnel goes on into the dark
 C_              EQU $07             ; the ceiling: black, white ink
 
 DrawPortal:
@@ -32,6 +34,9 @@ DrawPortal:
         ld hl, Band + ROAD_LINES - 2
         ld bc, (low Band - 2) * 256 + $FE    ; the mouth: the nearest line in it
         jr z, .scan
+        ld a, (TunJ0)           ; in it: the way out not in sight yet?
+        or a
+        ret z
         ld l, low Band
         ld bc, (low Band + ROAD_LINES) * 256 + 2   ; the way out: the furthest
 .scan:  bit 7, (hl)

@@ -584,9 +584,9 @@ UpdateTunnel:
         xor a
         ld h, a
         ld a, d
-        cp high 4096
+        cp high EXIT_SEE
         ld a, h
-        jr nc, .j0              ; (its end beyond the furthest line: from line 0)
+        jr nc, .j0              ; (its end too far to see: in it up to the furthest line)
         push bc
         call ObjLine
         pop bc
