@@ -2,14 +2,11 @@
 ; Einstein: frames into VRAM
 ;
 ; The Spectrum draws into a hidden screen and flips. Here the frame is built
-; in RAM (EinDraw: NameBuf, SlotShadow) and RequestFlip sends what changed:
-; the changed slots' patterns and colours, then each row of names that
-; differs from what VRAM holds (NameVram). All writes are paced (32 T), so
-; they are safe whenever they come.
-;
-; Milestone 1: one name table, written as the picture shows (a row can
-; change mid-frame). Two name tables, flipped in the vertical blank, are the
-; next step (docs/port_einstein.md).
+; in RAM (EinDraw: NameBuf, SlotShadow), RequestFlip marks it ready, and
+; the interrupt sends it at the start of a vertical blank (EinUpload): row
+; by row, the row's changed slots, then its names if it was drawn again;
+; then the car's and the sky's cells. Writes go at full speed while the
+; blank's budget lasts, paced (32 T) after, so none is ever lost.
 ; ---------------------------------------------------------------------------
 
 ; The Spectrum's per-buffer pointers, for the parts of its drawing code
@@ -138,23 +135,25 @@ ITEM_UNITS      EQU 40
 ; budget is gone, write paced.
 EinSpend:
         push hl
-        push de
         ld hl, (EBudget)
-        ld e, b
-        ld d, 0
-        or a
-        sbc hl, de
-        jr c, .out
-        ld de, ITEM_UNITS
-        sbc hl, de
-        jr c, .out
-        ld (EBudget), hl
-        pop de
+        ld a, l
+        sub b
+        ld l, a
+        jr nc, .s
+        dec h
+        jp m, .out
+.s:     ld a, l
+        sub ITEM_UNITS
+        ld l, a
+        jr nc, .k
+        dec h
+        jp m, .out
+.k:     ld (EBudget), hl
         pop hl
+        or a
         ret
 .out:   ld hl, 0
         ld (EBudget), hl
-        pop de
         pop hl
         scf
         ret
@@ -220,7 +219,34 @@ EinSendSlot:
         ld de, SlotShadow
         add hl, de
         pop de
-        bit 0, c
+        ld a, c                 ; both, and the blank's budget for them: at once
+        cp 3
+        jr nz, .one
+        push hl
+        ld hl, (EBudget)
+        push de
+        ld de, -(16 + ITEM_UNITS)
+        add hl, de
+        pop de
+        jr nc, .slow            ; (spent: the paced way)
+        ld (EBudget), hl
+        pop hl
+        call VdpAddr
+        ld c, EIN_VDP_DATA
+        DUP 8
+        outi
+        EDUP
+        ld a, d                 ; the colour, on all 8 lines
+        add a, high VRAM_COL
+        ld d, a
+        call VdpAddr
+        ld a, (hl)
+        DUP 8
+        out (EIN_VDP_DATA), a
+        EDUP
+        ret
+.slow:  pop hl
+.one:   bit 0, c
         jr z, .col
         push bc
         push de
@@ -253,7 +279,7 @@ EinResetDisplay:
         call EinFrontOff        ; (the game's display again)
         call VdpInit            ; (a disc read may have let MOS at the VDP)
         call VdpOff
-        ld hl, $FFFF            ; (the display off: any speed)
+        ld hl, $7FFF            ; (the display off: any speed)
         ld (EBudget), hl
         ld de, 0                ; all of VRAM: 0
         ld bc, $4000
@@ -296,8 +322,12 @@ EinResetDisplay:
         ld de, NameBuf + PANO_ROW0 * 32
         ld bc, (24 - PANO_ROW0) * 32
         ldir
-        xor a                   ; no silhouettes on show
-        ld (EOldCmds), a
+        ld hl, EMaskN           ; no silhouettes on show
+        ld de, EMaskN + 1
+        ld bc, 24 * MASK_ROW - 1
+        ld (hl), 0
+        ldir
+        xor a
         ld (EPanoN), a
         call EinPortalReset
         ld hl, NameBuf          ; (the display is off: any speed would do)
@@ -315,6 +345,16 @@ EinResetDisplay:
 .d:     ld (hl), 0
         inc hl
         djnz .d
+        ld hl, ECarPix          ; (none of the car's: all differ)
+        ld de, ECarPix + 1
+        ld bc, 4 * CAR_W * 8 - 1
+        ld (hl), $55
+        ldir
+        ld hl, EinCarAttr
+        ld de, EinCarAttr + 1
+        ld bc, 4 * CAR_W - 1
+        ld (hl), $FF
+        ldir
         ld a, 1                 ; the car: drawn again, sent again
         ld (CarDirty), a
         ld (EinCarDirty), a

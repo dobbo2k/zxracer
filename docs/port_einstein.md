@@ -167,8 +167,9 @@ Not yet:
 
 - the crew's crash close-ups (their portraits are left out of the Einstein
   build, for room)
-- drum and engine pitches, which are still the Spectrum's periods, so a
-  little high at 2 MHz
+- the tyre squeal's and the crash's AY periods, still the Spectrum's, so a
+  little high at 2 MHz (the drums, the lights' beeps and the engine's idle
+  note are scaled: `AYN` / `AYD` in `src/defs.asm`)
 - speed (section 6)
 
 ## 5. Graphics: the name table does the work
@@ -188,20 +189,35 @@ TMS colours, as the plan said.
 
 ## 6. Speed
 
-In the attract demo's worst stretch (`make test-einstein`, which wants at
-least 7), a game frame takes about 6 TV frames: 8 fps against the
-Spectrum's 16.7. The shared game logic (pass 1, the hill mapping, the
-projection) costs the same T-states as on the Spectrum. The rest is the
-Einstein's: the kerb cells, the slot commits, the silhouettes' cells, and
-the writes that spill past the vertical blank. Ideas, roughly in order:
+A game frame takes about 6.2 TV frames: 8 fps against the Spectrum's
+16.7 (`make test-einstein` wants at least 7 in the attract demo).
 
-- leave a row's kerb cells alone when only its bands moved (only colours
-  change then)
-- a silhouette cell: XOR into the slot only where its mask has pixels, and
-  keep a cell's slot from frame to frame
-- compare slots in their line pairs (4 bytes, not 8) and unroll the loops
-- fewer writes past the blank: send the colour of a slot only when it
-  changes, and spread the sky's cells over frames (done: 48 a frame)
+**The benchmark.** A game's speed changes what it does (the time step, the
+demo driver's steering), so ordinary runs don't compare. Assemble with
+`-DFIXED_ELAPSED=1` (every update counts 3 TV frames: the same game at any
+speed), boot, and time 300 game frames of the attract demo with the
+harness: `wait16 GameFrames 20`, then `wait16 GameFrames 320` prints the
+TV frames they took. Taken so: 1,955 at the start of the speed work, 1,860
+now.
+
+The shared game logic (pass 1, the hill mapping, the projection) costs the
+same T-states as on the Spectrum. The rest is the Einstein's, spread out:
+the road's rows (ranges, line pairs, kerb cells, slot commits, the centre
+line), the silhouettes' cells, and the interrupt's writes. In play the
+road's shape changes nearly every frame (steering, bends), so all 12 road
+rows are built again each frame. Tried and measured:
+
+- kept: sending a slot's 16 bytes in one go; the silhouettes' old cells
+  from last frame's mask; whole empty mask bytes skipped; the keyboard
+  read once a TV frame, each half-row worked out only when asked; kerb
+  cells classified by line pair; unrolled slot compares; name rows filled
+  with the Spectrum's unrolled `FillA`
+- dropped: comparing each row of names with what VRAM holds (it cost more
+  than it saved)
+
+What would make a real difference is building a row's cells in fewer
+passes (ranges, edges, kerb masks and slots together), and keeping a row's
+kerb cells when only its bands moved.
 - memory: the Spectrum's drawing code that the Einstein never calls
   (road pass 2, the fork's row drawer, the panorama's bitmap, the rolling
   tyres, the crew's close-ups) is left out of its build (`IFNDEF
@@ -214,7 +230,7 @@ the writes that spill past the vertical blank. Ideas, roughly in order:
 | Command | Does |
 |---|---|
 | `make einstein` | `build/einstein/speedrun.dsk` (and `.com`, `.sym`, `.lst`) |
-| `make test-einstein` | boots it in Albert's core and checks it (`tests/einstein_check.py`); builds the harness first if needed |
+| `make test-einstein` | boots it in Albert's core and checks it (`tests/einstein_check.py`); builds the harness first if needed (Visual Studio's C++ tools) |
 | `make run-einstein` | opens it in Albert; type `SPEEDRUN` at the `0:` prompt |
 
 They need, from the einstein repository (`EINSTEIN_REPO` in `local.mk`):
@@ -224,7 +240,7 @@ C++ tools (`tests/einstein/build_harness.cmd`).
 
 The harness (`build/einstein/speedrun_check.exe <rom> <dsk> <sym>
 commands...`) boots the disc and runs commands. Its header lists them:
-`boot` (to the main loop, after the title screens), `frames`, `hold`, `joy`, `peek8`, `vram`, `shot`, `record` (pictures and
+`boot` (to the main loop, after the title screens), `frames`, `hold`, `joy`, `wait16`, `peek8`, `vram`, `shot`, `record` (pictures and
 sound), `rec_start`/`rec_stop` (record whatever runs between them, the
 boot too), `type`, `until`, `profile` (T-states per routine) and `stats`
 (VRAM accesses that came too fast).

@@ -168,7 +168,7 @@ build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.D
 # The harness (Albert's core, Visual Studio's C++ tools): tests/einstein/build_harness.cmd
 EIN_HARNESS := build/einstein/speedrun_check.exe
 $(EIN_HARNESS): tests/einstein/speedrun_check.cpp
-	cmd //c "tests\einstein\build_harness.cmd"
+	ALBERT_CORE="$(shell cygpath -w "$(EINSTEIN_REPO)/emulator")" cmd.exe //c "tests\einstein\build_harness.cmd"
 
 test-einstein: build/einstein/speedrun.dsk $(EIN_HARNESS)
 	$(PYTHON) tests/einstein_check.py $(EIN_HARNESS) "$(EINSTEIN_ROM)" build/einstein/speedrun.dsk build/einstein/speedrun.sym build/einstein

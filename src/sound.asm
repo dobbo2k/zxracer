@@ -8,7 +8,7 @@
 ; ---------------------------------------------------------------------------
 AY_SEL          EQU $FFFD
 AY_DATA         EQU $BFFD
-ENGINE_IDLE     EQU 1400            ; tone period at standstill (~80 Hz)
+ENGINE_IDLE     EQU (1400 * AYN + AYD / 2) / AYD    ; tone period at standstill (~80 Hz)
 ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpdate: shifts)
 
 ; A = register, E = value

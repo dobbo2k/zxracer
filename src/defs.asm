@@ -55,6 +55,17 @@ ATTR_KERB_D     EQU %01010000   ; bright red paper, black ink
 
 STRIPE_BIT      EQU $40         ; bit of (z + position) selecting light/dark band
 
+; AY periods: the Spectrum's AY runs at 1.7734 MHz, the Einstein's at 2 MHz,
+; so there a period is AYN / AYD as long for the same pitch: write a period
+; as (p * AYN + AYD / 2) / AYD
+        IFDEF EINSTEIN
+AYN             EQU 1128
+AYD             EQU 1000
+        ELSE
+AYN             EQU 1
+AYD             EQU 1
+        ENDIF
+
 ; Input bits (same layout as Kempston)
 IN_RIGHT        EQU 0
 IN_LEFT         EQU 1

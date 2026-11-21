@@ -14,7 +14,10 @@ if not exist "!CORELIB!" (
     exit /b 1
 )
 
-set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+rem (run from MSYS2's make, ProgramFiles(x86) may not be set)
+set "PF86=%ProgramFiles(x86)%"
+if "!PF86!"=="" set "PF86=C:\Program Files (x86)"
+set "VSWHERE=!PF86!\Microsoft Visual Studio\Installer\vswhere.exe"
 for /f "usebackq tokens=*" %%i in (`"!VSWHERE!" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
 if "!VSPATH!"=="" (
     echo Visual Studio C++ toolset not found

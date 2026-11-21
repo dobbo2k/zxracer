@@ -381,30 +381,77 @@ EinCarSync:
         cp 24
         jr nz, .ar
         ret
-.full:  ld hl, $D800 + CAR_ROW * 32 + CAR_COL   ; (the attributes now)
-        ld de, EinCarAttr
-        ld b, 4
-.cp:    push bc
-        ld bc, CAR_W
-        ldir
-        ld bc, 32 - CAR_W
-        add hl, bc
-        pop bc
-        djnz .cp
-        ld b, CAR_ROW
+.full:  ld b, CAR_ROW            ; a new frame: the cells that differ
 .r:     ld c, CAR_COL
 .c:     push bc
-        ld a, b                 ; HL = ($1000 + (CAR_PAT + (row - 20) * 8 + column - 12) * 8) / 8
+        ld a, b                 ; K = (row - 20) * 8 + column - 12
         sub CAR_ROW
         add a, a
         add a, a
         add a, a
         add a, c
-        add a, CAR_PAT - CAR_COL
+        sub CAR_COL
+        ld (ECarK), a
+        add a, a                ; DE = ECarPix + K * 8
+        add a, a
+        add a, a
+        ld e, a
+        ld d, high ECarPix
+        ld a, b                 ; HL = screen B's cell (the bottom third)
+        and 7
+        rrca
+        rrca
+        rrca
+        or c
+        ld l, a
+        ld h, $D0
+        ld c, 0                 ; C: differs
+        ld b, 8
+.cmp:   ld a, (de)
+        cp (hl)
+        jr z, .eq
+        ld a, (hl)
+        ld (de), a
+        ld c, 1
+.eq:    inc e
+        inc h
+        djnz .cmp
+        pop hl                  ; (the row and column)
+        push hl
+        ld a, h                 ; the attribute: $D800 + row * 32 + column
+        rrca
+        rrca
+        rrca
+        ld b, a
+        and $E0
+        or l
+        ld e, a
+        ld a, b
+        and 3
+        or $D8
+        ld d, a
+        ld a, (ECarK)
+        add a, low EinCarAttr
+        ld l, a
+        ld a, high EinCarAttr
+        adc a, 0
+        ld h, a
+        ld a, (de)
+        cp (hl)
+        jr z, .same
+        ld (hl), a
+        ld c, 1
+.same:  ld a, c
+        pop bc
+        push bc
+        or a
+        jr z, .next
+        ld a, (ECarK)           ; HL = ($1000 + (CAR_PAT + K) * 8) / 8
+        add a, CAR_PAT
         ld l, a
         ld h, high $1000 / 8
         call EinSendCell
-        pop bc
+.next:  pop bc
         inc c
         ld a, c
         cp CAR_COL + CAR_W

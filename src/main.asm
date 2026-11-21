@@ -42,8 +42,7 @@ MainLoop:
         call UpdatePlayer
         call RoadPrepare
         call WaitFlip           ; (the last frame sent: its buffers free)
-        call EinSprSave         ; traffic and scenery into screen B, as ever
-        call EraseSprites
+        call EraseSprites       ; traffic and scenery into screen B, as ever
         call DrawSprites
         call DrawCar            ; (into screen B: its cells are sent)
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)

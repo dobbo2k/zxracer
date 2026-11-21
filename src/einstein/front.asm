@@ -34,7 +34,7 @@ EinFrontOn:
         ld a, $58
         ld (EinSendCell.att + 1), a
         call VdpInit            ; (the display off; MOS may have been at it)
-        ld hl, $FFFF            ; (any speed)
+        ld hl, $7FFF            ; (any speed)
         ld (EBudget), hl
         ld de, VRAM_NAMES       ; the names: each third's patterns in order
         call VdpAddr
@@ -232,3 +232,9 @@ EFrontOn:       db 0            ; screen A on show
 EOvClobbered:   db 0            ; the stage overlay drawn over
 EFrontCur:      dw 0            ; the next cell to compare
 ETick:          db 0            ; (the interrupt's 1 ms ticks, front end)
+
+; The car's cells as VRAM holds them, for sending only those that changed
+; (src/einstein/sky.asm EinCarSync)
+        ALIGN 256
+ECarPix:        ds 4 * CAR_W * 8        ; the car's cells' pixels
+ECarK:          db 0

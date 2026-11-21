@@ -272,17 +272,17 @@ DrumOut:
 ; dw tone period (0: none)
 DrumTab:        dw DrumKick, DrumSnare, DrumHat, DrumTom, DrumOpen
 DrumTom:        db 14, 0
-                dw 500
+                dw (500 * AYN + AYD / 2) / AYD
                 db 13, 0
-                dw 600
+                dw (600 * AYN + AYD / 2) / AYD
                 db 11, 0
-                dw 720
+                dw (720 * AYN + AYD / 2) / AYD
                 db 9, 0
-                dw 860
+                dw (860 * AYN + AYD / 2) / AYD
                 db 6, 0
-                dw 1000
+                dw (1000 * AYN + AYD / 2) / AYD
                 db 3, 0
-                dw 1150
+                dw (1150 * AYN + AYD / 2) / AYD
                 db 0
 ; (DrumOpen: src/holes.asm)
 

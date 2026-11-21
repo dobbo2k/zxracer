@@ -27,6 +27,8 @@
 //   rec_stop
 //   type TEXT          type on the keyboard (a backslash-n: ENTER)
 //   until SYM S        run until the PC reaches SYM (at most S seconds)
+//   wait16 SYM VALUE   run until the word at SYM reaches VALUE; prints the
+//                      TV frames it took (with -DFIXED_ELAPSED: a benchmark)
 //   profile N          T-states per routine over N frames, costliest first
 //   stats              VDP frames, fast VRAM accesses since the game began,
 //                      interrupts, PC
@@ -306,6 +308,15 @@ int main(int argc, char** argv) {
             std::string text = next();
             for (std::size_t k; (k = text.find("\\n")) != std::string::npos;) text.replace(k, 2, "\n");
             type_text(m, text);
+        } else if (command == "wait16") {
+            // wait16 SYM VALUE: run until the 16-bit SYM reaches VALUE (at most
+            // 300 s); prints the TV frames that took (for benchmarks)
+            const std::uint16_t a = symbol(next());
+            const unsigned target = static_cast<unsigned>(std::stoul(next()));
+            const std::uint64_t f0 = m.vdp.frames();
+            const std::uint64_t limit = m.tstates + std::uint64_t(300.0 * ein::Machine::kCpuClockHz);
+            while (unsigned(m.peek(a) | (m.peek(std::uint16_t(a + 1)) << 8)) < target && m.tstates < limit) step(m);
+            std::printf("wait16_frames=%llu\n", (unsigned long long)(m.vdp.frames() - f0));
         } else if (command == "until") {
             const std::string name = next();
             const std::uint16_t pc = symbol(name);

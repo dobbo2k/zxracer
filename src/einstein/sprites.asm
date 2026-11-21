@@ -22,28 +22,21 @@
 PANO_SPR        EQU 192             ; the panorama rows' cells under a silhouette
 MASK_ROW        EQU 4               ; bytes of a mask row: a bit a column
 
-; Before EraseSprites: the commands it erases (their cells change too)
-EinSprSave:
-        ld hl, CmdListB
-        ld de, EOldCmds
-        ld bc, 1 + MAX_SPR * CMD_SIZE
-        ldir
-        ret
-
 ; After DrawSprites: EMaskN, the cells the new commands cover, and EMaskU,
-; those and the cells the old ones did; the sky's cells in EMaskU to be
-; mirrored
+; those and the cells the old ones did (last frame's EMaskN: the commands
+; EraseSprites took away); the sky's cells in EMaskU to be mirrored
 EinSprCells:
+        ld hl, EMaskN           ; U = last frame's N
+        ld de, EMaskU
+        ld bc, 24 * MASK_ROW
+        ldir
         ld hl, EMaskN
         ld de, EMaskN + 1
-        ld bc, 2 * 24 * MASK_ROW - 1
+        ld bc, 24 * MASK_ROW - 1
         ld (hl), 0
-        ldir                    ; (EMaskU follows)
+        ldir
         ld hl, CmdListB
         ld ix, EMaskN
-        call .cmds
-        ld hl, EOldCmds
-        ld ix, EMaskU
         call .cmds
         ld hl, EMaskN           ; U |= N
         ld de, EMaskU
@@ -220,7 +213,13 @@ EinPanoCompose:
         ld c, 0
 .cb:    ld a, (hl)
         inc hl
-        ld e, 8
+        or a
+        jr nz, .cb8
+        ld a, c                 ; (none in these 8)
+        add a, 8
+        ld c, a
+        jr .cbn
+.cb8:   ld e, 8
 .cbit:  rrca
         jr nc, .cn
         push af
@@ -233,7 +232,7 @@ EinPanoCompose:
 .cn:    inc c
         dec e
         jr nz, .cbit
-        ld a, c
+.cbn:   ld a, c
         cp 32
         jr nz, .cb
 .portal:
@@ -441,7 +440,13 @@ EinRoadCompose:
         ld c, 0
 .cb:    ld a, (hl)
         inc hl
-        ld e, 8
+        or a
+        jr nz, .cb8
+        ld a, c                 ; (none in these 8)
+        add a, 8
+        ld c, a
+        jr .cbn
+.cb8:   ld e, 8
 .cbit:  rrca
         jr nc, .cn
         push af
@@ -456,7 +461,7 @@ EinRoadCompose:
 .cn:    inc c
         dec e
         jr nz, .cbit
-        ld a, c
+.cbn:   ld a, c
         cp 32
         jr nz, .cb
         ld hl, (EComposePtr)    ; the portal's cells
@@ -577,5 +582,5 @@ ERowLo:         ds 12           ; per road row: its road's slots end, its
 ERowHi:         ds 12           ; centre line's begin
 EMaskN:         ds 24 * MASK_ROW
 EMaskU:         ds 24 * MASK_ROW
-EOldCmds:       ds 1 + MAX_SPR * CMD_SIZE
+        ALIGN 32                ; (a row never crosses a page: EinFillRun)
 BaseNames:      ds (24 - PANO_ROW0) * 32    ; rows 10-23 as the road and panorama draw them

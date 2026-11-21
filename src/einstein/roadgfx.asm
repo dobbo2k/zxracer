@@ -286,15 +286,9 @@ EinCockpit:
         jr nz, .c
         ret
 
-; A = value, B = count (0-32), HL = destination (advances)
-EinFillRun:
-        inc b
-        dec b
-        ret z
-.l:     ld (hl), a
-        inc hl
-        djnz .l
-        ret
+; A = value, B = count (0-32), HL = destination in a row of BaseNames
+; (32-aligned: L advances, H stays): the unrolled fill (src/screen.asm)
+EinFillRun      EQU FillA
 
 ; ---------------------------------------------------------------------------
 ; The row's cell ranges ERA-ERD and band, as src/road.asm DrawRoadRow: from

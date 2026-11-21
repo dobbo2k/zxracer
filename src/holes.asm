@@ -148,17 +148,17 @@ LampGlyph:
 ; the route of the last game (the stage played on each row; $FF: not reached)
 Route:          ds 5, $FF
 ; the music's snare drum (src/music.asm)
-DrumSnare:      db 14, 6
-                dw 250
-                db 13, 7
+DrumSnare:      db 14, (6 * AYN + AYD / 2) / AYD
+                dw (250 * AYN + AYD / 2) / AYD
+                db 13, (7 * AYN + AYD / 2) / AYD
                 dw 0
-                db 11, 8
+                db 11, (8 * AYN + AYD / 2) / AYD
                 dw 0
-                db 9, 9
+                db 9, (9 * AYN + AYD / 2) / AYD
                 dw 0
-                db 6, 10
+                db 6, (10 * AYN + AYD / 2) / AYD
                 dw 0
-                db 3, 10
+                db 3, (10 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= MaskPage + 256
@@ -178,21 +178,21 @@ NoteTab:
         INCLUDE "music_notes.asm"
 ; the music's kick drum and hi-hat (src/music.asm)
 DrumKick:       db 15, 0
-                dw 300
+                dw (300 * AYN + AYD / 2) / AYD
                 db 14, 0
-                dw 600
+                dw (600 * AYN + AYD / 2) / AYD
                 db 12, 0
-                dw 1000
+                dw (1000 * AYN + AYD / 2) / AYD
                 db 10, 0
-                dw 1500
+                dw (1500 * AYN + AYD / 2) / AYD
                 db 7, 0
-                dw 2100
+                dw (2100 * AYN + AYD / 2) / AYD
                 db 4, 0
-                dw 2800
+                dw (2800 * AYN + AYD / 2) / AYD
                 db 0
-DrumHat:        db 10, 1
+DrumHat:        db 10, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 6, 1
+                db 6, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= StripPage + 256
@@ -598,15 +598,15 @@ UpdateTunnel:
         ld (TunJN), a
         jp Ceiling
 ; The open hi-hat (src/music.asm DrumTab): moved here for room
-DrumOpen:       db 11, 1
+DrumOpen:       db 11, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 9, 1
+                db 9, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 7, 1
+                db 7, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 5, 1
+                db 5, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 3, 1
+                db 3, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= FILL_END - 64

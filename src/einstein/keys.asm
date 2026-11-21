@@ -21,7 +21,81 @@ EinSpecIn:
         push de
         push hl
         ld c, a                 ; C: the half-rows wanted (0: wanted)
-        ld hl, EKeyRows         ; the Einstein's rows, pressed keys set
+        ld a, (FrameCount)      ; the keyboard: read once a TV frame
+        ld hl, EKeyFrame
+        cp (hl)
+        call nz, EinKeyScan
+        ld e, $FF               ; E: the answer
+        ld hl, SpecKeys
+        ld b, 0                 ; B: the half-row
+.h:     rrc c
+        jr c, .n
+        push hl
+        ld a, b                 ; its answer this TV frame, worked out once
+        add a, low EKeyAns
+        ld l, a
+        ld a, high EKeyAns
+        adc a, 0
+        ld h, a
+        ld a, (hl)
+        or a
+        jr nz, .have
+        ex (sp), hl             ; (the half-row's keys)
+        push hl
+        ld d, 1
+        ld a, $FF
+.key:   push af
+        ld a, (hl)              ; the key's Einstein row (8: none)
+        inc hl
+        push hl
+        add a, low EKeyRows
+        ld l, a
+        ld a, high EKeyRows
+        adc a, 0
+        ld h, a
+        ld a, (hl)
+        pop hl
+        and (hl)                ; its column
+        inc hl
+        jr z, .up
+        pop af
+        xor d                   ; pressed: its bit 0
+        push af
+.up:    pop af
+        sla d
+        bit 5, d
+        jr z, .key
+        pop hl
+        ex (sp), hl
+        ld (hl), a
+.have:  and e
+        ld e, a
+        pop hl
+.n:     ld a, l                 ; the next half-row's keys
+        add a, 10
+        ld l, a
+        jr nc, .hn
+        inc h
+.hn:    inc b
+        ld a, b
+        cp 8
+        jr nz, .h
+        ld a, e
+        pop hl
+        pop de
+        pop bc
+        ret
+
+; A = this TV frame: the Einstein's 8 rows read (EKeyRows, pressed keys
+; set); the half-rows' answers to be worked out afresh (EKeyAns: 0)
+EinKeyScan:
+        ld (hl), a
+        ld hl, EKeyAns
+        ld b, 8
+.z:     ld (hl), 0
+        inc hl
+        djnz .z
+        ld hl, EKeyRows
         ld d, 1
 .scan:  ld a, d
         cpl
@@ -40,70 +114,25 @@ EinSpecIn:
         inc hl
         sla d
         jr nc, .scan
-        ld e, $FF               ; E: the answer
-        ld hl, SpecKeys
-        ld b, 8
-.half:  rrc c
-        jr c, .skip             ; (not wanted)
-        ld d, 1                 ; D: the key's bit
-.key:   ld a, (hl)
-        inc hl
-        cp $FF
-        jr z, .next             ; (none here)
-        push hl
-        push af
-        rrca                    ; the row: bits 3-5
-        rrca
-        rrca
-        and 7
-        add a, low EKeyRows
-        ld l, a
-        ld a, high EKeyRows
-        adc a, 0
-        ld h, a
-        pop af
-        and 7                   ; the column: bits 0-2
-        inc a
-        ld l, (hl)              ; (the row's keys)
-.col:   rr l
-        dec a
-        jr nz, .col
-        pop hl
-        jr nc, .next            ; not pressed
-        ld a, d
-        cpl
-        and e
-        ld e, a
-.next:  sla d
-        ld a, d
-        cp 1 << 5
-        jr nz, .key
-        jr .hdone
-.skip:  ld a, l
-        add a, 5
-        ld l, a
-        jr nc, .hdone
-        inc h
-.hdone: djnz .half
-        ld a, e
-        pop hl
-        pop de
-        pop bc
+        ld (hl), 0              ; (EKeyRows + 8: no key)
         ret
 
-EKeyRows:       ds 8
+EKeyAns:        ds 8            ; per half-row, this TV frame's answer (0: not yet)
+EKeyRows:       ds 9             ; (the ninth: none, for the shifts)
+EKeyFrame:      db $FF          ; (the TV frame they were read in)
 
 ; Per Spectrum half-row ($FE, $FD .. $7F) and key (bit 0-4): where the key
-; is on the Einstein, row * 8 + column ($FF: none). The Einstein's rows:
+; is on the Einstein, its row and its column's bit (row 8: none). The
+; Einstein's rows:
 ;   0 BREAK - F0 F7 ALPHA ENTER SPACE ESC      4  7 6 5 4 3 2 1 F3
 ;   1 I O P [ _ LF | 0                          5  U Y T R E W Q F2
 ;   2 K L ; : ] EOT 9 F5                        6  J H G F D S A F1
 ;   3 , . / 8 EM = ^ F4                         7  M N B V C X Z F6
         MACRO EK row, col
-        db row * 8 + col
+        db row, 1 << col
         ENDM
 SpecKeys:
-        db $FF                          ; CAPS SHIFT
+        db 8, 1                         ; CAPS SHIFT
         EK 7, 6                         ; Z
         EK 7, 5                         ; X
         EK 7, 4                         ; C
@@ -139,7 +168,7 @@ SpecKeys:
         EK 6, 0                         ; J
         EK 6, 1                         ; H
         EK 0, 6                         ; SPACE
-        db $FF                          ; SYMBOL SHIFT
+        db 8, 1                         ; SYMBOL SHIFT
         EK 7, 0                         ; M
         EK 7, 1                         ; N
         EK 7, 2                         ; B
