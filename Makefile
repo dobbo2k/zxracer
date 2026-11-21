@@ -23,10 +23,13 @@ build:
 build/tables.asm: tools/gen_tables.py | build
 	$(PYTHON) tools/gen_tables.py $@
 
+assets/gfx/car.png: tools/make_car.py
+	$(PYTHON) $< $@
+
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
 	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32 3
 
-build/stages.asm: tools/make_stages.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
+build/stages.asm: tools/make_stages.py tools/round_art.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
 	$(PYTHON) tools/make_stages.py assets/stages.yaml build
 
 build/crew_data.asm: tools/make_crew.py tools/make_screens.py | build
@@ -78,16 +81,13 @@ release: build/speedrun.tap build/video.sna $(ZXSIM) tools/make_inlay.py release
 	mkdir -p release
 	cp build/speedrun.tap build/speedrun.tzx build/inlay_outside.png build/inlay_inside.png release/
 
-# Hand-drawn style cover art (needs Node with Playwright and Chromium to render):
-# the cover, the tape's loading screen made from a 4:3 version of it, and the
-# lettering for the inlay's spine (the last two are kept in assets/gfx, so
-# building the tape does not need Chromium)
-LOADING_STYLE ?= bands              # or dither, flat, light, outline (tools/make_loading.py)
-cover: tools/make_cover.py tools/make_loading.py | build
+assets/gfx/loading.scr: tools/make_screens.py tools/round_art.py tools/make_scenery.py tools/make_font.py assets/gfx/car.png
+	$(PYTHON) tools/make_screens.py --loading
+
+# Print artwork and spine lettering (needs Node with Playwright and Chromium).
+cover: tools/make_cover.py | build
 	mkdir -p release
 	$(PYTHON) tools/make_cover.py release/cover.png build/cover.svg portrait
-	$(PYTHON) tools/make_cover.py build/cover_wide.png build/cover_wide.svg wide
-	$(PYTHON) tools/make_loading.py build/cover_wide.png assets/gfx/loading.scr assets/gfx/loading_preview.png $(LOADING_STYLE)
 	$(PYTHON) tools/make_cover.py assets/gfx/spine.png build/spine.svg spine
 
 # The route map leaflet (needs Chromium too): the stage pyramid as a printed insert

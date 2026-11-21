@@ -51,29 +51,30 @@ if fps < 12:
     print(f"FAIL: frame rate {fps} below 12")
     ok = False
 
-EXPECT = {"sky": (0, 255, 255), "grass": (0, 255, 0), "road": (0, 0, 0),
-          "kerb / car red": (255, 0, 0), "kerb white": (255, 255, 255),
-          "car lamps": (255, 255, 0)}
+EXPECT = {"road": (0, 0, 0), "sunlit sand": (255, 255, 0), "sand in shade": (215, 215, 0),
+          "red kerb": (255, 0, 0), "white kerb": (255, 255, 255)}
 for f, name in shots.items():
     im = Image.open(f"{outdir}/{name}.ppm").convert("RGB")
     im.save(f"{outdir}/{name}.png")
     play = im.crop((32, 48, 288, 240))
-    colours = {c for _, c in play.getcolors(1 << 16)}
+    colours = {c for _, c in play.crop((0, 96, 256, 160)).getcolors(1 << 16)}
     missing = [k for k, v in EXPECT.items() if v not in colours]
+    sky = play.crop((48, 48, 208, 80))
+    if {c for _, c in sky.getcolors()} != {(0, 255, 255), (255, 255, 255)}:
+        missing.append("coastal sky and clouds")
     if missing:
         print(f"FAIL: {name}: missing {', '.join(missing)}")
         ok = False
 title = Image.open(f"{outdir}/title.ppm").convert("RGB").crop((32, 48, 288, 240))
 title.save(f"{outdir}/title.png")
-tcol = {c for _, c in title.getcolors(1 << 16)}
-for name, v in {"sun": (255, 255, 0), "sunset": (255, 0, 255), "car red": (255, 0, 0)}.items():
-    if v not in tcol:
-        print(f"FAIL: title screen: missing {name}")
-        ok = False
+art = Image.open("assets/gfx/screen_title.png").convert("RGB")
+if title.crop((0, 0, 256, 168)).tobytes() != art.crop((0, 0, 256, 168)).tobytes():
+    print("FAIL: title artwork differs from the packed picture")
+    ok = False
 table = Image.open(f"{outdir}/hiscores.ppm").convert("RGB").crop((32, 48, 288, 240))
 table.save(f"{outdir}/hiscores.png")
 tcol = {c for _, c in table.getcolors(1 << 16)}
-for name, v in {"yellow": (255, 255, 0), "cyan": (0, 255, 255), "red": (255, 0, 0)}.items():
+for name, v in {"white": (255, 255, 255), "cyan": (0, 255, 255), "blue": (0, 0, 255)}.items():
     if v not in tcol:
         print(f"FAIL: high-score table: missing {name}")
         ok = False

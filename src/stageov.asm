@@ -314,7 +314,7 @@ StageEntry:
 ; the traffic.
 LoadStage:
         call LoadPacks
-        jr StageHeaders
+        jp StageHeaders
 
 ; A = stage index: copy its theme and track packs into the caches (and
 ; nothing else: the demo carries on after the front end with this).
@@ -365,7 +365,89 @@ LoadPacks:
         add hl, de
         ld a, (Stage)
         ld (hl), a
+        ; StageEntry is shared by the route logic. Art has its own five-byte
+        ; directory entry, so the existing track and fork offsets stay fixed.
+        ld l, a
+        ld h, 0
+        ld d, h
+        ld e, l
+        add hl, hl
+        add hl, hl
+        add hl, de
+        ld de, RoundArtTable
+        add hl, de
+        ld a, (hl)
+        inc hl
+        ld e, (hl)
+        inc hl
+        ld d, (hl)
+        inc hl
+        ld c, (hl)
+        inc hl
+        ld b, (hl)
+        ex de, hl
+        ld de, ART_INPUT
+        call CopyFromBank
+        ld hl, ART_INPUT
+        ld de, THEME_CACHE + 6  ; tunnel exits also read the stage's own colours
+        ld bc, 9
+        ldir
+        ld de, ART_BITMAP
+        call UnLZ
+        ld hl, ART_BITMAP
+        ld de, PANO_CACHE
+        ld bc, 512
+        ldir
+        ; DE = second panorama. Keep the first nibble for the seam of each row.
+        ld hl, ART_BITMAP
+        ld c, 16
+.row:   ld a, (hl)
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        ld (.wrap + 1), a
+        ld b, 31
+.byte:  ld a, (hl)
+        inc hl
+        ; Form (current << 4) | (next >> 4).
+        rlca
+        rlca
+        rlca
+        rlca
+        and $F0
+        push bc
+        ld b, a
+        ld a, (hl)
+        rrca
+        rrca
+        rrca
+        rrca
+        and 15
+        or b
+        pop bc
+        ld (de), a
+        inc de
+        djnz .byte
+        ld a, (hl)
+        inc hl
+        rlca
+        rlca
+        rlca
+        rlca
+        and $F0
+.wrap:  or 0
+        ld (de), a
+        inc de
+        dec c
+        jr nz, .row
         ret
+
+; Scratch in the hidden display, beyond the overlay and below screen-A data.
+ART_INPUT       EQU $4A00
+ART_BITMAP      EQU $5200
+        ASSERT ART_BITMAP + 512 + 640 <= $5B00
 
 StageHeaders:
         ld hl, (THEME_CACHE)
@@ -460,6 +542,31 @@ OvResetDisplay:
         ld bc, 32 * (24 - ROAD_ROW0) - 1
         ldir
         call InitHud
+        ; Fixed sky artwork sits below the message and between the portraits.
+        ; Copy just once, before CopyScreenBA duplicates the complete display.
+        ld hl, ART_BITMAP + 512
+        ld b, 48
+.cloud: push bc
+        push hl
+        ld l, b
+        ld h, high ScrLo
+        ld a, (hl)
+        add a, 6
+        ld e, a
+        inc h
+        ld a, (hl)
+        or $80
+        ld d, a
+        pop hl
+        ld bc, 20
+        ldir
+        pop bc
+        inc b
+        ld a, b
+        cp 80
+        jr nz, .cloud
+        ld hl, $D800 + 3 * 32
+        call PaintRaceSky
         ; road state pages (per buffer: St1 D/E = 0, St2 lane = $FF,
         ; St3 row ranges = 0 / row band = $FF)
         ld hl, StateA1
@@ -526,6 +633,35 @@ OvResetDisplay:
 InitHud:
         ld a, $80
         ld (HudOr), a
+        ld hl, DashHeader
+        ld de, $C000
+        ld a, 8
+.strip: ld bc, 32
+        ldir
+        ld e, 0
+        inc d
+        dec a
+        jr nz, .strip
+        ld a, (PalHud)
+        cp $4F                  ; Riviera blue fascia, cyan lettering
+        jr nz, .label
+        ld a, $4D
+.label: ld hl, $D800
+        ld b, 32
+.top:   ld (hl), a
+        inc hl
+        djnz .top
+        ld hl, $D800 + 14
+        ld a, (PalTime)
+        and 7
+        rlca
+        rlca
+        rlca
+        or $40                  ; black TIME lettering on its accent paper
+        ld b, 4
+.badge: ld (hl), a
+        inc hl
+        djnz .badge
         ld hl, $D800 + 32 + 14  ; red attribute cells for the big timer (rows 1-2, columns 14-17)
         ld a, (PalTime)
         ld c, a
@@ -541,15 +677,6 @@ InitHud:
         add a, 32 - 3
         ld l, a
         djnz .ta
-        ld bc, $0001
-        ld de, TxtScore
-        call PrintAt
-        ld bc, $000E
-        ld de, TxtTime
-        call PrintAt
-        ld bc, $0019
-        ld de, TxtSpeed
-        call PrintAt
         ld bc, $011D
         ld de, TxtKmh
         call PrintAt
@@ -558,9 +685,6 @@ InitHud:
         call PrintAt
         ld a, (StageRow)
         jp PrintDigit
-TxtScore:       db "SCORE", 0
-TxtTime:        db "TIME", 0
-TxtSpeed:       db "SPEED", 0
 TxtKmh:         db "KM", 0
 TxtStage:       db "STAGE ", 0
 
@@ -660,5 +784,6 @@ TrafficRows:
         db 5, 4, 6, 8, 10
 
         INCLUDE "stages.asm"    ; the stage table
+        ASSERT $ <= ART_INPUT
         ASSERT NUM_ROWS == 5    ; (StageTimes, src/vars.asm)
         ASSERT NUM_STAGES == 15 ; (StageBest, src/holes.asm)

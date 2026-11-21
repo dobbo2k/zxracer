@@ -1,8 +1,8 @@
 # Speed Run: working on the local Windows machine
 
 The game, its design and the build are described in `README.md`, `PLAN.md`
-and `docs/HANDOVER.md` (the move from the cloud). This file covers the local
-setup.
+and `docs/HANDOVER.md` (the move from the cloud); the graphics and artwork in
+`docs/artwork.md`. This file covers the local setup.
 
 ## Toolchain: MSYS2 (UCRT64)
 

@@ -53,12 +53,12 @@ icons its scenery shapes - `tools/make_leaflet.py`). `make cover` draws `release
 illustration of the title scene (`tools/make_cover.py`: seeded sketchy ink
 lines, hatching, washes and paper grain as SVG, the car and crew drawn
 cleanly, brush lettering from its own letter skeletons, rendered with
-Chromium). It also draws a 4:3 version without the paper texture, which
-`tools/make_loading.py` turns into the tape's loading screen
-(`assets/gfx/loading.scr`: per 8 x 8 cell the best ink / paper pair, the
-pixels between them in 2 x 2 dither patterns), and the spine lettering
-(`assets/gfx/spine.png`); both are kept in the repository, so building the
-tape needs no Chromium.
+Chromium). It also draws the spine lettering. The tape build draws the
+Riviera Spider loading screen from the title artwork in `tools/make_screens.py`.
+
+The 15 stages share five roadside scenery families. Each stage has its own
+palette, scrolling horizon and sky layout. The route entries in
+`assets/stages.yaml` set the colours and landmarks.
 
 ## Layout
 
@@ -67,7 +67,7 @@ src/          Z80 assembly source (main loop, interrupts/flip, road renderer, in
 tools/        gen_tables.py, profile.py, hotspots.py, zxsim/ (headless 128K emulator)
 tests/        cputest.asm (Z80 core self-test), smoke.py (headless run + screenshot checks)
 assets/       stages.yaml (themes, palettes, the stage pyramid), generated artwork
-docs/         Technical notes
+docs/         Technical notes (docs/artwork.md: how every graphic is made and how to change it)
 ```
 
 ## Status

@@ -114,7 +114,7 @@ HiScreen:
         ld de, TxtBest
         call TallAt
         ld bc, 2 * 256 + 10
-        call SunsetAttrs
+        call DashHeadingAttrs
         ld ix, HiTable
         ld b, 7                 ; screen row
         ld c, 0                 ; entry
@@ -267,7 +267,7 @@ Initials:
         ld de, TxtNewHi
         call TallAt
         ld bc, 2 * 256 + 10
-        call SunsetAttrs
+        call DashHeadingAttrs
         ld bc, 6 * 256 + 9
         ld de, TxtYourScore
         call PrintAt
@@ -463,7 +463,7 @@ RouteScreen:
         ld de, TxtRoute
         call TallAt
         ld bc, 1 * 256 + 11
-        call SunsetAttrs
+        call DashHeadingAttrs
         ; every stage: a dim box
         ld b, NUM_STAGES
         ld c, 0
@@ -884,7 +884,7 @@ Options:
         ld de, TxtOptions
         call TallAt
         ld bc, 1 * 256 + 12
-        call SunsetAttrs
+        call DashHeadingAttrs
         ld bc, 5 * 256 + 4
         ld de, TxtOptMenu
         call PrintLines
@@ -1249,16 +1249,16 @@ ClearA: push af
         ldir
         ret
 
-; Sunset stripes along the top and bottom rows
+; Alternating coastal blue and cyan rails on the menu screens
 Stripes:
         ld hl, $5800
         ld de, $5800 + 23 * 32
         ld b, 32
 .s:     ld a, l
         and 1
-        ld a, $50               ; bright red / bright yellow paper
+        ld a, $48               ; blue / cyan paper
         jr z, .p
-        ld a, $70
+        ld a, $68
 .p:     ld (hl), a
         ld (de), a
         inc l
@@ -1267,13 +1267,13 @@ Stripes:
         ret
 
 ; B = row, C = column: tall text there in yellow over red (two rows of 16)
-SunsetAttrs:
+DashHeadingAttrs:
         push bc
-        ld a, $46
+        ld a, $4F
         call AttrRow
         pop bc
         inc b
-        ld a, $42
+        ld a, $4D
 ; B = row, A = attribute: the whole row
 AttrRow:
         push af

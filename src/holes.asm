@@ -143,8 +143,8 @@ CrewLines:      ; her line, his reply
         ORG MaskPage + $C0
         ASSERT LaneM2_end <= MaskPage + $C0
 LampGlyph:
-        db $00, $00, $03, $C0, $0F, $F0, $1F, $F8, $3F, $FC, $3F, $FC, $7F, $FE, $7F, $FE
-        db $7F, $FE, $7F, $FE, $3F, $FC, $3F, $FC, $1F, $F8, $0F, $F0, $03, $C0, $00, $00
+        db $07,$E0,$18,$18,$33,$CC,$67,$E6,$4F,$F2,$DF,$FB,$9F,$F9,$BF,$FD
+        db $BF,$FD,$9F,$F9,$DF,$FB,$4F,$F2,$67,$E6,$33,$CC,$18,$18,$07,$E0
 ; the route of the last game (the stage played on each row; $FF: not reached)
 Route:          ds 5, $FF
 ; the music's snare drum (src/music.asm)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw the initial player car sprite sheet (assets/gfx/car.png).
+"""Draw the seven-frame Riviera Spider sprite sheet (assets/gfx/car.png).
 
 An original rear view of a red convertible with its crew (him: mullet,
 shades, loud striped shirt; her: big blonde hair), 64x32 pixels per frame,
@@ -12,78 +12,64 @@ from PIL import Image, ImageDraw
 
 K = (0, 0, 0)
 R = (255, 0, 0)
-r = (215, 0, 0)
 Y = (255, 255, 0)
 W = (255, 255, 255)
 C = (0, 255, 255)
 
 
 def car(lean, smoke=None):
-    """lean: -1 left, 0 straight, +1 right; smoke: None, or 0 / 1 for the two
-    puffs of tyre smoke. Returns a 64x32 image."""
-    im = Image.new("RGB", (64, 32), K)
-    d = ImageDraw.Draw(im)
-    swing = 5 if smoke is not None else 3              # drifting: swung further round
-    t = swing * lean       # interior shifts most with the lean
-    m = (swing - 1) * lean  # rear deck
-    b = -lean * (2 if smoke is not None else 1)        # tyres move the other way
-    # --- row 0 (y 0-7): the open cockpit. Paper is whatever lies under the
-    # car; each cell's ink colour comes from here: white for him and the
-    # windscreen pillars, yellow for her
-    d.line([(7, 0), (4, 7)], W)                        # windscreen pillars
-    d.line([(56, 0), (59, 7)], W)
-    mx = 19 + t                                        # him: mullet, shades
-    d.ellipse([mx - 4, 0, mx + 4, 7], fill=W)          # head
-    d.rectangle([mx - 3, 4, mx + 3, 7], fill=W)        # mullet down the neck
-    d.point([(mx - 5, 3), (mx + 5, 3), (mx - 5, 4), (mx + 5, 4)], W)   # ears
-    d.point([(mx - 4, 3), (mx + 4, 3)], K)             # sunglasses' arms
-    wx = 44 + t                                        # her: big blown hair
-    d.ellipse([wx - 6, 0, wx + 5, 7], fill=Y)
-    d.polygon([(wx + 4, 1), (wx + 8, 2), (wx + 6, 3), (wx + 8, 5), (wx + 4, 6)], fill=Y)
-    d.point([(wx - 3, 2), (wx, 1), (wx + 2, 3)], K)    # strands
-    for y in range(8):                                 # (not into the pillar's cell)
-        for x in range(56, 64):
-            if im.getpixel((x, y)) == Y:
-                im.putpixel((x, y), K)
-    # --- row 1 (y 8-15): rear deck (red) with their shoulders above it:
-    # his loud striped shirt (cyan), her hair over her shoulders (yellow)
-    d.rounded_rectangle([0 + m, 8, 63 + m, 17], radius=4, fill=R)
-    d.point([(3 + m, 9), (60 + m, 9)], K)              # rounded corners
-    d.rounded_rectangle([mx - 8, 8, mx + 8, 11], radius=1, fill=C)
-    for x in range(mx - 7, mx + 8, 3):                 # stripes
-        d.line([(x, 8), (x + 1, 11)], R)
-    d.rectangle([mx - 2, 8, mx + 2, 8], fill=C)        # collar
-    d.rounded_rectangle([wx - 7, 8, wx + 6, 10], radius=1, fill=Y)
-    d.line([(wx - 6, 11), (wx + 5, 11)], Y)
-    # --- row 2 (y 16-23): lamps (yellow cells), body (red), plate (white)
-    d.rectangle([0, 16, 15, 23], K)
-    d.rectangle([48, 16, 63, 23], K)
-    for x0 in (1, 49):
-        d.rectangle([x0, 17, x0 + 13, 22], Y)
-        for y in (18, 20):
-            d.line([(x0 + 1, y), (x0 + 12, y)], K)     # slatted lamp clusters
-    d.rectangle([16, 16, 23, 23], R)
-    d.rectangle([40, 16, 47, 23], R)
-    d.rectangle([24, 16, 39, 23], K)
-    d.rectangle([25, 17, 38, 22], W)                   # number plate
-    for x in (27, 30, 33, 36):                         # plate characters
-        d.line([(x, 18), (x, 21)], K)
-        d.point((x + 1, 18), K)
-    # --- row 3 (y 24-31): bumper, tyres outlined in red, shadow
-    d.rectangle([1, 24, 62, 25], R)
-    # The tread is the one row the game animates (src/tyres.asm copies the
-    # tyres' outer bytes, 0-1 and 6-7, from it): mirrored left and right so
-    # in every steering frame it stays inside those bytes.
-    for x0, t0 in ((3 + b, 1), (47 + b, 2)):
-        d.rectangle([x0, 26, x0 + 13, 31], K)
-        d.line([(x0, 26), (x0, 31)], R)                # tyre sidewalls
-        d.line([(x0 + 13, 26), (x0 + 13, 31)], R)
-        for x in range(x0 + t0, x0 + 12, 3):           # tread
-            d.line([(x, 27), (x + 1, 27)], R)
-    for x in (22, 39):                                 # exhaust tips
-        d.rectangle([x, 26, x + 2, 27], R)
+    """Riviera Spider. The cockpit leads the tail through a corner."""
+    mask = Image.new("L", (64, 32))
+    d = ImageDraw.Draw(mask)
+    # Low, curved open spider. Twin headrests, split engine grille and four round lamps.
+    d.line([(7, 9), (12, 2), (16, 1), (47, 1), (52, 3), (56, 9)], 255)
+    d.line((16, 1, 25, 1), 0)
+    d.line((28, 1, 36, 1), 0)
+    for x, y, w in [(19, 3, 7), (38, 2, 9)]:
+        d.ellipse((x, y, x + w, y + 7), 255)
+        d.line((x + 2, y + 2, x + 4, y + 1), 0)
+    d.line([(46, 4), (49, 6), (47, 7)], 255)
+    d.polygon([(0, 13), (3, 10), (10, 9), (15, 11), (24, 10), (29, 11), (36, 11),
+               (41, 10), (48, 10), (53, 9), (60, 10), (63, 14), (62, 23),
+               (58, 26), (6, 26), (1, 23)], 255)
+    d.polygon([(14, 11), (25, 10), (39, 10), (50, 11), (54, 15), (9, 15)], 0)
+    for y, x1, x2 in [(11, 18, 46), (13, 15, 48), (15, 11, 52)]:
+        d.line((x1, y, x2, y), 255)
+        d.point((32, y), 0)
+    d.line((2, 14, 8, 13), 0)
+    d.line((55, 13, 61, 14), 0)
+    d.rounded_rectangle((2, 16, 61, 22), radius=2, fill=0)
+    for x in (4, 11, 47, 54):
+        d.ellipse((x, 17, x + 5, 21), 255)
+        d.point((x + 2, 19), 0)
+    d.rectangle((26, 18, 37, 21), 255)
+    for x in (28, 30, 33, 35):
+        d.line((x, 19, x, 20), 0)
+    for x in [20, 22, 40, 42]:
+        d.line((x, 18, x - 1, 21), 255)
+    d.line((6, 24, 57, 24), 0)
+    d.rectangle((0, 26, 63, 31), 0)
+    for x in (4, 51):
+        d.line((x, 26, x, 31), 255)
+        d.line((x + 8, 26, x + 8, 31), 255)
+        for offset in (2, 5):
+            d.line((x + offset, 27, x + offset + 1, 27), 255)
+    for x in (18, 42):
+        d.rectangle((x, 26, x + 4, 28), 255)
+        d.line((x + 1, 27, x + 3, 27), 0)
+
+    inks = ((C, C, W, W, Y, Y, Y, C), (R,) * 8,
+            (R, R, R, W, W, R, R, R), (R, R, W, W, W, W, R, R))
+    swing = (7 if smoke is not None else 4) * lean
+    im = Image.new("RGB", mask.size, K)
+    for y in range(32):
+        shift = round(swing * (1 - y / 21)) if y < 24 else -lean
+        for x in range(64):
+            dest = x + shift
+            if 0 <= dest < 64 and mask.getpixel((x, y)):
+                im.putpixel((dest, y), inks[y // 8][dest // 8])
     if smoke is not None:
-        tyre_smoke(im, d, lean, smoke)
+        tyre_smoke(im, ImageDraw.Draw(im), lean, smoke)
     return im
 
 

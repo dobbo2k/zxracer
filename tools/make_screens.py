@@ -14,7 +14,6 @@ Compression (unpacked by UnLZ in src/screens_bank.asm), a byte stream of:
   $80-$FE n   copy n - $80 + 3 bytes from offset (next word) bytes back
   $FF         end
 """
-import math
 import os
 import random
 import sys
@@ -22,8 +21,9 @@ import sys
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, os.path.dirname(__file__))
+import round_art
 import make_scenery as scn           # noqa: E402
-from make_font import rows as glyph  # noqa: E402
+from make_font import glyph_bytes, rows as glyph  # noqa: E402
 
 W, H = 256, 192
 BASE = [(0, 0, 0), (0, 0, 1), (1, 0, 0), (1, 0, 1), (0, 1, 0), (0, 1, 1), (1, 1, 0), (1, 1, 1)]
@@ -179,10 +179,10 @@ def unlz(src):
 def text(d, x, y, s, colour, scale=1):
     """The game's 5x7 font at pixel (x, y)."""
     for k, ch in enumerate(s):
-        for gy, row in enumerate(glyph(ch)):
-            for gx in range(5):
-                if row[gx] == "#":
-                    x0 = x + k * 8 * scale + (gx + 1) * scale
+        for gy, row in enumerate(glyph_bytes(ch)):
+            for gx in range(8):
+                if row & (0x80 >> gx):
+                    x0 = x + k * 8 * scale + gx * scale
                     y0 = y + gy * scale
                     d.rectangle([x0, y0, x0 + scale - 1, y0 + scale - 1], fill=colour)
 
@@ -222,12 +222,6 @@ def car_frame():
     return car.crop((0, 0, 64, 32))
 
 
-def bayer(level, x, y):
-    """Ordered dither: True for `level` (0-16) of 16 pixels."""
-    m = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
-    return m[y & 3][x & 3] < level
-
-
 # ---------------------------------------------------------------- title
 TITLE_TEXT_ROWS = (21, 22, 23)
 HISCORE_AT = (21, 17)       # row, column of the hi-score digits (printed by the game)
@@ -238,76 +232,41 @@ def title_screen(loading=False):
     """The title screen, or (loading) the tape's loading screen."""
     im = Image.new("RGB", (W, H), (0, 0, 0))
     d = ImageDraw.Draw(im)
-    rnd = random.Random(42)
-    # night sky with stars (rows 0-6), then sunset bands (rows 7-13)
-    for _ in range(40):
-        x, y = rnd.randrange(W), rnd.randrange(0, 56)
-        im.putpixel((x, y), rgb(WHITE, rnd.random() < 0.5))
-    # sunset bands (all bright): (top, colour, dither colour, dither level)
-    bands = [(56, BLUE, MAGENTA, 5), (64, MAGENTA, MAGENTA, 0), (72, MAGENTA, RED, 8),
-             (80, RED, RED, 0), (88, RED, YELLOW, 3), (96, RED, RED, 0), (104, RED, RED, 0)]
-    sun_x, sun_r, horizon = 128, 46, 112
-    for y0, c0, c1, lvl in bands:
-        for y in range(y0, y0 + 8):
-            for x in range(W):
-                near_sun = abs(x - sun_x) < sun_r + 8 and y >= (horizon - sun_r) // 8 * 8
-                dith = lvl and not near_sun and bayer(lvl, x, y)
-                im.putpixel((x, y), rgb(c1 if dith else c0))
-    # the sun, its stripes widening towards the horizon
-    for y in range(horizon - sun_r, horizon):
-        dy = horizon - y
-        if dy < 30 and dy % 6 < (3 if dy < 12 else 2):
-            continue
-        hw = int(math.sqrt(sun_r * sun_r - dy * dy))
-        d.line([(sun_x - hw, y), (sun_x + hw, y)], fill=rgb(YELLOW))
-    # mountains either side of the sun
-    from make_stages import panorama
-    pano = panorama("mountains", 7)
-    for x in range(W):
-        if abs(x - sun_x) < sun_r + 10:
-            continue
-        for y in range(16):
-            if pano.getpixel((x, y)):
-                im.putpixel((x, horizon - 16 + y), (0, 0, 0))
-    # neon ground: a perspective grid, the road clear of it
-    gy0 = horizon
-    for k in range(1, 12):                           # horizontal lines
-        y = gy0 + int(56 * (k / 11) ** 2.2) + 1
-        if y < 168:
-            d.line([(0, y), (W, y)], fill=rgb(MAGENTA))
-    for k in range(-12, 13):                         # lines to the vanishing point
-        d.line([(128 + k * 6, gy0), (128 + k * 64, gy0 + 64 * 4)], fill=rgb(MAGENTA))
-    road = [(124, gy0), (132, gy0), (128 + 112, 168), (128 - 112, 168)]
-    d.polygon(road, fill=(0, 0, 0))
-    d.line([(124, gy0), (128 - 112, 168)], fill=rgb(MAGENTA), width=3)
-    d.line([(132, gy0), (128 + 112, 168)], fill=rgb(MAGENTA), width=3)
-    for k in range(6):                               # centre dashes
-        t0, t1 = (k / 6) ** 1.8, ((k + 0.5) / 6) ** 1.8
-        y0, y1 = gy0 + int(56 * t0), gy0 + int(56 * t1)
-        w0 = max(1, int(4 * t0))
-        d.polygon([(128 - w0, y0), (128 + w0, y0), (128 + w0 + 1, y1), (128 - w0 - 1, y1)],
-                  fill=rgb(WHITE))
-    # palms against the sunset
-    for x, h, base in ((-8, 84, 150), (30, 56, 136), (200, 60, 138), (222, 88, 152)):
-        m = silhouette("palm", h)
-        paste_mask(im, m, x, base - h, (0, 0, 0))
-    # the logo
-    m = logo_mask("SPEED RUN", 4, 6, 0.3)
-    lx = (W - m.width) // 2 + 4
-    for y in range(m.height):
-        colour = rgb(WHITE) if y < 8 else rgb(YELLOW) if y < 24 else rgb(RED)
-        for x in range(m.width):
-            if m.getpixel((x, y)) and 0 <= lx + x < W:
-                im.putpixel((lx + x, 6 + y), colour)
-    # the player's car on the road
+    # Sunlit fascia, with the same blue instrument panel and gold badge as the car HUD.
+    d.rectangle((0, 0, 255, 47), fill=rgb(BLUE))
+    logo = logo_mask("SPEED RUN", 4, 5, 0.33)
+    lx = (W - logo.getbbox()[2]) // 2
+    for y in range(logo.height):
+        colour = rgb(WHITE if y < 15 else CYAN)
+        paste_mask(im, logo.crop((0, y, logo.width, y + 1)), lx, 5 + y, colour)
+    for x in (0, 5, 10, 225, 230, 235, 240, 245):
+        d.line((x, 45, x + 6, 40), fill=rgb(CYAN), width=2)
+    d.rectangle((0, 48, 255, 103), fill=rgb(CYAN))
+    sky = round_art.sky("harbour", 1)
+    im.paste(rgb(WHITE), (45, 50, 205, 82), sky)
+    horizon = round_art.panorama("harbour", 1)
+    im.paste(rgb(BLUE), (0, 88, 256, 104), horizon)
+    for y in range(104, 168):
+        t = (y - 104) / 63
+        centre = round(119 + 39 * (1 - t) ** 2)
+        width = round(5 + 127 * t)
+        light = y // 8 % 2
+        d.line((0, y, 255, y), fill=rgb(YELLOW, light))
+        d.line((centre - width - 5, y, centre + width + 5, y), fill=rgb(WHITE if light else RED))
+        d.line((centre - width, y, centre + width, y), fill=rgb(BLACK))
+        if light:
+            d.line((centre, y, centre + round(3 * t), y), fill=rgb(WHITE))
+    for name, x, base, h in (("tower", 46, 124, 33), ("palm", -2, 147, 66),
+                             ("palm", 197, 124, 40), ("palm", 215, 156, 74)):
+        paste_mask(im, silhouette(name, h), x, base - h, rgb(BLACK))
     im.paste(car_frame(), (96, 136))
     # text panel
     d.rectangle([0, 168, W - 1, H - 1], fill=(0, 0, 0))
     over = [(21, 0, 32, 0x45), (22, 0, 32, 0x46), (23, 0, 32, 0x07)]
     if loading:
         text(d, 8 * 7, 168, "FOR THE 128K SPECTRUM", rgb(CYAN))
-        text(d, 8 * 12, 176, "LOADING", rgb(YELLOW))
-        over[1] = (22, 0, 32, 0xC6)                  # flashing
+        text(d, 8 * 12, 184, "LOADING", rgb(YELLOW))
+        over[2] = (23, 0, 32, 0x46)
     else:
         text(d, 8 * 7, 168, "HI-SCORE", rgb(CYAN))
         text(d, 8 * 5, 176, "PRESS ANY KEY TO START", rgb(YELLOW))
@@ -329,8 +288,11 @@ def goal_screen(theme):
     horizon = 72
     d.rectangle([0, 0, W - 1, horizon - 1], fill=attr_rgb(sky, False))
     # backdrop
-    from make_stages import panorama
-    pano = panorama(**theme["horizon"])
+    style = theme["horizon"]["style"]
+    sky_panel = round_art.sky(style, theme["horizon"]["seed"])
+    cloud_ink = BLUE if (sky >> 3) & 7 == WHITE else YELLOW if (sky >> 3) & 7 == MAGENTA else WHITE
+    im.paste(rgb(cloud_ink, bool(sky & 64)), (48, 5, 208, 37), sky_panel)
+    pano = round_art.panorama(**theme["horizon"])
     for x in range(W):
         for y in range(16):
             if pano.getpixel(((x + 40) % 256, y)):
@@ -354,24 +316,24 @@ def goal_screen(theme):
         for x0, x1 in ((min(lefts) - rw, max(lefts)), (min(rights), max(rights) + rw)):
             d.rectangle([x0 // 8 * 8, y0, x1 // 8 * 8 + 7, y0 + 7], fill=kerb)
         for y in range(y0, y0 + 8):
-            d.line([span(y), (span(y)[1], y)] if False else [(span(y)[0], y), (span(y)[1], y)],
+            d.line([(span(y)[0], y), (span(y)[1], y)],
                    fill=(0, 0, 0))
     # theme scenery either side
-    big, small = theme["types"][:2]
-    for x, h, name in ((0, 72, big), (34, 50, big), (186, 50, big), (220, 72, big)):
+    big, _, landmark, _ = theme["types"]
+    for x, h, name in ((-6, 66, big), (29, 50, landmark), (183, 43, landmark), (219, 68, big)):
         m = silhouette(name, h)
         paste_mask(im, m, x, 128 - h, (0, 0, 0))
     # the finish gantry and its banner
     post = rgb(WHITE)
     d.rectangle([48, 16, 53, 127], fill=post)
     d.rectangle([202, 16, 207, 127], fill=post)
-    d.rectangle([56, 16, 199, 47], fill=rgb(WHITE))
+    d.rectangle([56, 16, 199, 47], fill=rgb(BLUE))
     for x in range(56, 200, 4):                      # chequered edges
         for y in (16, 20, 40, 44):
             if ((x // 4) + (y // 4)) % 2:
-                d.rectangle([x, y, x + 3, y + 3], fill=(0, 0, 0))
+                d.rectangle([x, y, x + 3, y + 3], fill=rgb(WHITE))
     m = logo_mask("GOAL!", 3, 2, 0.3)
-    paste_mask(im, m, 128 - m.width // 2 + 2, 24, rgb(RED))
+    paste_mask(im, m, 128 - m.width // 2 + 2, 24, rgb(YELLOW))
     # confetti
     for _ in range(26):
         cx, cy = rnd.randrange(32), rnd.randrange(0, 2)
@@ -397,6 +359,19 @@ ENDINGS = {
 }
 
 
+def ending_themes(config):
+    """The ending postcard uses the palette and location actually reached."""
+    endings = {}
+    for stage in config["rows"][-1]:
+        region = config["themes"][stage["theme"]]
+        endings[stage["theme"]] = {
+            **region,
+            "palette": {**region["palette"], **stage.get("palette", {})},
+            "horizon": {**region["horizon"], "seed": stage["seed"], "vista": stage.get("vista")},
+        }
+    return endings
+
+
 def build(themes, preview_dir="assets/gfx"):
     """-> {name: (raw 6912 bytes, compressed)} for 'title' and 'goal_<theme>'."""
     out = {"title": title_screen()}
@@ -410,7 +385,13 @@ def build(themes, preview_dir="assets/gfx"):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--loading"]:
+        data = title_screen(loading=True)
+        with open("assets/gfx/loading.scr", "wb") as output:
+            output.write(data)
+        preview(data).resize((512, 384), Image.Resampling.NEAREST).save("assets/gfx/loading_preview.png")
+        sys.exit(0)
     import yaml
     cfg = yaml.safe_load(open("assets/stages.yaml"))
-    for k, (raw, packed) in build(cfg["themes"]).items():
+    for k, (raw, packed) in build(ending_themes(cfg)).items():
         print(f"{k}: {len(packed)} bytes")

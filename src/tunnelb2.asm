@@ -23,17 +23,7 @@ Ceiling:
 .sky:   ld hl, $5800 + 3 * 32   ; both screens' sky and backdrop rows
         call .paint
         ld hl, $D800 + 3 * 32
-.paint: ld a, (PalSky)
-        ld b, 32 * (PANO_ROW0 - 3)
-.s:     ld (hl), a
-        inc hl
-        djnz .s
-        ld a, (PalPano)
-        ld b, 32 * (ROAD_ROW0 - PANO_ROW0)
-.p:     ld (hl), a
-        inc hl
-        djnz .p
-        ret
+.paint: jp PaintRaceSky
 ; HL = the backdrop's first byte (character rows 10-11): its 8 pixel lines
 .clear: ld b, 8
 .cl:    push bc
@@ -111,11 +101,8 @@ GateKind:
         ld b, S_
         cp ROAD_ROW0
         jr nc, .x
-        ld hl, PalPano
-        cp PANO_ROW0
-        jr nc, .p
-        dec hl                  ; (PalSky)
-.p:     ld b, (hl)
+        call SkyRowAttr
+        ld b, a
 .x:     ld hl, GatePat
         ld (hl), b
         inc hl
