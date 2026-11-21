@@ -68,8 +68,8 @@ def chord_parts(chord):
     return root, rest.startswith("m") and not rest.startswith("maj")
 
 
-# Bass patterns: per bar, (interval above the root - 'T' the chord's third -,
-# sixteenths, slide in)
+# Bass patterns: per bar, (interval above the root - 'T' the chord's third,
+# None a rest -, sixteenths, slide in)
 BASS = {
     "drive":   [(0, 2), (0, 2), (0, 2), (12, 2), (0, 2), (0, 2), (7, 2), (12, 2)],
     "gallop":  [(0, 2), (0, 1), (0, 1), (0, 2), (12, 2), (0, 2), (0, 1), (0, 1), (7, 2), (12, 2)],
@@ -79,6 +79,13 @@ BASS = {
     "funk":    [(0, 2), (0, 1), (12, 1, 1), (0, 2), (10, 2), (0, 1), (0, 1), (12, 2, 1), (7, 2), (10, 2)],
     "slap":    [(0, 1), (0, 1), (12, 2, 1), (0, 1), (12, 1), (0, 2), (7, 2), (0, 1), (12, 1, 1), (10, 2), (12, 2)],
     "epic":    [(0, 8), (7, 4), (12, 4, 2)],
+    # funk: short notes and gaps, octave pops, the seventh
+    "pocket":  [(0, 2), (None, 1), (0, 1), (12, 1), (None, 1), (0, 1), (None, 1), (10, 1), (12, 1),
+                (None, 1), (0, 1), (7, 1), (None, 1), (12, 1, 1), (10, 1)],
+    "bounce":  [(0, 1), (None, 1), (12, 1), (0, 1), (None, 2), (0, 1), (12, 1), (None, 1), (0, 1),
+                (10, 1), (12, 1), (None, 1), (7, 1), ("T", 1), (5, 1)],
+    "strut":   [(0, 2), (None, 1), (0, 1), ("T", 2), (None, 1), (7, 1), (None, 1), (7, 1), (12, 2),
+                (10, 1), (None, 1), (7, 1), (5, 1)],
 }
 
 # Drum patterns (one bar) and fills
@@ -89,6 +96,8 @@ DRUMS = {
     "disco": "K-OHS-OHK-OHS-OH",
     "epic":  "K---S---K-K-S---",
     "half":  "K-H-S-H-K-H-S-HH",
+    "groove": "K-H-S-HKH-KHS-OH",      # funk: kicks off the beat
+    "ghost": "K-HSS-HKH-K-SHSO",       # ... with ghost snares
 }
 FILL = "K-H-S-H-S-SSS-SS"
 TOMS = "S-S-T-T-TTT-TTSS"
@@ -97,33 +106,33 @@ ROLL = "TTT-TT-TT-TTSSSS"
 # The tunes: interrupts per sixteenth, sections of
 # (bass pattern, bass envelope, drums, fill, bars of (chord, melody))
 TUNES = {
-    # bright pop with a funky bass, C major
+    # bright pop-funk: syncopated lead, chord stabs, a busy bass, C major
     "coast": (6, [
-        ("funk", ENV_BASS, "rock", FILL, [
-            ("C", "E5:3 G5:3 /C6:2 B5:2 G5:2 E5:4"),
-            ("G", "D5:3 G5:3 /B5:2 A5:2 G5:2 D5:4"),
-            ("Am", "C5:3 E5:3 /A5:2 G5:2 E5:2 C5:4"),
-            ("F", "A4:2 C5:2 F5:4 E5:2 F5:2 !1 /A5:4 !0"),
-            ("C", "G5:4 E5:2 G5:2 /C6:4 B5:2 A5:2"),
-            ("G", "B5:4 G5:2 D5:2 !1 //G5:6 !0 -:2"),
-            ("F", "A5:2 G5:2 F5:2 E5:2 F5:2 A5:2 C6:4"),
-            ("G", "@G5.:4 @G5.:4 @G5.7:8"),
+        ("pocket", ENV_BASS, "groove", FILL, [
+            ("Cmaj7", "E5:2 G5:1 -:1 /C6:2 -:1 B5:1 G5:2 -:1 E5:1 G5:2 A5:2"),
+            ("G7", "-:1 D5:1 G5:2 -:1 /B5:2 A5:1 G5:2 F5:1 -:1 D5:4"),
+            ("Am7", "C5:2 E5:1 -:1 /A5:2 -:1 G5:1 E5:2 -:1 C5:1 E5:2 G5:2"),
+            ("Fmaj7", "@F5.maj7:1 -:1 @F5.maj7:1 -:3 @F5.maj7:2 -:2 !1 /A5:4 !0 -:2"),
+            ("Cmaj7", "G5:2 -:1 E5:1 G5:2 /C6:3 B5:1 -:2 A5:2 G5:2"),
+            ("G7", "B5:2 -:1 G5:1 D5:2 -:1 F5:1 !1 //G5:6 !0 -:2"),
+            ("Fmaj7", "A5:1 -:1 G5:1 F5:1 -:1 E5:1 F5:2 -:1 A5:1 C6:2 -:1 /E6:3"),
+            ("G7", "@G5.7:1 -:1 @G5.7:1 -:1 @G5.7:2 -:2 @G5.sus4:2 -:2 @G5.7:4"),
         ]),
-        ("slap", ENV_BASS, "disco", TOMS, [
-            ("Am", "A5:4 /C6:4 B5:2 A5:2 E5:4"),
-            ("F", "F5:4 /A5:4 G5:2 F5:2 C5:4"),
-            ("C", "@C5.:4 @C5.:4 @E5.m:4 @G5.:4"),
-            ("G", "!1 //D6:8 B5:4 G5:4 !0"),
-            ("Am", "C6:4 B5:2 A5:2 E5:4 A5:4"),
-            ("F", "F5:4 A5:2 C6:2 /F6:4 E6:4"),
-            ("G", "G5:2 A5:2 B5:2 D6:2 B5:2 A5:2 G5:4"),
-            ("G", "@G5.sus4:8 @G5.:8"),
+        ("bounce", ENV_BASS, "ghost", TOMS, [
+            ("Am7", "A5:2 -:1 /C6:2 -:1 B5:1 A5:1 -:2 E5:2 G5:1 A5:3"),
+            ("Fmaj7", "F5:2 -:1 /A5:2 -:1 G5:1 F5:1 -:2 C5:2 E5:1 F5:3"),
+            ("Cmaj7", "@C5.maj7:2 -:1 @C5.maj7:1 -:2 @E5.m7:2 -:1 @G5.:1 -:2 @G5.7:4"),
+            ("G7", "!1 //D6:6 !0 -:1 B5:1 -:1 G5:1 A5:2 B5:2 D6:2"),
+            ("Am7", "C6:2 -:1 B5:1 A5:2 -:1 E5:1 -:2 A5:1 G5:1 E5:2 G5:2"),
+            ("Fmaj7", "F5:1 -:1 A5:1 -:1 C6:2 -:1 /F6:3 E6:1 -:1 C6:2 A5:2"),
+            ("G7", "G5:1 A5:1 -:1 B5:1 -:1 D6:2 -:1 F6:2 E6:1 D6:1 B5:2 G5:2"),
+            ("G7", "@G5.sus4:3 -:1 @G5.sus4:2 -:2 @G5.7:3 -:1 @G5.7:4"),
         ]),
-        ("epic", ENV_HEAVY, "epic", ROLL, [
-            ("F", "!1 //A5:8 C6:4 F6:4"),
-            ("G", "//G6:8 F6:4 D6:4"),
-            ("Em", "//E6:8 D6:4 B5:4"),
-            ("Am", "@A5.m:8 @G5.:8 !0"),
+        ("slap", ENV_HEAVY, "groove", ROLL, [
+            ("Fmaj7", "!1 //A5:8 C6:4 F6:4"),
+            ("G7", "//G6:8 F6:4 D6:4"),
+            ("Em7", "//E6:8 D6:4 B5:4"),
+            ("Am7", "@A5.m7:2 -:2 @A5.m7:2 -:2 @G5.7:4 @G5.7:4 !0"),
         ]),
     ]),
     # driving rock-funk, A minor
@@ -184,27 +193,27 @@ TUNES = {
             ("B", "@B4.:8 @B4.7:8 !0"),
         ]),
     ]),
-    # upbeat and lush, G major
+    # upbeat and lush, with a strut: G major
     "country": (5, [
-        ("walk", ENV_BASS, "half", FILL, [
-            ("G", "B4:4 D5:4 !1 /G5:6 !0 F#5:2"),
-            ("Em", "E5:4 G5:4 !1 //B5:8 !0"),
-            ("C", "C6:4 B5:2 A5:2 G5:4 E5:4"),
-            ("D", "F#5:4 A5:4 @D5.:8"),
-            ("G", "G5:2 A5:2 B5:4 /D6:4 B5:4"),
-            ("Em", "G5:4 E5:4 B4:4 E5:4"),
-            ("C", "E5:2 F#5:2 G5:4 A5:4 C6:4"),
-            ("D", "@D5.:4 @D5.sus4:4 @D5.:8"),
+        ("strut", ENV_BASS, "groove", FILL, [
+            ("G", "B4:1 -:1 D5:2 -:1 G5:1 -:1 !1 /B5:5 !0 A5:1 G5:1 -:2"),
+            ("Em7", "E5:2 -:1 G5:1 -:1 B5:2 -:1 !1 //D6:6 !0 -:2"),
+            ("Cmaj7", "C6:1 -:1 B5:1 A5:1 -:1 G5:2 -:1 E5:2 -:1 G5:1 E5:2 D5:2"),
+            ("D7", "F#5:2 -:1 A5:1 -:2 @D5.7:1 -:1 @D5.7:2 -:2 @D5.7:4"),
+            ("G", "G5:1 A5:1 -:1 B5:1 -:1 /D6:3 B5:1 -:1 A5:1 G5:1 -:2 D5:2"),
+            ("Em7", "G5:2 -:1 E5:1 -:1 B4:2 -:1 E5:1 -:1 G5:2 A5:1 B5:3"),
+            ("Cmaj7", "E5:1 F#5:1 G5:2 -:1 A5:1 -:1 C6:2 -:1 B5:1 C6:1 /E6:4"),
+            ("D7", "@D5.:2 -:1 @D5.sus4:1 -:2 @D5.:2 -:1 @D5.7:3 -:4"),
         ]),
-        ("drive", ENV_BASS, "disco", TOMS, [
-            ("C", "E5:4 G5:4 !1 /C6:6 !0 B5:2"),
-            ("G", "B5:4 G5:4 !1 //D5:8 !0"),
-            ("D", "F#5:4 A5:4 /D6:6 C6:2"),
-            ("Em", "B5:4 G5:4 @E5.m:8"),
-            ("C", "C5:2 E5:2 G5:4 /C6:4 E6:4"),
-            ("G", "!1 //D6:8 B5:4 G5:4 !0"),
-            ("D", "A5:2 B5:2 C6:2 B5:2 A5:4 F#5:4"),
-            ("D", "@D5.:8 @D5.7:8"),
+        ("bounce", ENV_BASS, "ghost", TOMS, [
+            ("Cmaj7", "E5:2 -:1 G5:1 -:1 !1 /C6:4 !0 -:1 B5:1 A5:1 G5:2 E5:2"),
+            ("G", "B5:2 -:1 G5:1 -:1 !1 //D5:6 !0 -:1 G5:2 A5:2"),
+            ("D7", "F#5:1 -:1 A5:2 -:1 /D6:3 C6:1 -:1 A5:2 F#5:2 A5:2"),
+            ("Em7", "B5:2 -:1 G5:1 -:1 @E5.m7:1 -:1 @E5.m7:2 -:1 @E5.m7:6"),
+            ("Cmaj7", "C5:1 -:1 E5:1 -:1 G5:2 -:1 /C6:3 -:1 E6:1 D6:1 C6:1 -:2"),
+            ("G", "!1 //D6:6 !0 -:1 B5:1 -:1 G5:1 A5:2 B5:2 G5:2"),
+            ("D7", "A5:1 B5:1 -:1 C6:1 -:1 B5:2 -:1 A5:2 -:1 F#5:1 D5:2 F#5:2"),
+            ("D7", "@D5.:1 -:1 @D5.:1 -:1 @D5.7:2 -:2 @D5.7:2 -:2 @D5.7:4"),
         ]),
     ]),
     # night-time funk on sevenths, D dorian
@@ -277,6 +286,9 @@ def events(tune):
             base = note_index(root + "2")
             for step in BASS[pattern]:
                 iv, length = step[0], step[1]
+                if iv is None:
+                    bass.append(("rest", length * tick))
+                    continue
                 if iv == "T":
                     iv = 3 if minor else 4
                 bass.append(("note", base + iv, length * tick, step[2] if len(step) > 2 else 0, 0))
