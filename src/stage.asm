@@ -48,6 +48,7 @@ StartGame:
 ; HL = an entry in the overlay, A = what it takes in A. With screen B on
 ; show (blanked first, as there is no telling what it holds), copy the
 ; overlay into screen A, call the entry, then show what was on show before.
+MUSIC_GAP       EQU 12              ; a new stage: interrupts from its beep to its tune
 StageOv:
         ld e, 1
 StageOvE:
@@ -97,10 +98,12 @@ StageOvE:
         or a
         ret nz
         ld (Mute), a
-        ld a, (OvMusic)
+        ld a, (OvMusic)         ; with music: the tune after the beep and a gap
         or a
         ret z
-        jp MusicTheme
+        ld a, MUSIC_GAP
+        ld (MusicWait), a
+        ret
 .go:    jp (hl)
 OvEntry:        dw 0
 OvArg:          db 0

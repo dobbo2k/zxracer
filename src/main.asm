@@ -165,7 +165,8 @@ GatePat:        ds 5            ; a gantry row's colours (src/tunnelb2.asm)
 MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
 StageClock:     dw 0            ; 50 Hz frames on this stage
 StageTimes:     ds 5 * 2        ; per row: the stage's time (0: not finished)
-RUN_VARS        EQU 4 + 2 + 5 * 2   ; (5 rows: NUM_ROWS, defined later)
+MusicWait:      db 0            ; a new stage's tune: the gap to wait (src/holes.asm)
+RUN_VARS        EQU 4 + 2 + 5 * 2 + 1   ; (5 rows: NUM_ROWS, defined later)
 Traffic:        ds N_TRAFFIC * CAR_SIZE
         ASSERT $ <= IM2_TABLE
         ORG IM2_TABLE + 257

@@ -440,6 +440,28 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
 .avol:  ld a, 8
         call AyWrite
         jp CrashTickC
+
+; A new stage with music (MusicWait set, src/stage.asm StageOvE): each
+; interrupt, from JingleTick, only the jingle - no engine, no tune - until
+; it has played out, then MusicWait counts a short gap and the tune starts
+MusicWaitTick:
+        pop hl                  ; (out of SoundTick: nothing else this interrupt)
+        call JingleRun
+        ld a, (JingleHold)      ; the jingle still to come or playing?
+        ld hl, (JinglePtr)
+        or h
+        or l
+        ld hl, BeepTime
+        or (hl)
+        jp z, MusicGap
+        ld a, (hl)              ; a note: its time, and its end (the music would)
+        or a
+        ret z
+        dec (hl)
+        ret nz
+        ld e, (hl)
+        ld a, 10                ; (volume C off)
+        jp AyWrite
         ASSERT $ <= StateB3 + 256
         ORG StateA1 + $E0
         ASSERT StAE_end <= StateA1 + $E0
@@ -457,6 +479,11 @@ CrashHold:      db 0
 CrashRate:      db 0
 CrashCnt:       db 0
 CrashVol:       db 0
+MusicGap:                       ; (MusicWaitTick: the gap, then the tune)
+        ld hl, MusicWait
+        dec (hl)
+        ret nz
+        jp MusicTheme
         ASSERT $ <= StateA1 + 256
         ORG StateB1 + $60
         ASSERT StBD_end <= StateB1 + $60

@@ -90,10 +90,15 @@ WeaveTo:
 
 ; ---------------------------------------------------------------------------
 ; Each interrupt in a game (SoundTick): a jingle's next note on channel C
-; once the one before is nearly over. A new stage's (OvCheckpoint sets
+; once the one before is nearly over (with a new stage's tune waiting:
+; MusicWaitTick). A new stage's (OvCheckpoint sets
 ; JingleHold) waits for its first frame: the interrupt that flips to it
 ; (LastFlip = FrameCount, src/interrupt.asm).
 JingleTick:
+        ld a, (MusicWait)       ; a new stage's tune waiting (src/holes.asm)
+        or a
+        jp nz, MusicWaitTick
+JingleRun:
         ld a, (JingleHold)
         or a
         jr z, .go

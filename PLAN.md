@@ -527,7 +527,10 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   on show (about 18 frames, 0.36 s), then the display reset. A short high
   beep (C, 8 interrupts; with extended play its flourish instead) starts on the interrupt that flips to the new stage's first frame:
   the overlay sets `JingleHold`, and `JingleTick` (moved to bank 5) waits
-  until `LastFlip` = `FrameCount`. The next tune starts at full volume.
+  until `LastFlip` = `FrameCount`. With music, the next tune waits
+  (`MusicWait`: the interrupt plays only the jingle, no engine) until the
+  beep or flourish has played out and then a gap of `MUSIC_GAP` (12)
+  interrupts, and starts at full volume.
   (A fade-out over the stage's last stretch, a drum fill during the load, a
   fade-in of the next tune and a sweep of the new stage's colours down the
   screen were tried and taken out after play testing.) The video tools

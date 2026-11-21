@@ -144,7 +144,8 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   the far road - opens up. With the engine sound (options), the engine
   booms off the walls.
 - **Between stages:** the sound stops while the next stage loads; a short
-  beep marks the new stage's first frame, and its tune comes straight in.
+  beep marks the new stage's first frame, and after a moment's pause its
+  tune starts.
 - **The goal's gantry:** a chequered beam on red posts spans the road over
   the finish. Running into one from behind slows you right down; hit one that is
   much slower than you (at speed) and the car spins out, sliding on in a cloud of
