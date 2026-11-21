@@ -156,7 +156,7 @@ OvCheckpoint:
         call DiffEntry
         inc hl
         ld c, (hl)              ; this level's bonus
-        ld a, 1                 ; a beep as the new stage shows
+        ld a, 1                 ; a beep as the new stage shows (or the flourish)
         ld (JingleHold), a
         ld hl, JingleGo
         ld (JinglePtr), hl
@@ -164,7 +164,7 @@ OvCheckpoint:
         ld a, (OvFast)
         or a
         jr z, .b
-        ld hl, JingleGoExt      ; with a flourish
+        ld hl, JingleExt        ; with a flourish
         ld (JinglePtr), hl
         ld a, c
         add a, EXTRA_BONUS

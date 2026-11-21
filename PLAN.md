@@ -525,8 +525,7 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 - **Between stages** *(as built)*: at the checkpoint the stage overlay mutes
   the interrupt's sound while it loads (no engine blip), with the last frame
   on show (about 18 frames, 0.36 s), then the display reset. A short high
-  beep (C, 8 interrupts; before the extended-play flourish when there is
-  one) starts on the interrupt that flips to the new stage's first frame:
+  beep (C, 8 interrupts; with extended play its flourish instead) starts on the interrupt that flips to the new stage's first frame:
   the overlay sets `JingleHold`, and `JingleTick` (moved to bank 5) waits
   until `LastFlip` = `FrameCount`. The next tune starts at full volume.
   (A fade-out over the stage's last stretch, a drum fill during the load, a

@@ -124,7 +124,8 @@ JingleTick:
 .end:   ld (JinglePtr), de
         ret
 JingleHold:     db 0
-; A new stage begins: a short high beep (C) on its first frame
+; A new stage begins: a short high beep (C) on its first frame (extended
+; play: the flourish instead, src/gap4.asm)
 JingleGo:
         dw 106
         db 8
