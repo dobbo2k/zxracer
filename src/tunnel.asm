@@ -19,7 +19,7 @@ A_              EQU $76             ; the arch: bright yellow, yellow ink (white
 D_              EQU $00             ; dark
 S_              EQU $FF             ; (left as it is)
 ARCH_MIN        EQU 24              ; the road's width (pixels) at the mouth from which the arch shows
-EXIT_SEE        EQU 1024            ; the way out shows from this near (src/holes.asm UpdateTunnel):
+EXIT_SEE        EQU 1536            ; the way out shows from this near (src/holes.asm UpdateTunnel):
                                     ; further, the tunnel goes on into the dark
 C_              EQU $07             ; the ceiling: black, white ink
 

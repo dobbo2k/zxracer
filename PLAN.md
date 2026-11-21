@@ -505,7 +505,7 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   the road's edges there: approaching, a rock face, a yellow arch and the
   dark mouth (dark on its road rows too, so it shows from afar); inside, the
   sky round the far road and the ceiling round that - but only once the way
-  out is within `EXIT_SEE` (1024): further, the tunnel runs on into the dark
+  out is within `EXIT_SEE` (1536): further, the tunnel runs on into the dark
   up to the horizon.
   Road rows it paints are marked (their cached band set to 1) so the road
   redraws them. About 7% off the frame rate while a tunnel is in view. Room
