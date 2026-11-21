@@ -135,10 +135,13 @@ test-einstein`.
 - **Traffic and scenery** (`src/einstein/sprites.asm`): see 3.8.
 - **The sky and HUD** (`src/einstein/sky.asm`): the cells the Spectrum
   code writes are noted in a bitmap, a bit a cell, so none is dropped or
-  sent twice, and mirrored, at most 48 a frame (the rest wait). A tunnel's
-  way in and out changes the whole sky at once: a queue of 240 used to
-  overflow there and leave the portal's colours in the sky. The panorama is
-  sent once a stage and scrolls by its names alone.
+  sent twice, and all of them are mirrored with the frame. A tunnel's way
+  in and out changes the whole sky at once (about 3 TV frames of paced
+  writes, inside the interrupt): a TV frame that begins meanwhile is
+  counted and its sound played, so the clock and the music keep time. (A
+  queue of 240, 48 a frame, used to overflow there and leave the portal's
+  colours in the sky, and took 5 game frames over the change.) The
+  panorama is sent once a stage and scrolls by its names alone.
 - **The front end** (`src/einstein/front.asm`): the Spectrum's title,
   high scores, options (key redefinition too), game-over and goal screens,
   unchanged. They draw into screen A ($4000) as on the Spectrum, and screen
@@ -169,13 +172,17 @@ test-einstein`.
   asks the VDP for the frame; once one is seen, it waits 16 ms before
   asking again (the next comes 19.9 ms on).
 
+- **Sound:** the AY runs at 2 MHz, against the Spectrum 128's 1.77, so
+  every tone and noise period is 1.128 times the Spectrum's for the same
+  pitch: constants as `(p * AYN + AYD / 2) / AYD` (`src/defs.asm`; 1 / 1 on
+  the Spectrum, so its bytes are the same), and the computed ones in
+  Einstein code: the engine's 56 a rev (50), the crash's thud
+  (`EinCoarse`). The tune's notes come from their own table.
+
 Not yet:
 
 - the crew's crash close-ups (their portraits are left out of the Einstein
   build, for room)
-- the tyre squeal's and the crash's AY periods, still the Spectrum's, so a
-  little high at 2 MHz (the drums, the lights' beeps and the engine's idle
-  note are scaled: `AYN` / `AYD` in `src/defs.asm`)
 - speed (section 6)
 
 ## 5. Graphics: the name table does the work
@@ -190,8 +197,13 @@ As planned, with the details above. Per third (256 patterns each):
 
 Colours come from the Spectrum's attributes. Each Spectrum colour (with
 bright) maps to the nearest TMS colour (`SpecTms` in
-`src/einstein/vdp.asm`). Each theme's palette still wants picking for the
-TMS colours, as the plan said.
+`src/einstein/vdp.asm`). The TMS9129 has one cyan and one magenta, where
+the Spectrum has a plain and a bright of each, so where a palette tells
+two things apart by brightness alone, `einstein_palette` in
+`assets/stages.yaml` (a theme's or a stage's) changes it for the Einstein
+only (`tools/make_einstein.py`): the sunset theme's dark grass bands
+(dark blue, not the sky's magenta) and the beacon coast's (grey, not the
+sky's cyan). All 15 stages were checked in the harness for the rest.
 
 ## 6. Speed
 

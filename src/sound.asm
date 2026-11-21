@@ -9,7 +9,8 @@
 AY_SEL          EQU $FFFD
 AY_DATA         EQU $BFFD
 ENGINE_IDLE     EQU (1400 * AYN + AYD / 2) / AYD    ; tone period at standstill (~80 Hz)
-ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpdate: shifts)
+ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpdate: shifts;
+                                    ; the Einstein's 2 MHz AY: 56)
 
 ; A = register, E = value
 AyWrite:
@@ -46,6 +47,17 @@ EngineUpdate:
         add a, b
 .revs:  ld l, a                 ; revs x 50 (ENGINE_STEP) = 32 + 16 + 2
         ld h, 0
+        IFDEF EINSTEIN          ; (revs x 56 = 32 + 16 + 8: 50 at 2 MHz)
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld d, h
+        ld e, l                 ; 8
+        add hl, hl
+        ld b, h
+        ld c, l                 ; 16
+        add hl, hl              ; 32
+        ELSE
         add hl, hl
         ld d, h
         ld e, l                 ; 2
@@ -55,6 +67,7 @@ EngineUpdate:
         ld b, h
         ld c, l                 ; 16
         add hl, hl              ; 32
+        ENDIF
         add hl, bc
         add hl, de
         ex de, hl
@@ -64,8 +77,10 @@ EngineUpdate:
         ld (EnginePeriod), hl
         ret
 
-SFX_BUMP        EQU 6               ; noise period of the effect
-SFX_CRASH       EQU 24
+SFX_BUMP        EQU (6 * AYN + AYD / 2) / AYD  ; noise period of the effect
+SFX_CRASH       EQU (24 * AYN + AYD / 2) / AYD
+GRAVEL_NOISE    EQU (12 * AYN + AYD / 2) / AYD ; off the road
+SQ_TONE         EQU (40 * AYN + AYD / 2) / AYD ; the tyre squeal's tone (and up to 6 more)
 
 ; A = effect (noise period): start a 15-frame noise burst
 PlaySfx:

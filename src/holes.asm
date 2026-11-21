@@ -252,7 +252,7 @@ EngineSounds:
         ld e, 10
 .gr:    ld a, 9
         call AyWrite
-        ld e, 12                ; noise period
+        ld e, GRAVEL_NOISE      ; noise period
         ld a, 6
         call AyWrite
 .mix:
@@ -387,7 +387,7 @@ CrashTick:
         call AyWrite
         ld a, (CrashAge)        ; noise: a crack, deepening
         srl a
-        add a, 6
+        add a, (6 * AYN + AYD / 2) / AYD
         cp 31
         jr c, .np
         ld a, 31
@@ -417,7 +417,7 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
         jr z, .thud
         ld a, (FrameCount)      ; the squeal: a wavering high tone
         and 6
-        add a, 40
+        add a, SQ_TONE
         ld e, a
         ld d, 0
         ld a, 10
@@ -434,7 +434,11 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
         ld d, a
         ld a, 15
         sub e
+        IFDEF EINSTEIN
+        call EinCoarse          ; (the AY at 2 MHz: src/einstein/boot.asm)
+        ELSE
         ld e, 0
+        ENDIF
 .tone:  ld (CrVolA), a
         ld hl, CrMix
         res 0, (hl)             ; tone A
@@ -534,7 +538,7 @@ CrashTickC:                     ; C: debris, a clatter of high notes
         add a, a
         add a, e
         and 31
-        add a, 24
+        add a, (24 * AYN + AYD / 2) / AYD
         ld e, a                 ; a high, jumping pitch
         ld a, 4
         call AyWrite

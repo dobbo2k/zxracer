@@ -148,18 +148,15 @@ EinMarkBig:
         dec l
         ret
 
-; The cells marked: into VRAM
-; (at most MIRROR_FRAME a frame, so the interrupt stays short: the rest
-; wait, moved to the front of the list)
-MIRROR_FRAME    EQU 48
+; The cells noted (EMirrorBits): into VRAM, all of them. A tunnel's way in
+; or out changes the whole sky at once, more than a TV frame of paced
+; writes: frames that begin meanwhile are counted, and their sound played.
 EinMirror:
         ld a, (EMirrorN)
         or a
         ret z
         xor a
-        ld (EMirrorN), a        ; (noted again if some are left)
-        ld a, MIRROR_FRAME
-        ld (EMirrorLeft), a
+        ld (EMirrorN), a
         ld hl, EMirrorBits
         ld b, 0                 ; B = row, C = column
 .r:     ld c, 0
@@ -174,11 +171,6 @@ EinMirror:
 .bit:   ld a, (hl)
         and e
         jr z, .nx
-        ld a, (EMirrorLeft)
-        or a
-        jr z, .more
-        dec a
-        ld (EMirrorLeft), a
         ld a, e
         cpl
         and (hl)
@@ -187,6 +179,9 @@ EinMirror:
         push de
         push hl
         call EinMirrorCell
+        in a, (EIN_VDP_CTRL)    ; a TV frame begun meanwhile (a long list:
+        rla                     ; a tunnel's way in or out)? Counted, with
+        call c, EinLateFrame    ; its sound
         pop hl
         pop de
         pop bc
@@ -202,9 +197,13 @@ EinMirror:
         cp MIRROR_ROWS
         jr nz, .r
         ret
-.more:  ld a, 1                 ; (this frame's share sent: the rest later)
-        ld (EMirrorN), a
-        ret
+
+; A TV frame begun while the interrupt is still sending (its frame flag
+; read): counted, and its sound played, as the interrupt would have
+EinLateFrame:
+        ld hl, FrameCount
+        inc (hl)
+        jp SoundTick
 
 ; Every cell of rows 0-9 (a new stage, the display off)
 EinMirrorAll:
@@ -602,5 +601,4 @@ EinCarDirty:    db 1
 EinCarFull:     db 1
 EinCarAttr:     ds 4 * CAR_W    ; the car's attributes in VRAM
 EMirrorN:       db 0            ; any cells noted in EMirrorBits
-EMirrorLeft:    db 0            ; (EinMirror: this frame's share left)
 EPanoLast:      db $FF

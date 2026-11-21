@@ -107,3 +107,23 @@ EinIsr:
         pop af
         ei
         reti
+
+; D = a coarse tone period (the Spectrum's D * 256 at 1.77 MHz) -> DE = the
+; same pitch on the Einstein's 2 MHz AY: D * 289 (AF kept; HL spent)
+EinCoarse:
+        push af
+        ld l, d
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl              ; 32 D
+        ld a, l
+        add a, d
+        ld e, a
+        ld a, h
+        adc a, d
+        ld d, a                 ; + 257 D
+        pop af
+        ret

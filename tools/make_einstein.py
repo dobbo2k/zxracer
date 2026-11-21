@@ -99,7 +99,8 @@ def dat(cfg, outdir):
         where[label] = (len(data) // RECORD, len(blob))
         data += blob + bytes(records * RECORD - len(blob))
     pics = {}                               # the title and goal pictures
-    shots = make_stages.make_screens.build(make_stages.make_screens.ending_themes(cfg))
+    shots = make_stages.make_screens.build(make_stages.make_screens.ending_themes(cfg),
+                                           preview_dir=outdir)   # (not assets/: the Spectrum's)
     for name, (raw, packed) in shots.items():
         records = (len(packed) + RECORD - 1) // RECORD
         pics["scr_" + name] = (len(data) // RECORD, records)
@@ -159,9 +160,21 @@ def patch(cfg, outdir):
     open(os.path.join(outdir, "STAGES.DAT"), "wb").write(data)
 
 
+def einstein_palettes(cfg):
+    """Each theme's and stage's einstein_palette over its palette (the
+    TMS9129's colours: see assets/stages.yaml)."""
+    for theme in cfg["themes"].values():
+        theme["palette"].update(theme.get("einstein_palette", {}))
+    for row in cfg["rows"]:
+        for stage in row:
+            if "einstein_palette" in stage:
+                stage["palette"] = {**stage.get("palette", {}), **stage["einstein_palette"]}
+    return cfg
+
+
 def main(step, src="assets/stages.yaml", outdir="build/einstein"):
     os.makedirs(outdir, exist_ok=True)
-    cfg = yaml.safe_load(open(src)) if step != "patch" else None
+    cfg = einstein_palettes(yaml.safe_load(open(src))) if step != "patch" else None
     {"gen": gen, "dat": dat, "patch": patch}[step](cfg, outdir)
 
 
