@@ -160,7 +160,8 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   melody on the AY's three channels) that starts at the green light and
   changes with the road, and the title has one too - with fast arpeggio
   chords, pitch slides, vibrato on held notes, slap-style funk bass, tom-roll
-  fills and an epic final section. With the music on there is no engine note:
+  fills, a fat bass doubled an octave up on two channels (Green Valley's drum
+  and bass) and an epic final section. With the music on there is no engine note:
   just tyre squeal (sliding, spinning, and a chirp now and then on a fast
   bend), off-road gravel and bumps, which briefly take over a channel, and
   crashes, which take over all three: a crack that deepens into a rumble, a

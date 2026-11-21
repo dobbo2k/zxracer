@@ -607,7 +607,8 @@ or the sound set to the engine): the engine note on A, gravel and hits on B.
 Tunes are written in `tools/make_music.py` in sections (a bass pattern
 following each bar's chord, a drum pattern with a fill for the last bar, and
 the melody in sixteenths with slides `/E5`, arpeggios `@A5.m` and envelope
-changes `!1`) and encoded as byte streams (note, rest, tie, length, loop,
+changes `!1`; or, in a `double` section such as Green Valley's fat bass
+break, no melody: channel C plays the bass line an octave up) and encoded as byte streams (note, rest, tie, length, loop,
 and commands: arpeggio, envelope, slide, vibrato): 320-930 bytes each. The
 player's effects: arpeggios cycle the chord's three notes every interrupt;
 a slide moves from the last pitch to the new note in 2, 4 or 8 equal steps;
