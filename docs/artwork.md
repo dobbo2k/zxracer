@@ -24,7 +24,10 @@ sprite families. The figures below describe the Riviera build.
    8 × 8 cell**, both normal or both bright (black goes with either). Moving
    graphics (scenery, traffic) have no colour of their own at all: they are
    1-bit silhouettes in the ink colour of the cells they cross (black over
-   grass, sky and kerbs, white over the road).
+   grass, sky and kerbs, white over the road), except that each object type has
+   an ink of its own in the plain grass and road cells it covers (`PLAN.md` 2.2;
+   `make ZX_OBJINK=0` turns it off). The colours are `OBJ_INKS` in
+   `tools/make_stages.py`; an ink the same as the ground's is drawn black.
 3. **Memory is nearly full.** The car, traffic, font and crew share 27 free
    resident bytes. Each region also has its own scenery budget in section 10.
    The pack builder and assembler check these limits.

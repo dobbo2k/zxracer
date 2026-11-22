@@ -142,6 +142,31 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
 - **HUD:** top 2 rows in full colour (speed, time, score, stage), never overdrawn.
 - **Border:** stretch goal — timed `OUT ($FE)` split so the border is sky-coloured
   above the horizon and grass-coloured below, extending the picture to the CRT edge.
+- **Objects in their own inks** *(as built, the default since 22 November 2026;
+  `make ZX_OBJINK=0` for the silhouettes of before; `src/objink.asm`)*. After
+  `DrawSprites`, every cell of a draw command's box in rows 12-23 that is plain
+  grass or road (its attribute the stage's `PalGrassL`, `PalGrassD` or `PalRoad`)
+  and not the car's takes the object type's ink, its paper kept: traffic is solid
+  cyan, white or yellow on the road; the country's trees and the city palms red
+  (the nearest to brown: dark red in dark bands); the coast's palms, pines, bushes
+  and cacti green; the towers, windmills, billboards and windpumps blue; signs,
+  rocks and chalets red; the snowman white. An ink the same as the paper is drawn
+  black (white on black): the snowman on white snow, a bush on green grass. Kerb cells keep their ink (their
+  road pixels would take it too), a centre-line dash in a coloured cell takes it,
+  and the BRIGHT bit stays the band's. The row's band in the buffer's state page is
+  then made $FF, so `DrawRoadRow` writes the row's attributes afresh when the
+  buffer is next drawn. Bank 2 had room only for the 7 bytes that store each
+  command's object type and call the routine, so the routine (184 bytes) and a
+  colour per type (11 bytes, `OBJ_INKS` in `tools/make_stages.py`, or a theme's
+  `inks:`) are in every theme pack, at `THEME_CACHE + 17` and `+ 28`: the alpine
+  pack, the fullest, keeps 11 bytes of the theme cache. Measured (22 November
+  2026): `make profile` 209.8K to 217.7K T a game frame (the colouring about 4K,
+  the rows' attributes written again about 4K), game frames taking 4 TV frames
+  130 to 201 in 890, 15.05 to 14.82 fps; the FIXED_ELAPSED autopilot over 12,000
+  TV frames 14.94 to 14.45 fps. `make test` passes either way. The colours are
+  `OBJ_INKS` in `tools/make_stages.py` (a theme's `inks:` in `stages.yaml` can
+  change them); the BRIGHT bit is the band's, so a colour is bright in a light band
+  and dark in a dark one.
 
 ---
 

@@ -46,6 +46,19 @@ TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 
 LANDMARK_SHARE = 0.18               # of the big roadside scenery: the theme's landmark
 SMALL2_SHARE = 0.4                  # of the small scenery: the theme's second small type
 RESIDENT_TYPES = ["traffic", "van", "truck"]          # in bank 5
+# Objects in their own inks on the Spectrum (the Makefile's ZX_OBJINK, 1 by
+# default; with -DZX_OBJINK). Each theme pack gets a byte per object type after
+# its tune (Inks, in TYPE_IDS order; a theme's "inks:" in stages.yaml can change
+# them) and src/objink.asm, at THEME_CACHE + 28. ZX_OBJINK=0: neither.
+OBJINK = os.environ.get("ZX_OBJINK", "1") == "1"
+OBJINK_BYTES = 184                  # the routine's room (asserted)
+OBJ_INKS = {"traffic": 5, "van": 7, "truck": 6,                     # cyan, white, yellow
+            "sign_r": 2, "sign_l": 2, "fork": 2, "sign_tunnel": 2,  # red
+            "tree": 2, "citypalm": 2,                               # trees: red, for brown
+            "palm": 4, "pine": 4, "bush": 4, "cactus": 4,           # green (the coast's palms)
+            "rock": 2, "tumbleweed": 2, "chalet": 2,                # red
+            "tower": 1, "windmill": 1, "billboard": 1, "snowman": 7,    # blue; white
+            "parasol": 3, "windpump": 1, "haybales": 6, "lamp": 6}      # magenta, blue, yellow
 MAP_PAPER = {"coast": 5, "desert": 6, "alpine": 7, "country": 4, "sunset": 3}   # route map boxes
 END_STRAIGHT = SPLIT_LEN            # the road forks along the final straight
 MAX_X = 127 * 4                     # object x is stored / 4 in a signed byte
@@ -268,9 +281,18 @@ def theme_pack(name, theme, masters=None):
            "        db " + ", ".join(str(pal[k]) for k in
                                     ("sky", "pano", "hud", "time", "grass_l", "grass_d",
                                      "kerb_l", "kerb_d", "road")),
-           "        dw Tune                ; (+15: the theme's tune)",
-           "TypeDir:",
-           "        dw @Scn_traffic"]
+           "        dw Tune                ; (+15: the theme's tune)"]
+    objink = OBJINK and masters is None     # (the Spectrum's packs only)
+    if objink:
+        ids = ["traffic", "sign_r", "sign_l", "fork", theme["types"][0], theme["types"][1],
+               "van", "truck", theme["types"][2], theme["types"][3], "sign_tunnel"]
+        inks = {**OBJ_INKS, **theme.get("inks", {})}
+        out += ["Inks:   db " + ", ".join(str(inks.get(n, 255)) for n in ids),
+                '        INCLUDE "../src/objink.asm"',
+                "        ASSERT ObjInk == @THEME_CACHE + 28",
+                f"        ASSERT $ - ObjInk <= {OBJINK_BYTES}"]
+    out += ["TypeDir:",
+            "        dw @Scn_traffic"]
     assert len(theme["types"]) == 4, "a theme has four scenery types (ids 4, 5, 8, 9)"
     out += [f"        dw Scn_{t}" for t in types[:5]]
     out += ["        dw @Scn_van, @Scn_truck"]
@@ -281,6 +303,8 @@ def theme_pack(name, theme, masters=None):
         im = round_art.panorama(**theme["horizon"])
         im.convert("L").point(lambda v: 0 if v else 255).save(f"assets/gfx/horizon_{name[6:]}.png")
     size = 6 + 9 + 2 + make_music.tune_bytes(name[6:]) + 2 * (len(types) + 3) + len(theme["name"]) + 1
+    if objink:
+        size += 11 + OBJINK_BYTES
     for t in types:
         master = masters.get(t) if masters is not None else None
         consts, dirl, data = scn.emit_type(t, master=master, previews=masters is None)
