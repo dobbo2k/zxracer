@@ -204,6 +204,8 @@ Not yet:
 
 ## 5. Graphics: the name table does the work
 
+For redoing the Einstein's artwork, see `docs/einstein_artwork.md`.
+
 As planned, with the details above. Per third (256 patterns each):
 
 | Third | Patterns |

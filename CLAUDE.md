@@ -2,7 +2,8 @@
 
 The game, its design and the build are described in `README.md`, `PLAN.md`
 and `docs/HANDOVER.md` (the move from the cloud); the graphics and artwork in
-`docs/artwork.md`. This file covers the local setup.
+`docs/artwork.md`, and the Einstein port's in `docs/einstein_artwork.md`.
+This file covers the local setup.
 
 ## Toolchain: MSYS2 (UCRT64)
 
