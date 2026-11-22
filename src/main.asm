@@ -76,6 +76,9 @@ MainLoop:
         call DrawPortal         ; (a tunnel's mouth or way out)
         BORDER 3                ; magenta: sprites
         call DrawSprites
+        IFDEF ZX_OBJINK
+        call THEME_CACHE + 28   ; their inks (src/objink.asm, in the theme pack)
+        ENDIF
         call DrawCar
         BORDER 5                ; cyan: HUD
         call DrawHud

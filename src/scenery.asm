@@ -417,6 +417,11 @@ DrawObject:
         IFDEF EINSTEIN
         ld a, (ObjType)
         ld (hl), a
+        ELSE
+        IFDEF ZX_OBJINK         ; (its ink: src/objink.asm)
+        ld a, (ObjType)
+        ld (hl), a
+        ENDIF
         ENDIF
         inc hl
         ld (CmdPtr), hl

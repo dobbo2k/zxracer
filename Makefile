@@ -3,6 +3,12 @@ ASM      ?= sjasmplus
 CC       ?= cc
 PYTHON   ?= python3
 ASMFLAGS ?= --nologo --msg=war --fullpath -Ibuild --lst=build/zxracer.lst --sym=build/zxracer.sym
+# ZX_OBJINK (1, the default): traffic and scenery in their own inks (src/objink.asm,
+# PLAN.md 2.2); ZX_OBJINK=0: the black and white silhouettes of before. A change of
+# it makes the packs and snapshots again (OBJINK_STAMP).
+ZX_OBJINK  ?= 1
+OBJINK_DEF := $(if $(filter 1,$(ZX_OBJINK)),-DZX_OBJINK=1)
+OBJINK_STAMP := build/objink-$(ZX_OBJINK).stamp
 
 SRC   := $(wildcard src/*.asm)
 # On Windows (MSYS2) the C compiler writes zxsim.exe; the ./ lets Windows
@@ -29,8 +35,12 @@ assets/gfx/car.png: tools/make_car.py
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
 	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32 3
 
-build/stages.asm: tools/make_stages.py tools/round_art.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
-	$(PYTHON) tools/make_stages.py assets/stages.yaml build
+$(OBJINK_STAMP): | build
+	rm -f build/objink-*.stamp
+	touch $@
+
+build/stages.asm: tools/make_stages.py tools/round_art.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png $(OBJINK_STAMP) | build
+	ZX_OBJINK=$(ZX_OBJINK) $(PYTHON) tools/make_stages.py assets/stages.yaml build
 
 build/crew_data.asm: tools/make_crew.py tools/make_screens.py | build
 	$(PYTHON) tools/make_crew.py $@
@@ -42,7 +52,7 @@ build/font_data.asm: tools/make_font.py | build
 	$(PYTHON) tools/make_font.py $@
 
 build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
-	$(ASM) $(ASMFLAGS) src/main.asm
+	$(ASM) $(ASMFLAGS) $(OBJINK_DEF) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build
 	$(CC) -O2 -Wall -o $@ $<
@@ -65,7 +75,7 @@ profile: $(ZXSIM) build/zxracer.sna
 # Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
 # Release build (no timing bars) and the tape image made from it
 build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
-	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 src/main.asm
+	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 $(OBJINK_DEF) src/main.asm
 
 build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py assets/gfx/loading.scr src/loader.asm | build
 	$(PYTHON) tools/make_tap.py build/release.sna build/release.sym $@
@@ -96,7 +106,7 @@ leaflet: tools/make_leaflet.py assets/stages.yaml | build
 	$(PYTHON) tools/make_leaflet.py release/route_map.png build/route_map.svg
 
 build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
-	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 src/main.asm
+	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 $(OBJINK_DEF) src/main.asm
 
 video: $(ZXSIM) build/video.sna
 	$(PYTHON) tools/make_video.py $(ZXSIM) build/video.sna build/gameplay.mp4 2400
