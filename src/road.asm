@@ -130,7 +130,9 @@ RoadPass1:
         ld (P1Hill), a
         ld hl, .flat
         jr .hset
-.hills: ld a, 1
+.hills: ld a, (P1Hill)
+        or a                    ; Z: flat mapping last frame, rebuild unconditionally
+        ld a, 1
         ld (P1Hill), a
         call HillMap
         ld hl, HillStore
@@ -392,63 +394,66 @@ RoadPass1:
 ; depth line the screen line shows; bit 7: that depth line is in a tunnel
 RoadBands:
         ld a, (Pos)
-        ld (.p + 1), a
-        ld (.q + 1), a
-        ld a, (TunJ0)
-        ld (.t0 + 1), a
-        ld (.t2 + 1), a
+        ld c, a
+        ld b, ROAD_LINES / 2
+        ld hl, SrcLine
+        ld d, high ZLo
         ld a, (TunJN)
-        ld (.t1 + 1), a
-        ld (.t3 + 1), a
+        or a
+        jr nz, .tunnel
         ld a, (P1Hill)
         or a
         jr nz, .hills
-        ld hl, ZLo              ; no hills: screen line = depth line
+        ld hl, ZLo
         ld de, Band
-.flat:  ld a, l
-.t0:    sub 0
-.t1:    cp 0
-        sbc a, a
-        and $80
-        ld b, a
-        ld a, (hl)
-.q:     add a, 0
+.flat:  ld a, (hl)
+        add a, c
         and STRIPE_BIT
-        or b
         ld (de), a
         inc l
         inc l
         inc e
         inc e
-        ld a, e
-        cp low Band + ROAD_LINES
-        jr nz, .flat
+        djnz .flat
         ret
-.hills:
-        ld bc, SrcLine
-        ld de, Band
-        ld h, high ZLo
-.band:  ld a, (bc)
-        ld l, a
-.t2:    sub 0
-.t3:    cp 0
-        sbc a, a
-        and $80
-        ld (de), a
-        ld a, (hl)
-.p:     add a, 0
+
+        ; Band and SrcLine have the same offset on their respective pages.
+        ASSERT low Band == low SrcLine
+.hills: ld e, (hl)
+        ld a, (de)
+        add a, c
         and STRIPE_BIT
-        ex de, hl
-        or (hl)
+        ld h, high Band
         ld (hl), a
-        ex de, hl
-        inc c
-        inc c
-        inc e
-        inc e                   ; even lines only: lines are drawn in pairs
+        ld h, high SrcLine
+        inc l
+        inc l
+        djnz .hills
+        ret
+
+        ; SrcLine is the identity map on flat ground, including in tunnels.
+.tunnel:
+        ld (.length + 1), a
+        ld a, (TunJ0)
+        ld (.first + 1), a
+.pair:  ld e, (hl)
         ld a, e
-        cp low Band + ROAD_LINES
-        jr nz, .band
+.first: sub 0
+.length: cp 0
+        ld a, (de)
+        jr c, .inside
+        add a, c
+        and STRIPE_BIT
+        jr .store
+.inside: add a, c
+        and STRIPE_BIT
+        or $80
+.store: ld h, high Band
+        ld (hl), a
+        ld h, high SrcLine
+        inc l
+        inc l
+        djnz .pair
         ret
 
         IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)

@@ -47,7 +47,6 @@ NextNB:         db 0            ; pass 1: the next curve boundary line
 NextNZ:         db 0            ; ... and zone line
 CurK3:          ds 3            ; 3 k (fraction first)
 OldK3:          ds 3
-CurveList:      ds 2 + 3 * MAX_BOUNDS + 1
 
 ; track
 SegPtr:         dw 0

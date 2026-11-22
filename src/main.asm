@@ -194,6 +194,8 @@ hv      DEFL 1
         db $81, hv
 hv      DEFL hv + 2
         EDUP
+; Projected segment boundaries in the gap between the hill tables.
+CurveList:      ds 2 + 3 * MAX_BOUNDS + 1
         ASSERT $ <= SrcLine
         ORG SrcLine
 hv      DEFL 0
@@ -286,6 +288,7 @@ CmdListB        EQU $10000 - THEME_TOP
         INCLUDE "music.asm"     ; the music player
         INCLUDE "extend.asm"    ; stage times, extended play, weaving traffic
         INCLUDE "tunnel.asm"    ; tunnels
+PrevHillInputs: ds 2 + 3 * MAX_BOUNDS + 1
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 

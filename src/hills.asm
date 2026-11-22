@@ -28,7 +28,28 @@
 ; Before pass 1, with hills in view. IY walks ProjClip + j, IXL = screen
 ; pairs still free above the road drawn so far, HL = vertical offset,
 ; DE = vertical speed (8.8 screen lines), BC = hill increment.
+; The vertical mapping depends only on the projected segment boundaries
+; and hill values. Compare the complete list so that a matching prefix
+; cannot hide a new boundary. Even on a hit, refresh the uncovered rows.
+; Z on entry means the prior mapping was flat, so the cache is invalid.
 HillMap:
+        ld hl, CurveList
+        ld de, PrevHillInputs
+        ld b, 2 + 3 * MAX_BOUNDS + 1
+        jr z, .changed
+.compare:
+        ld a, (de)
+        cp (hl)
+        jr nz, .changed
+        inc hl
+        inc de
+        djnz .compare
+        ld a, (HillNf)
+        jp .empty
+.changed:
+        ld c, b                 ; preceding bytes already match
+        ld b, 0
+        ldir
         ld hl, CurveList + 2    ; hill boundaries: (line, curvature, hill)
         ld (HmPtr), hl
         ld a, (hl)
@@ -151,7 +172,7 @@ HillMap:
         ld (HillTopJ), a
         ld a, ixl
         ld (HillNf), a
-        or a
+.empty: or a
         ret z
         ld b, a
         ld a, (HillTopJ)

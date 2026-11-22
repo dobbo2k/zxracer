@@ -1,9 +1,10 @@
 SPEED RUN
-A road race for the ZX Spectrum 128K, +2, +2A and +3
-=====================================================
+A road race for the ZX Spectrum 128K family and Tatung Einstein TC-01
+====================================================================
 
 FILES
 
+  speedrun.dsk       Bootable XtalDOS disc for the Tatung Einstein TC-01.
   speedrun.tzx       The game, turbo loading: about 3 minutes.
   speedrun.tap       The same at the normal tape speed: about 6 minutes.
                      Use it if your player or emulator cannot play turbo
@@ -17,6 +18,11 @@ FILES
   cover.png          The cover art.
 
 LOADING
+
+  On the Einstein, boot speedrun.dsk in drive 0. At the XtalDOS 0: prompt,
+  type SPEEDRUN and press RETURN.
+
+  ZX Spectrum 128K, +2, +2A and +3
 
   Choose Tape Loader from the 128K menu (or type LOAD "" and press ENTER)
   and play the tape. A short BASIC program loads the game's own loader,
@@ -34,7 +40,8 @@ CONTROLS
   A        brake               SPACE    change gear (LOW / HIGH)
   H        pause
 
-  A Kempston joystick works at any time (fire changes gear). On the title
+  A Kempston joystick on the Spectrum or an analogue joystick on the
+  Einstein works at any time (fire changes gear). On the title
   screen, ENTER opens the options:
 
   1-3      keyboard, Sinclair joystick or Cursor joystick

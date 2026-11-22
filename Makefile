@@ -20,7 +20,7 @@ ZXSIM := ./build/zxsim$(EXE)
 # Machine-specific settings (emulator paths); see CLAUDE.md
 -include local.mk
 
-.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet einstein test-einstein run-einstein
+.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet einstein release-einstein test-einstein run-einstein
 all: build/zxracer.sna
 
 build:
@@ -150,6 +150,10 @@ EIN_GEN := build/einstein/einstein_objects.asm build/einstein/spider.asm build/e
 EIN_DAT := build/einstein/stages.asm build/einstein/stageov_pack.asm build/einstein/screens_data.asm build/einstein/stages_raw.dat build/einstein/reserve.txt
 
 einstein: build/einstein/speedrun.dsk
+
+release-einstein: build/einstein/speedrun.dsk
+	mkdir -p release
+	cp $< release/speedrun.dsk
 
 build/einstein:
 	mkdir -p build/einstein
