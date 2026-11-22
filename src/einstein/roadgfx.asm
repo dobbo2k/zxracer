@@ -25,8 +25,12 @@
 EinDraw:
         ld hl, DirtyList
         ld (EDirtyEnd), hl
+        ld hl, EDirtyRowN       ; (no slot changed yet)
+        ld b, 12
         xor a
-        ld (DirtyN), a
+.dz:    ld (hl), a
+        inc hl
+        djnz .dz
         ld (ERow), a
         ld a, (TunInside)       ; (in or out of a tunnel: every row, for the lamps)
         ld hl, ELastTun
@@ -256,78 +260,58 @@ EinRow:
         ld a, 1
         ld (EStatic), a
         call EinDashRow
-        xor a                   ; (no slot of the road's: all the row's for
-        ld (ERowLoNow), a       ; silhouettes)
-        ld a, SLOTS_T2
-        ld (ERowHiNow), a
+        jp EinRowBase.allSil
+
+; The row's slots all free (ESlotN 0, ESlotTop its count), the road's taken
+; first, then its silhouettes': a light band's from the bottom up, a dark
+; band's from the top down (EDown). So a slot keeps its colours (the kerb's,
+; light or dark) while bands pass, and only its pixels change.
+EinSlotRange:
+        xor a
+        ld (ESlotN), a
         ld a, (ERow)
         cp 4
-        jr nc, .s2
         ld a, SLOTS_T1
-        ld (ERowHiNow), a
-.s2:    ld a, (ERow)
-        cp CAR_ROW - ROAD_ROW0
-        jp c, EinRowBase.slotsSet
-        call EinRowColours      ; (the car's rows: EAG, EAK for the cockpit)
-        jp EinRowBase.slotsSet
+        jr c, .t1
+        ld a, SLOTS_T2
+.t1:    ld (ESlotTop), a
+        ld a, (ERBand)
+        and $40
+        rlca
+        rlca
+        ld (EDown), a
+        ret
 
-; The row's slots (ERow): the first (a SlotShadow index), how many, the
-; first's bytes in SlotShadow and its name (ERowSlotTab)
+; The row's slots (ERow): their bytes in SlotShadow and the first's name
+; (ERowSlotTab)
 EinRowSlots:
         ld a, (ERow)
         ld l, a
         add a, a
-        add a, a
-        add a, l                ; x 5
+        add a, l                ; x 3
         add a, low ERowSlotTab
         ld l, a
         ld a, high ERowSlotTab
         adc a, 0
         ld h, a
-        ld de, ESlot0
-        ldi
-        ldi
+        ld de, ESlotPtr
         ldi
         ldi
         ldi
         ret
-ERowSlotTab:                    ; per row: ESlot0, ESlotMax, ESlotPtr, ESlotName0
-        db 0 * SLOTS_T1, SLOTS_T1
-        dw SlotShadow + 0 * SLOTS_T1 * SLOT_SIZE
-        db SLOT_FIRST + 0 * SLOTS_T1
-        db 1 * SLOTS_T1, SLOTS_T1
-        dw SlotShadow + 1 * SLOTS_T1 * SLOT_SIZE
-        db SLOT_FIRST + 1 * SLOTS_T1
-        db 2 * SLOTS_T1, SLOTS_T1
-        dw SlotShadow + 2 * SLOTS_T1 * SLOT_SIZE
-        db SLOT_FIRST + 2 * SLOTS_T1
-        db 3 * SLOTS_T1, SLOTS_T1
-        dw SlotShadow + 3 * SLOTS_T1 * SLOT_SIZE
-        db SLOT_FIRST + 3 * SLOTS_T1
-        db 4 * SLOTS_T1 + 0 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 0 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 0 * SLOTS_T2
-        db 4 * SLOTS_T1 + 1 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 1 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 1 * SLOTS_T2
-        db 4 * SLOTS_T1 + 2 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 2 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 2 * SLOTS_T2
-        db 4 * SLOTS_T1 + 3 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 3 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 3 * SLOTS_T2
-        db 4 * SLOTS_T1 + 4 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 4 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 4 * SLOTS_T2
-        db 4 * SLOTS_T1 + 5 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 5 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 5 * SLOTS_T2
-        db 4 * SLOTS_T1 + 6 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 6 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 6 * SLOTS_T2
-        db 4 * SLOTS_T1 + 7 * SLOTS_T2, SLOTS_T2
-        dw SlotShadow + (4 * SLOTS_T1 + 7 * SLOTS_T2) * SLOT_SIZE
-        db SLOT_FIRST + 7 * SLOTS_T2
+ERowSlotTab:                    ; per row: ESlotPtr, ESlotName0
+k       DEFL 0
+        DUP 4                   ; rows 12-15: the middle third's
+        dw SlotShadow + k * SLOTS_T1 * SLOT_SIZE
+        db SLOT_FIRST + k * SLOTS_T1
+k       DEFL k + 1
+        EDUP
+k       DEFL 0
+        DUP 8                   ; rows 16-23: the bottom third's
+        dw SlotShadow + (4 * SLOTS_T1 + k * SLOTS_T2) * SLOT_SIZE
+        db SLOT_FIRST + k * SLOTS_T2
+k       DEFL k + 1
+        EDUP
 
 EinRowBase:
         ; its names in BaseNames (rows from PANO_ROW0)
@@ -349,14 +333,25 @@ EinRowBase:
         ld hl, ERowDrawn + ROAD_ROW0
         add hl, de
         ld (hl), 1
+        ld a, (ESloped)         ; (a sloped row: its ranges made, the exact way)
+        or a
+        jr z, .ranges
+        xor a
+        ld (ESloped), a
+        ld (EStatic), a
+        jr .ranged
+.ranges:
         call EinRowRanges
         call EinStaticRanges    ; (rows 16-23: ready-made edges, ERB / ERC moved)
+.ranged:
         call EinRowColours
         ; ---- names: grass, kerb, road, kerb, grass
         ld hl, (ERowPtr)
         ld a, (ERA)
         ld b, a
         ld a, (ECG)
+        call EinGroundName
+        ld (.g2 + 1), a         ; (the same on the right)
         call EinFillRun
         ld a, (ERA)
         ld c, a
@@ -383,7 +378,7 @@ EinRowBase:
         neg
         add a, 32
         ld b, a
-        ld a, (ECG)
+.g2:    ld a, 0
         call EinFillRun
         ; ---- a tunnel's light band, inside it: lamps on the walls beside
         ; the kerbs (as src/road.asm RowAttrs)
@@ -420,21 +415,11 @@ EinRowBase:
         jr z, .exact
         call EinStaticCells
         call EinDashRow
-        xor a                   ; (no slot of the road's: all the row's for
-        ld (ERowLoNow), a       ; silhouettes)
-        ld a, SLOTS_T2
-        ld (ERowHiNow), a
-        ld a, (ERow)
-        cp 4
-        jr nc, .slotsSet
-        ld a, SLOTS_T1
-        ld (ERowHiNow), a
-        jr .slotsSet
+.allSil:
+        call EinSlotRange       ; (no slot of the road's: all the row's for
+        jr .slotsUsed           ; silhouettes)
 .exact: call EinRowSlots        ; ---- the exact way: the row's slots
-        xor a
-        ld (ESlotN), a
-        ld a, (ESlotMax)
-        ld (ESlotTop), a
+        call EinSlotRange
         ; ---- both of the fork's branches on the row: its own way
         ld a, (ERow)
         add a, low RowFork
@@ -472,8 +457,11 @@ EinRowBase:
         call EinDashRow
 .slotsUsed:
         ld a, (ESlotN)          ; the row's slots in use: the road's (silhouettes
-        ld (ERowLoNow), a       ; take the rest)
-        ld a, (ESlotTop)
+        ld (ERowLoNow), a       ; take the rest, on from them; bit 7 of
+        ld a, (EDown)           ; ERowHi: from the top down)
+        rrca
+        ld hl, ESlotTop
+        or (hl)
         ld (ERowHiNow), a
 .slotsSet:
         ld a, (ERow)
@@ -490,49 +478,11 @@ EinRowBase:
         ld a, (ERow)            ; the car's rows: its attributes again, and
         cp CAR_ROW - ROAD_ROW0  ; its names over the road's
         ret c
-        ld a, 1
-        ld (CarAttrDirty), a
         ld a, (ERow)
         add a, ROAD_ROW0
         ld b, a
         ld hl, (ERowPtr)
-        call EinCarNames
-        ld a, (ERow)
-        cp CAR_ROW - ROAD_ROW0
-        ret nz
-; Row 20: the attributes under the car's open cockpit (columns 12-19, as
-; src/fork.asm SaveCockpit keeps them for DrawCar)
-EinCockpit:
-        ld de, (high StateB1 + 2) * 256 + COCKPIT
-        ld c, CAR_COL
-.c:     ld a, c
-        ld hl, ERA
-        cp (hl)
-        ld a, (EAG)
-        jr c, .put              ; grass
-        ld a, c
-        ld hl, ERB
-        cp (hl)
-        ld a, (EAK)
-        jr c, .put              ; kerb
-        ld a, c
-        ld hl, ERC
-        cp (hl)
-        ld a, (PalRoad)
-        jr c, .put              ; road
-        ld a, c
-        ld hl, ERD
-        cp (hl)
-        ld a, (EAK)
-        jr c, .put              ; kerb
-        ld a, (EAG)             ; grass
-.put:   ld (de), a
-        inc e
-        inc c
-        ld a, c
-        cp CAR_COL + CAR_W
-        jr nz, .c
-        ret
+        jp EinCarNames
 
 ; ---------------------------------------------------------------------------
 ; A row (not a fork's, nor a tunnel's, nor one whose road is in one cell):
@@ -541,6 +491,12 @@ EinCockpit:
 ; way: a slope of 2-line steps). A kerb edge's cell is one name: nothing is
 ; sent but the names.
 ; After EinRowRanges: EStatic, and if set, ERB / ERC for the edges' cells.
+; In rows 16-23 an edge whose top and bottom lines are more than EIN_SLOPE
+; pixels apart is drawn the exact way instead (EinRowFast too).
+        IFNDEF EIN_SLOPE        ; (-D: other thresholds, for measuring)
+EIN_SLOPE       EQU 4
+        ENDIF
+        ASSERT 2 * EIN_SLOPE + 1 < 256
 EinStaticRanges:
         xor a
         ld (EStatic), a
@@ -559,7 +515,20 @@ EinStaticRanges:
         jr z, .take             ; no road: all grass
         ld bc, (ERDE0)          ; B = D0, C = E0
         ld de, (ERDE1)          ; D = D1, E = E1
+        ld a, (ERow)
+        cp 4
+        jr c, .mean
         ld a, b
+        sub d
+        add a, EIN_SLOPE
+        cp 2 * EIN_SLOPE + 1
+        ret nc
+        ld a, c
+        sub e
+        add a, EIN_SLOPE
+        cp 2 * EIN_SLOPE + 1
+        ret nc
+.mean:  ld a, b
         add a, d
         rra                     ; (the carry: the sum's bit 8)
         ld (EDm), a
@@ -646,96 +615,6 @@ EinStaticCells:
 .r:     ld (hl), a
         ret
 
-; The ready-made kerb edges into VRAM, the middle and bottom thirds (the
-; display off, at a display reset: the stage's colours), and their pixels
-; and colours for silhouettes (EStatByte, EStatCol)
-EinStaticInit:
-        call EinColourSets
-        ld b, 0                 ; ---- the open road's light and dark kerb
-        ld c, 0                 ; C: the pattern (0 .. KERB_N - 1)
-.set:   ld a, b                 ; its colour byte: EKC
-        add a, a
-        add a, a
-        add a, a
-        sub b
-        add a, low (ERowSets + 5)
-        ld l, a
-        ld a, high (ERowSets + 5)
-        adc a, 0
-        ld h, a
-        ld a, (hl)
-        ld (EStatC), a
-        ld e, $7F               ; left edges: road from pixel 1 .. 7
-.le:    ld a, e
-        call .put
-        srl e
-        jr nz, .le
-        ld e, $80               ; right edges: road to pixel 0 .. 6
-.re:    ld a, e
-        call .put
-        sra e
-        ld a, e
-        inc a
-        jr nz, .re
-        inc b
-        ld a, b
-        cp 2
-        jr nz, .set
-        ret
-; A = the pattern's byte (on all 8 lines), EStatC its colour: pattern C of
-; both thirds (C then the next); BC, DE kept
-.put:   push bc
-        push de
-        ld (EStatB), a
-        ld l, c
-        ld h, 0
-        ld de, EStatByte
-        add hl, de
-        ld (hl), a
-        ld de, EStatCol - EStatByte
-        add hl, de
-        ld a, (EStatC)
-        ld (hl), a
-        ld a, c
-        add a, KERB_T1          ; the middle third's
-        ld bc, VRAM_PAT + $800
-        call .one
-        pop de
-        pop bc
-        push bc
-        push de
-        ld a, c
-        add a, KERB_T2          ; the bottom third's
-        ld bc, VRAM_PAT + $1000
-        call .one
-        pop de
-        pop bc
-        inc c
-        ret
-; A = name, BC = its third: its 8 bytes (EStatB) and colours (EStatC)
-.one:   ld l, a
-        ld h, 0
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, bc
-        ex de, hl
-        push de
-        ld a, (EStatB)
-        ld l, a
-        ld bc, 8
-        call VdpFill
-        pop de
-        ld a, d
-        add a, high VRAM_COL
-        ld d, a
-        ld a, (EStatC)
-        ld l, a
-        ld bc, 8
-        jp VdpFill
-
-EStatC:         db 0
-EStatB:         db 0
 EStatByte:      ds KERB_N       ; per ready-made pattern: its byte,
 EStatCol:       ds KERB_N       ; its colour byte
 
@@ -806,33 +685,6 @@ EinRowFast:
 .t1:    ld a, e
         cp b
         jp c, .grass            ; (no road on the row)
-        ld a, b                 ; ---- the edges: the lines' mean
-        add a, c
-        rra
-        ld (EDm), a
-        rrca
-        rrca
-        rrca
-        and 31
-        ld h, a                 ; H: the left edge's cell
-        ld a, e
-        add a, d
-        rra
-        ld (EEm), a
-        rrca
-        rrca
-        rrca
-        and 31
-        ld l, a                 ; L: the right edge's
-        sub h
-        ret c                   ; (both in one cell: the exact way; carry,
-        scf                     ; or Z then carry set)
-        ret z
-        ld a, h
-        inc a
-        ld (ERB), a             ; kerb to the left edge's cell
-        ld a, l
-        ld (ERC), a             ; and from the right edge's
         ld a, (ERW0)            ; ---- [a, d): a = min(D - RW) >> 3 (at least 0)
         ld l, a
         ld a, b
@@ -872,10 +724,84 @@ EinRowFast:
         and 31
         inc a
         ld (ERD), a
+        ld a, (ERow)            ; ---- rows 16-23: an edge sloping more than 4
+        cp 4                    ; pixels is drawn the exact way (its slope in
+        jr c, .mean             ; 2-line steps)
+        ld a, b
+        sub c
+        add a, EIN_SLOPE
+        cp 2 * EIN_SLOPE + 1
+        jr nc, .sloped
+        ld a, e
+        sub d
+        add a, EIN_SLOPE
+        cp 2 * EIN_SLOPE + 1
+        jr c, .mean
+.sloped:                        ; (its ranges as EinRowRanges makes them: b =
+        ld a, b                 ; max(D) >> 3 + 1, c = max(b, min(E) >> 3), d
+        cp c                    ; at least c; a as here)
+        jr nc, .s0
+        ld a, c
+.s0:    rrca
+        rrca
+        rrca
+        and 31
+        inc a
+        ld (ERB), a
+        ld l, a
+        ld a, e
+        cp d
+        jr c, .s1
+        ld a, d
+.s1:    rrca
+        rrca
+        rrca
+        and 31
+        cp l
+        jr nc, .s2
+        ld a, l
+.s2:    ld (ERC), a
+        ld hl, ERD
+        cp (hl)
+        jr c, .s3
+        ld (hl), a
+.s3:    ld a, 1                 ; (EinRowBase: not made again)
+        ld (ESloped), a
+        scf
+        ret
+.mean:  ld a, b                 ; ---- the edges: the lines' mean
+        add a, c
+        rra
+        ld (EDm), a
+        rrca
+        rrca
+        rrca
+        and 31
+        ld h, a                 ; H: the left edge's cell
+        ld a, e
+        add a, d
+        rra
+        ld (EEm), a
+        rrca
+        rrca
+        rrca
+        and 31
+        ld l, a                 ; L: the right edge's
+        sub h
+        ret c                   ; (both in one cell: the exact way; carry,
+        scf                     ; or Z then carry set)
+        ret z
+        ld a, h
+        inc a
+        ld (ERB), a             ; kerb to the left edge's cell
+        ld a, l
+        ld (ERC), a             ; and from the right edge's
         call .start             ; ---- the names: HL, IX (its colours)
         ld a, (ERA)             ; grass
         ld b, a
         ld a, (ix + 2)
+        call EinGroundName
+        ld (.g2 + 1), a         ; (the same on the right)
         call EinFillRun
         ld a, (ERB)             ; kerb, to the left edge's cell
         dec a
@@ -924,7 +850,7 @@ EinRowFast:
         neg
         add a, 32
         ld b, a
-        ld a, (ix + 2)
+.g2:    ld a, 0
         call EinFillRun
         pop iy
         or a                    ; (done)
@@ -937,6 +863,7 @@ EinRowFast:
         call .start
         ld b, 32
         ld a, (ix + 2)
+        call EinGroundName
         call EinFillRun
         pop iy
         or a
@@ -1218,18 +1145,99 @@ EinRowColour:
         ret
 
 ; ---------------------------------------------------------------------------
-; The kerb cells ECol .. EColEnd - 1: the road's pixels in each, per line.
-; A cell with none stays solid kerb, one that is all road becomes solid road.
+; The kerb cells ECol .. EColEnd - 1 (a row that is not a fork's): the
+; road's pixels in each, per line pair (as EinCellMasks, into EPat). A cell
+; with none stays solid kerb, one that is all road becomes solid road, the
+; rest take a slot (as EinKerbName). In one pass.
 EinKerbCells:
-.col:   ld a, (ECol)
-        ld hl, EColEnd
-        cp (hl)
-        ret nc
-        call EinCellMasks
-        call EinKerbName
-        ld hl, ECol
-        inc (hl)
+        ld a, (ECol)
+        ld c, a                 ; C: the cell
+.col:   ld a, (EColEnd)
+        cp c
+        ret z
+        ret c
+        push bc
+        ld hl, ELines
+        ld de, EPat
+        ld b, 4
+.ln:    ld a, c                 ; ---- per line pair (EinCellMasks' rule)
+        cp (hl)                 ; D's cell
+        jr c, .zero4            ; left of the road (or none on the pair)
+        jr z, .atD
+        inc l
+        inc l
+        cp (hl)                 ; E's cell
+        jr c, .full             ; between: all road
+        jr z, .atE
+        xor a                   ; right of the road
+        jr .put2
+.full:  ld a, $FF
+.put2:  inc l
+        inc l
+.put:   ld (de), a
+        inc e
+        ld (de), a
+        inc e
+        djnz .ln
+        ld hl, EPat             ; ---- none, all or some road? (E: any, D: all)
+        ld a, (hl)
+        ld e, a
+        ld d, a
+        DUP 3
+        inc l
+        inc l
+        ld a, (hl)
+        or e
+        ld e, a
+        ld a, (hl)
+        and d
+        ld d, a
+        EDUP
+        pop bc
+        ld a, e
+        or a
+        jr z, .next             ; no road in it: kerb, as named
+        ld a, (ECR)
+        inc d
+        jr z, .name             ; all road
+        push bc
+        ld a, (EKC)
+        call EinCommitSlot
+        pop bc
+        cp $FF
+        jr z, .next             ; (the row's slots are all used)
+.name:  ld e, a
+        ld hl, (ERowPtr)
+        ld a, l
+        add a, c
+        ld l, a
+        jr nc, .nm
+        inc h
+.nm:    ld (hl), e
+.next:  inc c
         jr .col
+.atE:   inc l
+        ld a, (hl)              ; E's mask
+        inc l
+        jr .put
+.zero4: xor a
+        inc l
+        inc l
+        jr .put2
+.atD:   inc l
+        ld a, (hl)              ; D's mask
+        inc l
+        ex af, af'
+        ld a, c
+        cp (hl)                 ; E's cell too?
+        jr nz, .dOnly
+        ex af, af'
+        inc l
+        and (hl)                ; and its mask
+        inc l
+        jr .put
+.dOnly: ex af, af'
+        jr .put2
 
 ; EPat = the road's pixels in kerb cell ECol: no road, it stays kerb (as
 ; named); all road, solid road; else a slot
@@ -1533,16 +1541,22 @@ EinForkCells:
 ; -> A = the slot's name ($FF: the row's slots are all used)
 EinCommitSlot:
         ld c, a
-        ld a, (ESlotN)          ; the next kerb slot, below the centre line's
-        ld hl, ESlotTop
-        cp (hl)
-        jr c, .ok
-        ld a, $FF
-        ret
-.ok:    ld b, a
-        inc a
-        ld (ESlotN), a
+        ld hl, ESlotN           ; the next free slot: [ESlotN, ESlotTop)
+        ld a, (ESlotTop)
+        sub (hl)
+        jr z, .full
+        ld a, (EDown)
+        or a
+        jr nz, .down
+        ld b, (hl)              ; from the bottom up
+        inc (hl)
         jr EinCommitAt
+.down:  ld hl, ESlotTop         ; from the top down
+        dec (hl)
+        ld b, (hl)
+        jr EinCommitAt
+.full:  ld a, $FF
+        ret
 ; B = the slot in the row, C = the colour -> A = its name
 EinCommitAt:
         ld a, b                 ; HL = its SlotShadow bytes
@@ -1596,20 +1610,20 @@ EinCommitAt:
         ld e, 1                 ; the pixels
         jr z, .dirty
         ld e, 3                 ; and the colour
-.dirty: ld a, (ERow)            ; the row, for RequestFlip's order
-        add a, a
-        add a, a
-        or e
-        ld e, a
-        ld a, (ESlot0)          ; (slot, what) onto DirtyList (each slot at
-        add a, b                ; most once a frame: it never fills)
+.dirty: ld a, e                 ; (the slot in the row, what: bits 6, 7) onto
+        rrca                    ; DirtyList, counted for the row (each slot at
+        rrca                    ; most once a frame: it never fills; the rows
+        or b                    ; in order: EinUpload's)
         ld hl, (EDirtyEnd)
         ld (hl), a
         inc hl
-        ld (hl), e
-        inc hl
         ld (EDirtyEnd), hl
-        ld hl, DirtyN
+        ld a, (ERow)
+        add a, low EDirtyRowN
+        ld l, a
+        ld a, high EDirtyRowN
+        adc a, 0
+        ld h, a
         inc (hl)
 .same:  pop hl
         ld a, (ESlotName0)      ; its name
@@ -1620,14 +1634,14 @@ EinCommitAt:
 ERow:           db 0            ; road row 0-11 (screen row 12-23)
 EI:             db 0            ; its top line
 ERowPtr:        dw 0            ; its names in NameBuf
-ESlot0:         db 0            ; its first slot, how many it has, the first's
-ESlotMax:       db 0            ; bytes in SlotShadow, its name (in this order:
-ESlotPtr:       dw 0            ; EinRowSlots)
-ESlotName0:     db 0
+ESlotPtr:       dw 0            ; its slots' bytes in SlotShadow, the first's
+ESlotName0:     db 0            ; name (in this order: EinRowSlots)
 ESlotN:         db 0            ; how many used
 ERowLoNow:      db 0            ; (EinRowBase: the row's ERowLo, ERowHi)
 ERowHiNow:      db 0
-ESlotTop:       db 0            ; (the slots from the row's last down: free)
+ESlotTop:       db 0            ; (the free slots: ESlotN .. ESlotTop - 1)
+EDown:          db 0            ; 1: taken from the top down (EinSlotRange)
+ESloped:        db 0            ; EinRowFast made a sloped row's ranges
 EDirtyEnd:      dw 0            ; DirtyList's end
 ERW0:           db 0            ; kerb widths of its top and bottom lines
 ERW1:           db 0
@@ -1665,7 +1679,6 @@ EDMin:          db 0
 EEMax:          db 0
 ELines:         ds 4 * 4        ; per pair: D's cell and mask, E's cell and mask
         ASSERT high ELines == high (ELines + 15)
-DirtyN:         db 0
 EinShape:       db 1            ; pass 1 ran: rows whose shape changed again
 EinForce:       db 1            ; every row again
 ELastTun:       db 0

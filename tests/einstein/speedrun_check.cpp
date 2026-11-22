@@ -26,6 +26,7 @@
 //   rec_start PREFIX   record every frame from here, whatever runs, to rec_stop
 //   rec_stop
 //   type TEXT          type on the keyboard (a backslash-n: ENTER)
+//   stage N            call the game stage loader at a main-loop boundary
 //   until SYM S        run until the PC reaches SYM (at most S seconds)
 //   wait16 SYM VALUE   run until the word at SYM reaches VALUE; prints the
 //                      TV frames it took (with -DFIXED_ELAPSED: a benchmark)
@@ -274,6 +275,20 @@ int main(int argc, char** argv) {
             m.adc.set_axis(0, static_cast<std::uint8_t>(x));
             m.adc.set_axis(1, static_cast<std::uint8_t>(y));
             m.keyboard.set_port20_low(fire ? 0x01 : 0x00);
+        } else if (command == "stage") {
+            const int stage = std::stoi(next());
+            if (stage < 0 || stage >= symbol("NUM_STAGES")) return 2;
+            const auto loop = symbol("MainLoop");
+            const auto limit = m.tstates + 120ULL * ein::Machine::kCpuClockHz;
+            while (!at_program_pc(m, loop) && m.tstates < limit) step(m);
+            if (!at_program_pc(m, loop)) return 2;
+            m.cpu.sp.w -= 2;
+            m.write(m.cpu.sp.w, static_cast<std::uint8_t>(loop));
+            m.write(m.cpu.sp.w + 1, static_cast<std::uint8_t>(loop >> 8));
+            m.cpu.af.b.h = static_cast<std::uint8_t>(stage);
+            m.cpu.pc.w = symbol("RestartAt");
+            while (!at_program_pc(m, loop) && m.tstates < limit) step(m);
+            if (!at_program_pc(m, loop) || m.peek(symbol("Stage")) != stage) return 2;
         } else if (command == "peek8") {
             const std::string name = next();
             std::printf("%s=%u\n", name.c_str(), m.peek(symbol(name)));

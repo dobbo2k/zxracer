@@ -93,8 +93,22 @@ EinSprCells:
         inc hl
         inc hl
         inc hl
-        ld a, (hl)              ; height
+        ld a, (hl)              ; divide the projected height into three paint bands
+        push af
+        srl a
+        ld b, a
+        srl a
+        add a, d
+        ld (.middle + 1), a
+        add a, b
+        ld (.base + 1), a
         inc hl
+        ld a, (hl)              ; three inks per object type
+        ld b, a
+        add a, a
+        add a, b
+        ld (.type + 1), a
+        pop af
         inc hl
         push hl
         add a, d
@@ -112,9 +126,18 @@ EinSprCells:
         ld b, a                 ; B = the row
 .row:   ld a, b
         cp 24
-        jr nc, .done
+        jp nc, .done
         push bc
         push de
+        push hl
+        ld a, 32                ; E columns from C, up to column 31
+        sub c
+        jr z, .rowDone
+        jr c, .rowDone
+        cp e
+        jr c, .n
+        ld a, e
+.n:     ld e, a                 ; (E: the row's cells, at least 1)
         ld a, b                 ; IX: the row's byte of column C in N (U
         add a, a                ; 96 on), D: its bit
         add a, a
@@ -132,39 +155,77 @@ EinSprCells:
         ld ixh, a
         ld a, c
         and 7
-        push hl
         add a, low EBitTab
         ld l, a
         ld a, high EBitTab
         adc a, 0
         ld h, a
         ld d, (hl)
-        pop hl
-.col:   ld a, c                 ; E columns from C
-        cp 32
-        jr nc, .rowDone
-        ld a, (ix + 0)
+        push de
+        ld l, 0                 ; L: this mask byte's cells
+.mc:    ld a, l
         or d
-        ld (ix + 0), a
-        ld a, (ix + 24 * MASK_ROW)
-        or d
-        ld (ix + 24 * MASK_ROW), a
+        ld l, a
         rlc d
-        jr nc, .cs
-        inc ix
-.cs:    inc c
+        call c, .flush
         dec e
-        jr nz, .col
+        jr nz, .mc
+        call .flush
+        pop de
+        ld a, b                 ; ---- the cells' ink (rows 10-23: rows above
+        cp PANO_ROW0            ; are the sky's own, src/einstein/sky.asm)
+        jr c, .rowDone
+        add a, a                ; the object's type's, by the third of its
+        add a, a                ; height the row's middle line is in
+        add a, a
+        add a, 4
+.middle: cp 0
+        ld a, 0
+        jr c, .shade
+        ld a, b
+        add a, a
+        add a, a
+        add a, a
+        add a, 4
+.base:  cp 0
+        ld a, 1
+        jr c, .shade
+        inc a
+.shade:
+.type:  add a, 0
+        ld hl, EObjectInks
+        ASSERT low EObjectInks == 0
+        add a, l
+        ld l, a
+        ld d, (hl)
+        call EinMaterialCell    ; (BC, DE kept)
+        ld a, d
+.pt:    ld (hl), a
+        inc l
+        dec e
+        jr nz, .pt
 .rowDone:
+        pop hl
         pop de
         pop bc
         ld a, b
         inc b
         cp h
-        jr nz, .row
+        jp nz, .row
 .done:  pop hl
         pop bc
-        djnz .cmd
+        dec b
+        jp nz, .cmd
+        ret
+; (L: a mask byte's cells into N and U at IX; IX on, L clear)
+.flush: ld a, (ix + 0)
+        or l
+        ld (ix + 0), a
+        ld a, (ix + 24 * MASK_ROW)
+        or l
+        ld (ix + 24 * MASK_ROW), a
+        inc ix
+        ld l, 0
         ret
 
 ; B = row, C = column, IX = a mask: set its bit (BC, DE, IX kept)
@@ -325,7 +386,7 @@ EinComposeStart:
         or 1                    ; NZ
         ret
 
-; B = row, C = column -> ESprM: screen B's 8 bytes of the cell (the
+; B = row, C = column -> EPat: screen B's 8 bytes of the cell (the
 ; silhouette's pixels); Z if there are none (BC kept)
 EinSprMask:
         ld a, b
@@ -339,7 +400,7 @@ EinSprMask:
         rrca
         or c
         ld l, a
-        ld de, ESprM
+        ld de, EPat
         push bc
         ld c, 0
         DUP 7
@@ -357,9 +418,44 @@ EinSprMask:
         or a
         ret
 
+; B = row (4-23), C = column -> HL: the projected object's ink for the cell
+; (EObjectUpper: rows 4-11, EObjectLower: rows 12-23, each page-aligned).
+; BC, DE kept.
+EinMaterialCell:
+        ld a, b
+        sub 12
+        jr nc, .low
+        add a, 8                ; (rows 4-11: 0-7, x 32)
+        rrca
+        rrca
+        rrca
+        or c
+        ld l, a
+        ld h, high EObjectUpper
+        ret
+.low:   rrca                    ; (rows 12-23: 0-11, x 32)
+        rrca
+        rrca
+        ld l, a
+        and 3
+        add a, high EObjectLower
+        ld h, a
+        ld a, l
+        and $E0
+        or c
+        ld l, a
+        ret
+
 ; B = row (10-11), C = column under a silhouette: its own pattern, the
 ; panorama's (copy 0, its column EPanoCol + C) XOR the silhouette
 EinPanoCell:
+        call EinMaterialCell
+        ld a, (hl)
+        rlca
+        rlca
+        rlca
+        rlca
+        ld (.material + 1), a
         call EinSprMask
         ret z
         ld a, b                 ; EPanoSpr + ((row - 10) * 32 + column) * 8
@@ -383,16 +479,61 @@ EinPanoCell:
         ld l, a
         ld a, b
         sub PANO_ROW0
-        ld h, a                 ; (x 256: 8 lines of 32)
+        ld h, a
         push bc
+        push hl                 ; scanline-major panorama pixel offset
+        ld a, h                 ; tile-major ink offset
+        rrca
+        rrca
+        rrca
+        or l
+        ld l, a
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld bc, PANO_CACHE + 512
+        add hl, bc
+        push hl
+        pop ix
+        push de
+        ld hl, EPanoInkBuf - EPanoSpr
+        add hl, de
+        push hl
+        pop iy
+        pop de
+        pop hl
         ld bc, PANO_CACHE
         add hl, bc
-        ld bc, ESprM
+        ld bc, EPat
         ld a, 8
 .ln:    push af
         ld a, (bc)
-        xor (hl)
-        ld (de), a
+        or a
+        jr z, .bare
+        push af
+        ld a, (ix)
+        and 15
+.material: or 0
+        ld (iy), a
+        rlca
+        rlca
+        rlca
+        rlca
+        cp (iy)
+        ld a, (iy)
+        jr nz, .ink
+        xor $F0
+        or $10
+.ink:   ld (iy), a
+        pop af
+        jr .put
+.bare:  ld a, (ix)
+        ld (iy), a
+        ld a, (hl)
+.put:   ld (de), a
+        inc ix
+        inc iy
         inc bc
         inc de
         push de
@@ -447,6 +588,15 @@ EinPanoSend:
         ld bc, EPanoSpr
         add hl, bc
         ld b, 8
+        push de
+        push hl
+        call EinWrite
+        pop hl
+        ld de, EPanoInkBuf - EPanoSpr
+        add hl, de
+        pop de
+        set 5, d
+        ld b, 8
         call EinWrite
         pop hl
         pop bc
@@ -472,10 +622,14 @@ EinRoadCompose:
         add hl, de
         ld a, (hl)
         ld (ESlotN), a
-        ld hl, ERowHi
+        ld hl, ERowHi           ; (bit 7: taken from the top down)
         add hl, de
         ld a, (hl)
+        and $7F
         ld (ESlotTop), a
+        xor (hl)
+        rlca
+        ld (EDown), a
         ld ix, EMaskN
         call EinMaskRow
         ld c, 0
@@ -508,22 +662,59 @@ EinRoadCompose:
         ld hl, (EComposePtr)    ; the portal's cells
         jp EinPortalCells
 
-; B = a car row (20-23), HL = its names: the car's (CAR_COL on)
+; B = a car row (20-23), HL = its names: the car's (CAR_COL on). The paper
+; under each of its cells noted (ECarGround); a cell whose paper changed is
+; to be recoloured (ECarDirty)
 EinCarNames:
         ld a, b
         sub CAR_ROW
+        push af                 ; (the car row)
         add a, a
         add a, a
         add a, a
+        ld e, a
+        ld d, 0
+        ld ix, ECarGround
+        add ix, de
         add a, CAR_PAT
+        ld c, a                 ; C: the car's name
         ld de, CAR_COL
         add hl, de
-        ld c, CAR_W
-.car:   ld (hl), a
+        ld de, $0100            ; D: the cell's bit, E: the cells changed
+        ASSERT CAR_W == 8
+.car:   ld a, (hl)              ; the paper under it: a solid cell's colour,
+        cp SLOT_FIRST           ; the verge's, or the road's (a kerb edge, a
+        jr c, .surface          ; slot)
+        cp GROUND_PAT
+        jr z, .g0
+        cp GROUND_PAT + 1
+        ld a, (ECR)
+        jr nz, .surface
+        ld a, (EGroundPapers + 1)
+        jr .surface
+.g0:    ld a, (EGroundPapers)
+.surface:
+        cp (ix)
+        jr z, .same
+        ld (ix), a
+        ld a, e
+        or d
+        ld e, a
+.same:  inc ix
+        ld (hl), c
         inc hl
-        inc a
-        dec c
-        jr nz, .car
+        inc c
+        sla d
+        jr nc, .car
+        pop af
+        add a, low ECarDirty
+        ld l, a
+        ld a, high ECarDirty
+        adc a, 0
+        ld h, a
+        ld a, (hl)
+        or e
+        ld (hl), a
         ret
 
 ; B = row (12-23), C = column under a silhouette: a slot of the row's, the
@@ -547,26 +738,29 @@ EinSprCell:
         inc h
 .h:     ld (ESprName), hl
         ld a, (hl)              ; the road's name there
+        call EinGroundPaper
         cp SLOT_FIRST
         jr nc, .slot
-        ld e, a                 ; a solid colour: the silhouette in its ink
-        ld a, (ERoadPaperT)
-        cp e
-        ld a, (ERoadInkT)
-        jr z, .ink
-        ld a, 1                 ; (black: grass, kerbs)
-.ink:   rlca
-        rlca
-        rlca
-        rlca
-        or e
-        push af
-        ld hl, ESprM
-        ld de, EPat
-        ld bc, 8
-        ldir
+        push af                 ; one ink band from the projected object
+        call EinMaterialCell
+        ld e, (hl)
         pop af
-        jr .commit
+        cp e
+        jr nz, .contrast
+        ld e, 1
+        cp e
+        jr nz, .contrast
+        ld e, 15
+.contrast:
+        ld d, a
+        ld a, e
+        rlca
+        rlca
+        rlca
+        rlca
+        ld e, d
+        or e
+        jr .commit              ; (its pixels: the silhouette's, in EPat)
 .slot:  ld e, a                  ; a ready-made kerb edge (its third's)?
         ld a, b
         cp 16
@@ -584,18 +778,14 @@ EinSprCell:
         ld de, EStatByte
         add hl, de
         ld e, (hl)
-        ld hl, ESprM
-        push bc
-        ld bc, EPat
+        ld hl, EPat             ; (the silhouette's pixels XOR it)
         ld d, 8
 .xs:    ld a, (hl)
         xor e
-        ld (bc), a
-        inc hl
-        inc bc
+        ld (hl), a
+        inc l
         dec d
         jr nz, .xs
-        pop bc
         pop hl
         ld de, EStatCol
         add hl, de
@@ -619,21 +809,14 @@ EinSprCell:
         add hl, de
         ld de, SlotShadow
         add hl, de
-        ld de, ESprM
-        push bc
-        ld bc, EPat
-        ld a, 8
-.x:     push af
-        ld a, (de)
+        ld de, EPat             ; (the silhouette's pixels XOR it)
+        ld b, 8
+.x:     ld a, (de)
         xor (hl)
-        ld (bc), a
+        ld (de), a
         inc hl
-        inc de
-        inc bc
-        pop af
-        dec a
-        jr nz, .x
-        pop bc
+        inc e
+        djnz .x
         ld a, (hl)              ; its colour
 .commit:
         call EinCommitSlot
@@ -646,12 +829,10 @@ EinSprCell:
 ; ---------------------------------------------------------------------------
 EComposePtr:    dw 0
 ESprName:       dw 0
-ESprM:          ds 8
-        ASSERT high ESprM == high (ESprM + 7)
 ERoadPaperT:    db 0            ; the road's paper and ink (TMS)
 ERoadInkT:      db 0
 EPanoCol:       db 0            ; the panorama's column at the left edge
 EPanoIdx:       db 0
 EPanoN:         db 0
-ERowLo:         ds 12           ; per road row: its road's slots end, its
-ERowHi:         ds 12           ; centre line's begin
+ERowLo:         ds 12           ; per road row: its silhouettes' free slots
+ERowHi:         ds 12           ; (ESlotN, ESlotTop; ERowHi bit 7: EDown)

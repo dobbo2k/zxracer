@@ -386,6 +386,18 @@ LoadPacks:
         inc hl
         ld b, (hl)
         ex de, hl
+        IFDEF EINSTEIN
+        ; InitHud marks cells in the name-buffer area. Keep the compressed
+        ; streams in screen-A scratch until all of the HUD writes are done.
+        ld (EinArtLength + 1), bc
+        ld de, BaseNames
+        call EinRead
+        ld hl, BaseNames
+        ld de, THEME_CACHE + 6
+        ld bc, 9
+        ldir
+        ret
+        ELSE
         ld de, ART_INPUT
         call CopyFromBank
         ld hl, ART_INPUT
@@ -443,6 +455,8 @@ LoadPacks:
         dec c
         jr nz, .row
         ret
+
+        ENDIF
 
 ; Scratch in the hidden display, beyond the overlay and below screen-A data.
 ART_INPUT       EQU $4A00
@@ -544,6 +558,7 @@ OvResetDisplay:
         call InitHud
         ; Fixed sky artwork sits below the message and between the portraits.
         ; Copy just once, before CopyScreenBA duplicates the complete display.
+        IFNDEF EINSTEIN
         ld hl, ART_BITMAP + 512
         ld b, 48
 .cloud: push bc
@@ -565,6 +580,7 @@ OvResetDisplay:
         ld a, b
         cp 80
         jr nz, .cloud
+        ENDIF
         ld hl, $D800 + 3 * 32
         call PaintRaceSky
         ; road state pages (per buffer: St1 D/E = 0, St2 lane = $FF,

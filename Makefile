@@ -136,7 +136,7 @@ EINSTEIN_REPO   ?= $(subst \,/,$(USERPROFILE))/OneDrive/Documents/GitHub/einstei
 EINSTEIN_SYSTEM ?= $(EINSTEIN_REPO)/roms/disassembled/Einstein/__XTALDOS131/SYSTEM131.CPM
 EINSTEIN_ROM    ?= $(EINSTEIN_REPO)/roms/Tatung X-TAL MOS v1.2 (1983)(Tatung).rom
 EIN_SRC := $(wildcard src/einstein/*.asm)
-EIN_GEN := build/einstein/packs.asm build/einstein/stagepacks.asm build/einstein/music_notes.asm
+EIN_GEN := build/einstein/einstein_objects.asm build/einstein/spider.asm build/einstein/packs.asm build/einstein/stagepacks.asm build/einstein/music_notes.asm
 EIN_DAT := build/einstein/stages.asm build/einstein/stageov_pack.asm build/einstein/screens_data.asm build/einstein/stages_raw.dat build/einstein/reserve.txt
 
 einstein: build/einstein/speedrun.dsk
@@ -144,12 +144,12 @@ einstein: build/einstein/speedrun.dsk
 build/einstein:
 	mkdir -p build/einstein
 
-$(EIN_GEN) &: tools/make_einstein.py build/stages.asm | build/einstein
+$(EIN_GEN) &: tools/einstein_art.py tools/einstein_illustration.py tools/make_einstein.py build/stages.asm | build/einstein
 	$(PYTHON) tools/make_einstein.py gen assets/stages.yaml build/einstein
 
 # every stage's packs, each assembled where it runs, then STAGES.DAT
 build/einstein/stagepacks.stamp: build/einstein/stagepacks.asm
-	$(ASM) --nologo --msg=war -Ibuild build/einstein/stagepacks.asm
+	$(ASM) --nologo --msg=war -Ibuild -Ibuild/einstein build/einstein/stagepacks.asm
 	touch $@
 
 $(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py tools/make_screens.py

@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import wave
+from pathlib import Path
 
 import numpy as np
 
@@ -26,6 +27,51 @@ def run(harness, rom, dsk, sym, *commands):
             k, v = line.split("=", 1)
             values.setdefault(k, []).append(v)
     return values
+
+
+def check_artwork(harness, rom, dsk, sym, outdir):
+    # Compare the actual VDP against the generated artwork. Revisit the coast
+    # after the other fourteen stages to exercise the overlay sharing sky RAM.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+    import einstein_art
+    import yaml
+    cfg = yaml.safe_load((Path(__file__).resolve().parents[1] / "assets/stages.yaml").read_text())
+    stages = [stage for row in cfg["rows"] for stage in row]
+    route = [*range(len(stages)), 0]
+    commands = ["boot", "SPEEDRUN"]
+    for stage in route:
+        commands += ["stage", str(stage), "frames", "80", "vram", "1B00", "57",
+                     "vram", "3800", "416", "vram", "0300", "256",
+                     "vram", "2C00", "512", "shot", str(Path(outdir) / f"round_{stage:02}.ppm")]
+    values = run(harness, rom, dsk, sym, *commands, "stats")
+    horizons = values["vram_2C00"]
+    if len(set(horizons)) != 15 or horizons[0] != horizons[-1]:
+        sys.exit("einstein_check: scrolling horizon colour planes did not survive stage loading")
+    for stage, shown, inks in zip(route, values["vram_0300"], horizons):
+        spec = stages[stage]
+        scene = einstein_art.landscape(spec, cfg["themes"][spec["theme"]])
+        pixels, _ = einstein_art.planes(scene.crop((0, 24, 256, 32)))
+        _, colours = einstein_art.planes(scene.crop((0, 80, 256, 96)))
+        if colours != bytes.fromhex(inks):
+            sys.exit(f"einstein_check: native panorama colours differ on stage {stage}")
+        if pixels != bytes.fromhex(shown):
+            sys.exit(f"einstein_check: native sky pixels differ on stage {stage}")
+    for table, tiles in zip(values["vram_1B00"], values["vram_3800"]):
+        attrs, patterns = bytes.fromhex(table), bytes.fromhex(tiles)
+        if attrs[48:57] != bytes((177,100,48,8,177,143,48,8,208)):
+            sys.exit("einstein_check: tail lamp sprites missing")
+        for n in range(0, 48, 4):
+            y, x, tile, _ = attrs[n:n+4]
+            for line in range(8):
+                if not 160 <= y + 1 + line < 192:
+                    continue
+                for dx in range(16):
+                    byte = patterns[tile*8 + line + (dx//8)*16]
+                    if 96 <= x+dx < 160 and byte & (128 >> (dx%8)):
+                        sys.exit("einstein_check: lane marker visible through the Spider")
+    if values["fast_vram_accesses"] != ["0"]:
+        sys.exit("einstein_check: stage artwork exceeded the VDP access rate")
+    print("einstein_check: verified the native sky and scrolling horizon across 15 stages")
 
 
 def main(harness, rom, dsk, sym, outdir):
@@ -69,6 +115,7 @@ def main(harness, rom, dsk, sym, outdir):
             os.remove(p)
     if failures:
         sys.exit("einstein_check: FAILED: " + "; ".join(failures))
+    check_artwork(harness, rom, dsk, sym, outdir)
     print("einstein_check: passed")
 
 

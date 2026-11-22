@@ -57,41 +57,38 @@ RequestFlip:
 ; speed, the picture not being drawn. Row by row, the row's changed slots
 ; and then its names, so a row never shows new names over old patterns.
 EinUpload:
-        ld hl, BLANK_UNITS
-        ld (EBudget), hl
+        ld a, (ELongWait)       ; (timed: the CTC's wait started as the frame
+        ld (EBudget), a         ; was seen; else paced)
         ld hl, DirtyList
         ld (EDirtyPtr), hl
-        ld a, (DirtyN)
-        ld (EDirtyLeft), a
         call EinDashSend        ; (the centre line's sprites)
         call EinPanoSend        ; (the panorama's cells under silhouettes)
         ld c, MIRROR_ROWS       ; (the panorama's and the road's rows)
 .row:   push bc
-.slot:  ld a, (EDirtyLeft)      ; this row's changed slots
+        ld a, c                 ; a road row's changed slots: EDirtyRowN of
+        sub ROAD_ROW0           ; them, next in DirtyList
+        jr c, .names
+        ld e, a
+        add a, low EDirtyRowN
+        ld l, a
+        ld a, high EDirtyRowN
+        adc a, 0
+        ld h, a
+        ld a, (hl)
         or a
         jr z, .names
+        ld b, a
+        call EinSlotBase
         ld hl, (EDirtyPtr)
+.slot:  ld a, (hl)
         inc hl
-        ld a, (hl)              ; what changed, the row above bit 2
-        rrca
-        rrca
-        and $0F
-        add a, ROAD_ROW0
-        cp c
-        jr nz, .names
-        dec hl
-        ld a, (hl)
-        inc hl
-        ld e, (hl)
-        inc hl
-        ld (EDirtyPtr), hl
-        ld hl, EDirtyLeft
-        dec (hl)
         push bc
-        ld c, e
+        push hl
         call EinSendSlot
+        pop hl
         pop bc
-        jr .slot
+        djnz .slot
+        ld (EDirtyPtr), hl
 .names: ld a, c                 ; then its names, if it was drawn again
         add a, low ERowDrawn
         ld l, a
@@ -129,36 +126,37 @@ EinUpload:
         call EinCarSync         ; ---- the car's cells
         jp EinMirror            ; ---- the sky's cells written
 
-; The writes' budget in the vertical blank (about 30,800 T): units of a
-; byte at OTIR's 21 T, each write costing ITEM_UNITS more for its address
-; and calls. Past it, writes are paced (32 T) and safe in the picture.
-BLANK_UNITS     EQU 750
-ITEM_UNITS      EQU 40
+; The writes in the vertical blank (30,830 T) go at full speed while it
+; lasts, by the clock: the interrupt saw the frame at most 1 ms (and its own
+; few hundred T) into the blank, and started the CTC's 16 ms wait then
+; (src/einstein/boot.asm), a count each 256 T down from 250. A write starts
+; at full speed only while the count leaves it time at 32 T a byte before
+; BLANK_END (100 counts, 25,600 T: the blank's 26,600 T after the latest
+; start, less a margin). Past it, writes are paced (32 T), safe in the
+; picture. A frame seen at the first poll after a wait (late, by an unknown
+; time: no wait started) is sent paced.
+BLANK_END       EQU 250 - 100
 
-; B = bytes about to be written: spend them (DE, HL, B kept). Carry: the
-; budget is gone, write paced.
+; B = bytes about to be written (B, C, DE, HL kept): carry, write them paced.
+; EBudget: 0 paced, 1 timed (EinUpload), else any speed (the display off).
 EinSpend:
-        push hl
-        ld hl, (EBudget)
-        ld a, l
-        sub b
-        ld l, a
-        jr nc, .s
-        dec h
-        jp m, .out
-.s:     ld a, l
-        sub ITEM_UNITS
-        ld l, a
-        jr nc, .k
-        dec h
-        jp m, .out
-.k:     ld (EBudget), hl
-        pop hl
-        or a
+        ld a, (EBudget)
+        cp 1
+        jr z, .timed
+        sub 1                   ; (0: carry)
         ret
-.out:   ld hl, 0
-        ld (EBudget), hl
-        pop hl
+.timed: ld a, b                 ; at least BLANK_END + 1 + B / 8 counts left
+        rrca
+        rrca
+        rrca
+        and 31
+        add a, BLANK_END + 1
+        ld (.need + 1), a
+        in a, (EIN_CTC2)
+.need:  cp 0
+        ret nc
+        xor a                   ; past it: paced from now on (the count goes
+        ld (EBudget), a         ; on down, and from 0 starts again at 250)
         scf
         ret
 
@@ -169,8 +167,17 @@ EinWrite:
         jp c, VdpWrite
         call VdpAddr
         ld c, EIN_VDP_DATA
-        otir
-        ret
+.chunk: ld a, b                 ; (the unrolled OUTIs: 16 T a byte, 32 at a
+        sub 33                  ; time, src/main.asm)
+        jr c, .tail
+        call OutiEnd - 64
+        jr .chunk
+.tail:  add a, 33               ; (1-32 left)
+        add a, a
+        neg
+        ld (.jp + 1), a
+.jp:    jp OutiEnd - 256        ; (low byte patched: OutiEnd - 2 * B)
+        ASSERT low OutiEnd == 0
 
 ; DE = VRAM address, B = count (1-255), L = value: as EinWrite
 EinFill:
@@ -194,57 +201,73 @@ EinFill:
 
 EBudget:        dw 0
 EDirtyPtr:      dw 0
-EDirtyLeft:     db 0
+ERowShadow:     dw 0            ; (EinSlotBase: the row's first slot's bytes in
+ERowVram:       dw 0            ; SlotShadow, its pattern's VRAM address)
 
-; A = slot (a SlotShadow index), C = what changed (bit 0 the pixels, bit 1
-; the colour): from SlotShadow into VRAM
+; E = road row (0-11): its first slot's bytes and VRAM address (ERowSlotTab:
+; ESlotPtr, ESlotName0), for EinSendSlot. BC kept.
+EinSlotBase:
+        ld a, e
+        add a, a
+        add a, e                ; (x 3)
+        add a, low ERowSlotTab
+        ld l, a
+        ld a, high ERowSlotTab
+        adc a, 0
+        ld h, a
+        ld a, (hl)
+        inc hl
+        ld (ERowShadow), a
+        ld a, (hl)
+        inc hl
+        ld (ERowShadow + 1), a
+        ld l, (hl)
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld a, e                 ; (rows 12-15: the middle third; on: the bottom)
+        cp 4
+        ld a, high (VRAM_PAT + $800)
+        jr c, .t
+        ld a, high (VRAM_PAT + $1000)
+.t:     add a, h
+        ld h, a
+        ld (ERowVram), hl
+        ret
+
+; A = a changed slot of the row (EinSlotBase): bits 0-4 the slot in the row,
+; bit 6 its pixels changed, bit 7 its colour: from SlotShadow into VRAM
 EinSendSlot:
         ld b, a
-        ld d, high (VRAM_PAT + $800)    ; the middle third
-        cp 4 * SLOTS_T1
-        jr nc, .t2
-        add a, SLOT_FIRST
-        jr .p
-.t2:    ld d, high (VRAM_PAT + $1000)   ; the bottom third
-        add a, SLOT_FIRST - 4 * SLOTS_T1
-.p:     ld l, a                 ; DE = the pattern's VRAM address
-        ld h, 0
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        ld a, h
-        add a, d
-        ld d, a
-        ld e, l
-        ld a, b                 ; HL = SlotShadow + slot * 9
+        and $C0
+        ld c, a                 ; C: what changed
+        xor b
+        ld b, a                 ; B: the slot
+        add a, a
+        add a, a
+        add a, a
+        ld e, a                 ; (x 8: its pattern)
+        add a, b                ; (x 9: its bytes; a row's slots: < 256)
+        ld hl, (ERowShadow)
+        add a, l
         ld l, a
-        ld h, 0
-        push de
-        ld d, h
-        ld e, l
-        add hl, hl
-        add hl, hl
-        add hl, hl
+        jr nc, .h
+        inc h
+.h:     push hl
+        ld hl, (ERowVram)       ; DE = the pattern's VRAM address
+        ld d, 0
         add hl, de
-        ld de, SlotShadow
-        add hl, de
-        pop de
-        push hl                 ; its cost: 8 units a part, and ITEM_UNITS
-        ld hl, (EBudget)
+        ex de, hl
+        ld b, 8                 ; its bytes: 8 a part
         ld a, c
-        cp 3
-        ld a, low -(8 + ITEM_UNITS)
-        jr nz, .c1
-        ld a, low -(16 + ITEM_UNITS)
-.c1:    push de
-        ld e, a
-        ld d, $FF
-        add hl, de              ; (carry: it fits)
-        pop de
-        jr nc, .paced
-        ld (EBudget), hl
+        cp $C0
+        jr c, .c1
+        ld b, 16
+.c1:    call EinSpend
+        jr c, .paced
         pop hl
-        bit 0, c                ; ---- at full speed
+        bit 6, c                ; ---- at full speed
         jr z, .fc
         push bc
         call VdpAddr
@@ -259,7 +282,7 @@ EinSendSlot:
         ld l, a
         jr nc, .fc2
         inc h
-.fc2:   bit 1, c
+.fc2:   bit 7, c
         ret z
         ld a, d                 ; the colour, on all 8 lines
         add a, high VRAM_COL
@@ -270,10 +293,8 @@ EinSendSlot:
         out (EIN_VDP_DATA), a
         EDUP
         ret
-.paced: ld hl, 0                ; ---- the budget spent: paced, 32 T a byte
-        ld (EBudget), hl
-        pop hl
-        bit 0, c
+.paced: pop hl                  ; ---- past the blank: paced, 32 T a byte
+        bit 6, c
         jr z, .pc
         push bc
         call VdpAddr
@@ -292,7 +313,7 @@ EinSendSlot:
         ld l, a
         jr nc, .pc2
         inc h
-.pc2:   bit 1, c
+.pc2:   bit 7, c
         ret z
         ld a, d
         add a, high VRAM_COL
@@ -318,7 +339,24 @@ EinSendSlot:
 ; panorama's, grass below; no slot in use.
 EinResetDisplay:
         di                      ; (the interrupt reads the VDP's status)
-        call EinFrontOff        ; (the game's display again)
+        ld hl, BaseNames
+        ld de, NameBuf
+EinArtLength: ld bc, 0
+        ldir
+        ld hl, NameBuf + 9
+        ld de, ESkyPixels
+        call UnLZ
+        ld de, ESkyInks
+        call UnLZ
+        ld de, PANO_CACHE
+        call UnLZ
+        ld de, EObjectInks
+        call UnLZ
+        xor a                   ; the packed stream may span the old object list
+        ld (CmdListB), a
+        inc a
+        ld (EOvClobbered), a
+        call EinFrontOff        ; the game's display again
         call VdpInit            ; (a disc read may have let MOS at the VDP)
         call VdpOff
         ld hl, $7FFF            ; (the display off: any speed)
@@ -335,12 +373,14 @@ EinResetDisplay:
         call .solids
         ld de, VRAM_COL + $1000
         call .solids
+        call EinGroundInit
         call EinStaticInit      ; the bottom third's ready-made patterns
         call EinDashReset       ; the centre line's sprites
         ld hl, EDashAttr
         ld de, VRAM_SPRATTR
-        ld b, 12 * 4 + 1
+        ld b, 12 * 4
         call VdpWrite
+        call EinTailLamps
         xor a
         ld (EDashAttrNew), a
         call EinMirrorAll
@@ -416,28 +456,14 @@ EinResetDisplay:
 .d:     ld (hl), 0
         inc hl
         djnz .d
-        ld hl, ECarPix          ; (none of the car's: all differ)
-        ld de, ECarPix + 1
-        ld bc, 4 * CAR_W * 8 - 1
-        ld (hl), $55
-        ldir
-        ld hl, EinCarAttr
-        ld de, EinCarAttr + 1
-        ld bc, 4 * CAR_W - 1
-        ld (hl), $FF
-        ldir
-        ld a, 1                 ; the car: drawn again, sent again
-        ld (CarDirty), a
-        ld (EinCarDirty), a
-        ld (EinCarFull), a
+        ld a, $FF
+        ld (CarShownB), a
         ld hl, SlotShadow       ; the slots: as VRAM, all clear
         ld de, SlotShadow + 1
         ld bc, N_SLOTS * SLOT_SIZE - 1
         ld (hl), 0
         ldir
-        xor a
-        ld (DirtyN), a
-        inc a
+        ld a, 1                 ; (no slot changed: EinDraw starts the list)
         ld (EinShape), a        ; every row to be drawn
         ld (EinForce), a
         call VdpOn

@@ -38,19 +38,19 @@ start:
         IFDEF EINSTEIN
 MainLoop:
         call CheckPause
-        call ReadInput
+        call EinReadInput       ; (ReadInput, the Einstein's way)
         call UpdatePlayer
         call RoadPrepare
         call WaitFlip           ; (the last frame sent: its buffers free)
         call EraseSprites       ; traffic and scenery into screen B, as ever
         call DrawSprites
-        call DrawCar            ; (into screen B: its cells are sent)
-        call EinCarPrep         ; (a new frame of it: made ready to send whole)
+        call EinCarPrep         ; select the native Spider pose for this frame
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
         call EinSprCells        ; the cells they cover (src/einstein/sprites.asm)
         call EinPortal          ; and the portal's (src/einstein/portal.asm)
         call EinHorizon
         call EinDraw            ; the frame into RAM: names, patterns (src/einstein)
+        call EinCarGroundSync
         call DrawHud            ; (into screen B: the cells it writes are sent)
         call EinFlash           ; (the timer's last ten seconds)
         call RequestFlip        ; then into VRAM, in the vertical blank
@@ -122,6 +122,18 @@ CodeEnd:
 TablesEnd:
         ASSERT TablesEnd <= PANO_LDI_END - 64
         INCLUDE "tyres.asm"     ; (in the gap before the panorama's chain)
+        IFDEF EINSTEIN          ; (no panorama bitmap nor road pass 2: their
+        INCLUDE "einstein/static.asm"   ; chains' room for code)
+        ASSERT $ <= PANO_LDI_END - 64
+; Unrolled OUTI chain for VRAM in the blank (src/einstein/flip.asm
+; EinWrite): entered at OutiEnd - 2*n for n bytes
+        ORG PANO_LDI_END - 64
+        DUP 32
+        outi
+        EDUP
+OutiEnd:
+        ret
+        ELSE
         ASSERT $ <= PANO_LDI_END - 64
 
 ; Unrolled LDI chain for the panorama: entered at PanoLdiEnd - 2*n
@@ -146,6 +158,7 @@ PanoLdiEnd:
 DualEnd:
         ret
         ASSERT high (DualEnd - 7 * STRIP_PAD) == high DualEnd
+        ENDIF
         INCLUDE "respawn.asm"   ; (small pieces in the gap before the XOR chain)
         INCLUDE "lights.asm"
         ASSERT $ <= XOR_END - 5 * 8
@@ -241,9 +254,19 @@ CmdListB        EQU $10000 - THEME_TOP
 ; sprite, the font and the player's car; then code that is not time-critical
 ; (bank 5 is contended). The track cache follows.
         ORG SCN_DATA
+        IFDEF EINSTEIN
+        INCLUDE "einstein_objects.asm"
+        ELSE
         INCLUDE "resident_data.asm"
+        ENDIF
         INCLUDE "font_data.asm"
+        IFDEF EINSTEIN
+        INCLUDE "spider.asm"
+        INCLUDE "einstein/ground.asm"
+        INCLUDE "einstein/car.asm"
+        ELSE
         INCLUDE "car_data.asm"
+        ENDIF
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
         INCLUDE "crew.asm"      ; the crew's crash close-ups

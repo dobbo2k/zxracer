@@ -56,26 +56,85 @@ EinDashRedo:                    ; (ERow, EI, ERB, ERC)
         cp $FF
         jp z, .none
         ld (EDashXk), a
-        call EinDashHideRow     ; (EDashHideNow, EDashHideAny: B kept)
-        ld de, $FFFF            ; D, E: the left and right bytes' masks
-        ld a, (EDashHideAny)
-        or a
-        jr z, .full
-        ld a, b                 ; the three cells under its 16 pixels
+        ld b, a                 ; B: x
+        rrca                    ; ---- the three cells under its 16 pixels
+        rrca                    ; (x >> 3 on): those this frame's silhouettes,
+        rrca                    ; the portal or the car cover take its pixels
+        and 31                  ; out (past column 31: off the screen)
+        ld c, a                 ; C: the first cell
         rrca
         rrca
         rrca
-        and 31
-        ld c, a
-        call .cell
-        ld d, a
-        inc c
-        call .cell
+        and 3
+        ld (.j + 1), a          ; (its byte in a mask row)
         ld e, a
-        inc c
-        call .cell
-        ld l, a                 ; D E L, shifted left by x & 7
-        ld a, b
+        ld a, (ERow)
+        add a, ROAD_ROW0
+        add a, a
+        add a, a
+        add a, e
+        ld e, a
+        ld d, 0
+        ld ix, EMaskPOld        ; (EMaskP 96 bytes before it, EMaskN 96 after)
+        ASSERT EMaskPOld - EMaskP == 96 && EMaskN - EMaskPOld == 96
+        add ix, de
+        ld a, (ix - 96)
+        or (ix + 96)
+        ld e, a                 ; E: the first cell's byte
+        ld d, 0                 ; D: the next's
+        ld a, c
+        cp 24
+        jr nc, .car
+        ld a, (ix - 95)
+        or (ix + 97)
+        ld d, a
+.car:   ld a, (ERow)            ; (rows 20-23: the car's columns 12-19)
+        cp CAR_ROW - ROAD_ROW0
+        jr c, .win
+        ASSERT CAR_COL == 12 && CAR_W == 8
+.j:     ld a, 0
+        dec a
+        jr z, .j1
+        inc a
+        jr z, .j0
+        cp 2
+        jr nz, .win             ; (byte 3: none)
+        ld a, e                 ; byte 2: columns 16-19
+        or $0F
+        ld e, a
+        jr .win
+.j1:    ld a, e                 ; byte 1: 12-15, and byte 2's
+        or $F0
+        ld e, a
+        ld a, d
+        or $0F
+        ld d, a
+        jr .win
+.j0:    ld a, d                 ; byte 0: byte 1's
+        or $F0
+        ld d, a
+.win:   ld a, c                 ; the three cells' bits down to bits 0-2
+        and 7
+        jr z, .w0
+.wr:    srl d
+        rr e
+        dec a
+        jr nz, .wr
+.w0:    ld a, e
+        and 7
+        ld de, $FFFF            ; D, E: the left and right bytes' masks
+        jr z, .full             ; (none covered)
+        ld l, e                 ; L: the third cell's
+        rra
+        jr nc, .v1
+        ld d, 0
+.v1:    rra
+        jr nc, .v2
+        ld e, 0
+.v2:    rra
+        jr nc, .v3
+        ld l, 0
+.v3:    ld a, b                 ; D E L, shifted left by x & 7
         and 7
         jr z, .full
         ld b, a
@@ -324,39 +383,6 @@ EinDashRedo:                    ; (ERow, EI, ERB, ERC)
         inc de
         pop hl
         ret
-; C = a cell -> A: its pixels' mask, FF if shown, 0 if hidden (or past 31)
-.cell:  ld a, c
-        cp 32
-        ld a, 0
-        ret nc
-        push hl
-        push de
-        ld a, c
-        rrca
-        rrca
-        rrca
-        and 3
-        add a, low EDashHideNow
-        ld l, a
-        ld a, high EDashHideNow
-        adc a, 0
-        ld h, a
-        ld a, c
-        and 7
-        add a, low EBitTab
-        ld e, a
-        ld a, high EBitTab
-        adc a, 0
-        ld d, a
-        ld a, (de)
-        and (hl)
-        pop de
-        pop hl
-        ld a, 0
-        ret nz
-        dec a
-        ret
-
 ; The row (ERow): no centre line
 EinDashNone:
         ld a, (ERow)
@@ -366,67 +392,6 @@ EinDashNone:
         add hl, de
         ld (hl), 1
         jp EinDashRedo.none
-
-; ERow -> EDashHideNow: its cells this frame's silhouettes, the portal or
-; the car cover; EDashHideAny: any
-EinDashHideRow:
-        ld a, (ERow)
-        add a, ROAD_ROW0
-        add a, a
-        add a, a                ; x MASK_ROW
-        ld e, a
-        ld d, 0
-        ld hl, EMaskN
-        add hl, de
-        push hl
-        ld hl, EMaskP
-        add hl, de
-        ex de, hl
-        pop hl
-        ld bc, EDashHideNow
-        ld a, (de)
-        or (hl)
-        ld (bc), a
-        inc hl
-        inc de
-        inc bc
-        ld a, (de)
-        or (hl)
-        ld (bc), a
-        inc hl
-        inc de
-        inc bc
-        ld a, (de)
-        or (hl)
-        ld (bc), a
-        inc hl
-        inc de
-        inc bc
-        ld a, (de)
-        or (hl)
-        ld (bc), a
-        ld a, (ERow)            ; the car's (rows 20-23: columns 12-19)
-        cp CAR_ROW - ROAD_ROW0
-        jr c, .any
-        ASSERT (CAR_COL & 7) == 4 && CAR_W == 8
-        ld hl, EDashHideNow + CAR_COL / 8
-        ld a, (hl)
-        or $F0
-        ld (hl), a
-        inc hl
-        ld a, (hl)
-        or $0F
-        ld (hl), a
-.any:   ld hl, EDashHideNow
-        ld a, (hl)
-        inc hl
-        or (hl)
-        inc hl
-        or (hl)
-        inc hl
-        or (hl)
-        ld (EDashHideAny), a
-        ret
 
 ; Each frame, after the rows: a row not drawn again that something covers
 ; now or covered last frame is done again
@@ -531,8 +496,25 @@ EinDashSend:
         ld (EDashAttrNew), a
         ld hl, EDashAttr
         ld de, VRAM_SPRATTR
-        ld b, 12 * 4 + 1
+        ld b, 12 * 4
         jp EinWrite
+
+; Two fixed sprite overlays give the four lamps their own red highlights.
+; The two overlapping centre-line sprites leave two scanline slots free.
+EinTailLamps:
+        ld hl, .pixels
+        ld de, VRAM_SPRPAT + 12 * 32
+        ld b, 32
+        call VdpWrite
+        ld hl, .attrs
+        ld de, VRAM_SPRATTR + 12 * 4
+        ld b, 9
+        jp VdpWrite
+.pixels: db 0,$70,$70
+        ds 13
+        db 0,$E0,$E0
+        ds 13
+.attrs: db 177,100,48,8, 177,143,48,8, $D0
 
 ; At a display reset (VRAM cleared): every row's sprite hidden, its
 ; patterns clear; the attributes sent
@@ -576,7 +558,5 @@ EDashMR:        db 0
 EDashAnyB:      db 0            ; any of its pixels shown
 EDashAny2:      db 0            ; any row's patterns to be sent
 EDashAttrNew:   db 0            ; the attributes to be sent
-EDashHideAny:   db 0
-EDashHideNow:   ds 4
 EDashV:         ds 4            ; a row's bytes: lines 0-3 left, right; 4-7
         ASSERT MASK_ROW == 4

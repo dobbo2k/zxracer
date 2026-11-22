@@ -94,6 +94,65 @@ EinSpecIn:
         pop bc
         ret
 
+; ReadInput (src/input.asm) for the game's loop: each of the game's keys
+; (KeyMap: its Spectrum half-row and bit) looked up straight where it is on
+; the Einstein (SpecKeys), in the rows read this TV frame; then the joystick
+EinReadInput:
+        ld a, (FrameCount)      ; the keyboard: read once a TV frame
+        ld hl, EKeyFrame
+        cp (hl)
+        call nz, EinKeyScan
+        ld hl, KeyMap
+        ld de, $0501            ; D: keys to read, E: the input bit
+        ld c, 0
+.key:   ld a, (hl)              ; its half-row (port $FE's high byte: a 0 bit)
+        inc hl
+        ld b, -1
+.h:     inc b
+        rra
+        jr c, .h
+        ld a, b                 ; SpecKeys + half-row * 10 + the bit's * 2
+        add a, a
+        ld b, a
+        add a, a
+        add a, a
+        add a, b
+        ld b, a
+        ld a, (hl)              ; its bit
+        inc hl
+.k:     rra
+        jr c, .kf
+        inc b
+        inc b
+        jr .k
+.kf:    push hl
+        ld a, b
+        add a, low SpecKeys
+        ld l, a
+        ld a, high SpecKeys
+        adc a, 0
+        ld h, a
+        ld a, (hl)              ; its Einstein row (8: none)
+        inc hl
+        add a, low EKeyRows
+        ld b, (hl)              ; its column's bit
+        ld l, a
+        ld h, high EKeyRows
+        ld a, b
+        and (hl)                ; (pressed: set)
+        pop hl
+        jr z, .up
+        ld a, c
+        or e
+        ld c, a
+.up:    sla e
+        dec d
+        jr nz, .key
+        call EinJoy             ; (the analogue stick)
+        or c
+        ld (Input), a
+        ret
+
 ; A = this TV frame: the Einstein's 8 rows read (EKeyRows, pressed keys
 ; set); the half-rows' answers to be worked out afresh (EKeyAns: 0)
 EinKeyScan:

@@ -469,7 +469,7 @@ def size_indices(name):
     return [max(1, k - lift) for k in range(len(SIZES))]
 
 
-def emit_type(name, label=None):
+def emit_type(name, label=None, *, master=None, previews=True):
     """Sprite directory and data for one type.
 
     Returns (consts, directory, data) lists of assembler lines. The
@@ -477,8 +477,9 @@ def emit_type(name, label=None):
     aliases size 1."""
     fn, factor, shifts = TYPES[name]
     label = label or f"Scn_{name}"
-    master = fn()
-    master.save(f"assets/gfx/{name}.png")
+    master = fn() if master is None else master
+    if previews:
+        master.save(f"assets/gfx/{name}.png")
     consts, dirl, data = [], [f"{label}:"], []
     indices = size_indices(name)
     for k in indices:
@@ -506,10 +507,10 @@ def emit_type(name, label=None):
     return consts, dirl, data
 
 
-def type_bytes(name):
+def type_bytes(name, master=None):
     """Bytes of sprite data emit_type produces (for memory planning)."""
     fn, factor, shifts = TYPES[name]
-    master = fn()
+    master = fn() if master is None else master
     tot = 0
     for k in set(size_indices(name)):
         nshift = shifts[k]

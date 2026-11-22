@@ -1,16 +1,10 @@
 ; ---------------------------------------------------------------------------
 ; Einstein: the sky rows (0-11)
 ;
-; Rows 0-9 mirror the Spectrum's screen B ($C000), where the game's own code
-; still draws the HUD, the message line and the sky's artwork. Each of those
-; cells has a pattern of its own (rows 0-7 the top third's 256, rows 8-9 the
-; middle third's SKY_PAT_T1 on): its 8 bitmap bytes, its attribute's ink and
-; paper on all 8 lines. PrintChar and PrintBig mark the cells they write
-; (EinMarkCell); RequestFlip sends them.
-;
-; Rows 10-11 are the panorama: both of its copies (PANO_CACHE: 16 lines of 32
-; bytes each, the second 4 pixels on) are patterns, sent at a stage start;
-; it scrolls by its 64 names (EinHorizon).
+; Rows 0-2 carry the instruments. In rows 3-9 the moving ink in screen B
+; is composited over cached native pattern and colour planes. Tunnel and
+; lamp attributes select the ordinary solid/bitmap path. The two panorama
+; rows scroll by name, in eight-pixel steps, with separate overlapping cells.
 ; ---------------------------------------------------------------------------
 
 ; HL = a cell's top line in screen B: note it to be sent (all kept)
@@ -291,6 +285,48 @@ EinSendCell:
         and 3
 .att:   or $D8                  ; (patched: $58)
         ld d, a
+        ld a, (EFrontOn)
+        or a
+        jr nz, .legacy
+        ld a, b
+        or a
+        jr nz, .notHeader
+        ld a, c
+        sub 14
+        cp 4
+        ld a, $71
+        jr nc, .noFl
+        ld a, $F4
+        jr .noFl
+.notHeader:
+        cp 3
+        jr c, .legacy
+        ld a, (TunInside)
+        or a
+        jr nz, .legacy
+        push bc
+        ld c, b
+        call SkyRowAttr
+        ld l, a
+        pop bc
+        ld a, (de)
+        cp l
+        jr nz, .legacy
+        ld a, b
+        cp MSG_ROW
+        jp nz, EinSkyCell
+        ld a, c
+        sub MSG_COL
+        cp MSG_LEN
+        jp nc, EinSkyCell
+        ld hl, (Message)
+        ld de, MsgNone
+        or a
+        sbc hl, de
+        jp z, EinSkyCell
+        ld a, $F4              ; white message on blue when one is active
+        jr .noFl
+.legacy:
         ld a, (de)
         push af
         call AttrInk
@@ -331,230 +367,141 @@ EinSendCell:
         ld b, 8
         jp EinFill
 
+; B,C = screen cell. EMPat contains only moving ink (object or message).
+; Copy the original pair back exactly on each uncovered scanline.
+EinSkyCell:
+        ld a, b
+        sub 3
+        ld h, a
+        ld a, c
+        add a, a
+        add a, a
+        add a, a
+        ld l, a
+        ld de, ESkyPixels
+        add hl, de
+        ld de, ESkyInks - ESkyPixels
+        push hl
+        add hl, de
+        push hl
+        pop ix
+        pop hl
+        ld de, EMPat
+        ld iy, ENativeInk
+        ld b, 8
+.pixels:
+        ld a, (de)
+        or a
+        jr z, .base
+        ld c, a
+        ld a, (ix)
+        and 15
+        cp 1
+        jr nz, .dark
+        or $F0
+        jr .ink
+.dark:  or $10
+.ink:   ld (iy), a
+        ld a, c
+        jr .p
+.base:  ld a, (ix)
+        ld (iy), a
+        ld a, (hl)
+.p:     inc ix
+        inc iy
+        ld (de), a
+        inc hl
+        inc de
+        djnz .pixels
+        pop de
+        push de
+        ld hl, EMPat
+        ld b, 8
+        call EinWrite
+        pop de
+        set 5, d
+        ld hl, ENativeInk
+        ld b, 8
+        jp EinWrite
+ENativeInk: ds 8
+
 ; ---------------------------------------------------------------------------
-; The player's car: src/car.asm DrawCar draws its 8 x 4 cells into screen B
-; (EinCarDirty when it does); they are the bottom third's CAR_PAT on, and
-; their names go over the road's in rows 20-23 whenever those are drawn.
+; The native Spider owns the bottom third's last 32 patterns (rows 20-23).
 CAR_PAT         EQU 256 - 32            ; 224-255
         ASSERT KERB_T2 + KERB_N <= CAR_PAT
 
-; The car's cells into VRAM, if DrawCar drew them: a new frame of it
-; (EinCarPrep made it ready) as two blocks, its patterns and colours, else
-; only the colours of the cells whose attribute changed (the cockpit's, over
-; a new colour underneath)
+; In the vertical blank: a new pose's patterns, and each car row's cells
+; recoloured (ECarSend), its first changed cell to its last
 EinCarSync:
         ld a, (ECarBlock)
         or a
-        jr z, .attrs
+        jr z, .colours
         xor a
         ld (ECarBlock), a
-        ld (EinCarDirty), a
-        ld hl, ECarPix          ; (128 bytes a write: the blank's budget counts
-        ld de, VRAM_PAT + $1000 + CAR_PAT * 8   ; each)
-        ld b, 128
-        call EinWrite
-        ld de, VRAM_PAT + $1000 + CAR_PAT * 8 + 128
-        ld b, 128
-        call EinWrite
-        ld a, (ECarColNew)      ; (the colours: if one changed)
-        or a
-        ret z
-        xor a
-        ld (ECarColNew), a
-        ld hl, ECarCol
-        ld de, VRAM_COL + $1000 + CAR_PAT * 8
-        ld b, 128
-        call EinWrite
-        ld de, VRAM_COL + $1000 + CAR_PAT * 8 + 128
-        ld b, 128
-        jp EinWrite
-.attrs: ld a, (EinCarDirty)
-        or a
-        ret z
-        xor a
-        ld (EinCarDirty), a
-        ld hl, $D800 + CAR_ROW * 32 + CAR_COL
-        ld de, EinCarAttr
-        ld b, CAR_ROW
-.ar:    ld c, CAR_COL
-.ac:    ld a, (de)
-        cp (hl)
-        jr z, .an
-        ld a, (hl)
-        ld (de), a
-        push bc
+        ld hl, ECarPix
+        ld de, VRAM_PAT + $1000 + CAR_PAT * 8
         push de
-        push hl
-        push af                 ; the colour byte: ink over paper
-        call AttrInk
-        rlca
-        rlca
-        rlca
-        rlca
-        ld l, a
-        pop af
-        call AttrPaper
-        or l
-        ld l, a
-        ld a, b                 ; VRAM: $3000 + (CAR_PAT + (row - 20) * 8 + column - 12) * 8
-        sub CAR_ROW
-        add a, a
-        add a, a
-        add a, a
-        add a, c
-        add a, CAR_PAT - CAR_COL
-        ld e, a
-        ld a, l                 ; (ECarCol too: kept as VRAM holds it)
-        push hl
-        push af
-        ld a, e
-        sub CAR_PAT
-        add a, a
-        add a, a
-        add a, a
-        ld l, a
-        ld h, 0
-        push de
-        ld de, ECarCol
-        add hl, de
+        ld b, 128
+        call EinWrite
         pop de
-        pop af
-        DUP 8
-        ld (hl), a
-        inc hl
-        EDUP
-        pop hl
-        ld d, high ($3000 / 8)
-        ex de, hl
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        ex de, hl
-        ld b, 8
-        call EinFill
-        pop hl
-        pop de
-        pop bc
-.an:    inc hl
-        inc de
-        inc c
-        ld a, c
-        cp CAR_COL + CAR_W
-        jr nz, .ac
-        ld a, l
-        add a, 32 - CAR_W
-        ld l, a
-        jr nc, .ah
-        inc h
-.ah:    inc b
-        ld a, b
-        cp 24
-        jr nz, .ar
-        ret
-
-
-; After DrawCar (the main loop): a new frame of the car (EinCarFull): its 32
-; cells' pixels and colours made ready, in pattern order (cell k = (row -
-; 20) * 8 + column - 12 at k * 8): ECarPix, ECarCol, sent whole in the next
-; vertical blank (EinCarSync); its attributes as sent (EinCarAttr)
-EinCarPrep:
-        ld a, (EinCarFull)
+        set 7, e
+        ld b, 128
+        call EinWrite
+.colours:
+        ld hl, ECarSend
+        ld c, 0                 ; C: the row's first cell (0, 8, 16, 24)
+.row:   ld a, (hl)
         or a
-        ret z
-        xor a
-        ld (EinCarFull), a
-        ld de, ECarPix
-        ld b, CAR_ROW
-.r:     ld c, CAR_COL
-.c:     ld a, b                 ; screen B's cell (the bottom third)
-        and 7
-        rrca
-        rrca
-        rrca
-        or c
-        ld l, a
-        ld h, $D0
-        ld a, e                 ; (k * 8: ECarPix is 256-aligned, and E wraps
-        ld (ECarK8), a          ; past the last cell)
-        DUP 8
-        ld a, (hl)
-        ld (de), a
-        inc e
-        inc h
-        EDUP
-        push de
-        ld a, b                 ; its attribute: $D800 + row * 32 + column
-        rrca
-        rrca
-        rrca
-        ld l, a
-        and $E0
-        or c
-        ld e, a
-        ld a, l
-        and 3
-        or $D8
+        jr z, .next
+        ld (hl), 0
+        push hl
         ld d, a
-        ld a, (de)
-        pop de
-        push de
-        push bc
-        ld c, a
-        ld a, (ECarK8)          ; its k
-        rrca
-        rrca
-        rrca
-        ld hl, EinCarAttr
-        add a, l
-        ld l, a
-        jr nc, .ah
-        inc h
-.ah:    ld a, (hl)              ; its colours as they are? (ECarCol kept)
-        cp c
-        jr z, .same
-        ld (hl), c
-        ld a, 1
-        ld (ECarColNew), a
-        ld a, c                 ; the colour byte: ink over paper
-        call AttrInk
-        rlca
-        rlca
-        rlca
-        rlca
-        ld b, a
-        ld a, c
-        call AttrPaper
-        or b
-        ld hl, (ECarK8)         ; ECarCol + k * 8: 8 times
-        ld h, 0
-        ld de, ECarCol
-        add hl, de
-        DUP 8
-        ld (hl), a
-        inc hl
-        EDUP
-.same:  pop bc
-        pop de
-        inc c
-        ld a, c
-        cp CAR_COL + CAR_W
-        jp nz, .c
+        ld e, c                 ; E: past its last changed cell
+.hi:    inc e
+        srl a
+        jr nz, .hi
+        ld a, d
+        ld b, c                 ; B: its first
+.lo:    rrca
+        jr c, .send
         inc b
+        jr .lo
+.send:  ld a, e
+        sub b
+        add a, a
+        add a, a
+        add a, a
+        ld d, a                 ; (bytes: 8 a cell)
         ld a, b
-        cp 24
-        jp nz, .r
-        ld a, 1
-        ld (ECarBlock), a
+        add a, a
+        add a, a
+        add a, a
+        ld b, d
+        push bc
+        ld e, a                 ; ECarCol + first * 8 -> its colours' VRAM
+        add a, low ECarCol
+        ld l, a
+        ld a, high ECarCol
+        adc a, 0
+        ld h, a
+        ld d, high (VRAM_COL + $1000 + CAR_PAT * 8)
+        ASSERT low (VRAM_COL + $1000 + CAR_PAT * 8) == 0
+        call EinWrite
+        pop bc
+        pop hl
+.next:  inc hl
+        ld a, c
+        add a, 8
+        ld c, a
+        cp 32
+        jr nz, .row
         ret
-ECarBlock:      db 0            ; (ECarPix to be sent)
-ECarColNew:     db 0            ; (ECarCol too: a colour changed)
-ECarK8:         db 0            ; (the cell's k * 8)
 
 ; ---------------------------------------------------------------------------
 ; The panorama's patterns: row r (0-1), column c is pattern PANO_PAT +
 ; r * 32 + c of the middle third (its first copy only: the second's 64
 ; patterns hold the cells under silhouettes, src/einstein/sprites.asm);
-; all of 128-255 in its colours
+; matching scanline inks for the 64 scrolling patterns
 EinPanoUpload:
         ld de, $0800 + PANO_PAT * 8
         call VdpAddr
@@ -583,21 +530,13 @@ EinPanoUpload:
         add hl, de
         pop bc
         djnz .blk
-        ld a, (PalPano)         ; the colours: ink over paper
-        push af
-        call AttrInk
-        rlca
-        rlca
-        rlca
-        rlca
-        ld l, a
-        pop af
-        call AttrPaper
-        or l
-        ld l, a
+        ld hl, PANO_CACHE + 512
         ld de, VRAM_COL + $0800 + PANO_PAT * 8
-        ld bc, 128 * 8
-        jp VdpFill
+        ld b, 0
+        call VdpWrite
+        ld de, VRAM_COL + $0800 + PANO_PAT * 8 + 256
+        ld b, 0
+        jp VdpWrite
 
 ; The panorama's names for its scroll (as src/horizon.asm DrawHorizon, but
 ; in steps of 8 pixels: one copy; hidden in a tunnel)
@@ -657,8 +596,5 @@ EinCeiling:
 EMPat:          ds 8
 EMCol:          db 0
 EFlashOn:       db 0            ; FLASH cells: ink and paper swapped now
-EinCarDirty:    db 1
-EinCarFull:     db 1
-EinCarAttr:     ds 4 * CAR_W    ; the car's attributes in VRAM
 EMirrorN:       db 0            ; any cells noted in EMirrorBits
 EPanoLast:      db $FF

@@ -414,6 +414,10 @@ DrawObject:
         ld a, (SprH)
         ld (hl), a
         inc hl
+        IFDEF EINSTEIN
+        ld a, (ObjType)
+        ld (hl), a
+        ENDIF
         inc hl
         ld (CmdPtr), hl
         ld de, -CMD_SIZE

@@ -25,6 +25,11 @@ EinScreensEnter:
 
 ; Show screen A (ShowA, ShowPic): every cell sent, with the display off
 EinFrontOn:
+        call EinFrontInit
+        ld b, 0
+        jr EinFrontRows
+
+EinFrontInit:
         di
         ld a, 1
         ld (EFrontOn), a
@@ -48,7 +53,9 @@ EinFrontOn:
         ld bc, 1
         ld l, $D0
         call VdpFill
-        ld b, 0                 ; every cell
+        ret
+
+EinFrontRows:                   ; send B..23, then start tracking screen A
 .r:     ld c, 0
 .c:     push bc
         call EinFrontCell
@@ -70,6 +77,48 @@ EinFrontOn:
         ld (EFrontCur + 1), a
         call VdpOn
         ei
+        ret
+
+; Picture record count A, first record HL. While the display is off the
+; pattern and ink streams share a 6K unpack buffer. The final stream is the
+; editable footer; matching A/B shadows keep later text updates incremental.
+EinPicture:
+        ld b, a
+        ld c, 0
+        srl b
+        rr c
+        ld de, $C000
+        call EinRead
+        call EinFrontInit
+        ld hl, $C000
+        ld a, (hl)
+        ld (.rows + 1), a
+        inc hl
+        ld de, VRAM_PAT
+        call .plane
+        ld de, VRAM_COL
+        call .plane
+        ld de, $4000
+        call UnLZ
+.rows:  ld b, 0
+        jp EinFrontRows
+.plane: push de
+        ld de, $4000
+        call UnLZ
+        pop de
+        push hl
+        ld hl, $4000
+        ld a, (.rows + 1)
+.send:  push af
+        push de
+        ld b, 0
+        call VdpWrite
+        pop de
+        inc d
+        pop af
+        dec a
+        jr nz, .send
+        pop hl
         ret
 
 ; B = row, C = column: screen A's cell into its pattern (third (B & $18),
@@ -237,4 +286,5 @@ ETick:          db 0            ; (the interrupt's 1 ms ticks, front end)
 ; (src/einstein/sky.asm EinCarSync)
         ALIGN 256
 ECarPix:        ds 4 * CAR_W * 8        ; the car's cells' pixels
-ECarK:          db 0
+ECarSourceInks: ds 256                  ; and colours as drawn (paper 0: transparent)
+        ASSERT low ECarSourceInks == 0  ; (EinCarGroundSync steps L)

@@ -3,16 +3,7 @@
 ; A = bank, HL = compressed picture in it: unpack into screen A, show it
 ShowPic:
         IFDEF EINSTEIN          ; (A = its records, HL = the first, in STAGES.DAT)
-        ld b, a
-        ld c, 0
-        srl b
-        rr c                    ; BC = A * 128
-        ld de, EPicBuf
-        call EinRead
-        ld hl, EPicBuf
-        ld de, $4000
-        call UnLZ
-        jp EinFrontOn
+        jp EinPicture
         ENDIF
         or P7FFD_ROM48 | P7FFD_SHADOW
         ld bc, PORT_7FFD

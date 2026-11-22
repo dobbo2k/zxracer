@@ -13,9 +13,9 @@ and `make test-einstein` (see "Building and testing" at the end).
   `SPEEDRUN`.
 - **Frame rate:** a steady 12.5 fps (a frame every 4 TV frames) where it
   can; the Spectrum's is 16.7. In the attract demo's worst stretch
-  (steering, curves, hills and scenery every frame) about 8 frames in 10
-  make it and most of the rest take 5 TV frames: 11.8 fps on average. See
-  section 6.
+  (steering, curves, hills and scenery every frame), with the native
+  artwork, 6 frames in 10 make it and most of the rest take 5 TV frames:
+  11.2 fps on average. See section 6.
 
 ## 2. The hardware, as found
 
@@ -172,15 +172,20 @@ test-einstein`.
 - **Game time:** a game frame takes longer than the Spectrum's 4 TV frames
   at most, so `Elapsed` goes up to 8 here and the clock and the car keep
   real time.
-- **The player's car:** the Spectrum's `DrawCar`, its 32 cells mirrored.
-  A new frame of it (steering) is made ready by the main code
-  (`EinCarPrep`) and sent as two 256-byte blocks, its patterns and
-  colours; otherwise only the cockpit's colours over a new colour
-  underneath.
+- **The player's car** (`src/einstein/car.asm`): the native Spider, its
+  32 cells the bottom third's last patterns. A line whose paper is 0 is
+  transparent: it takes the paper of the ground under its cell, noted as
+  each car row is drawn (`EinCarNames`). A new pose (steering, smoke) is
+  made ready by the main code (`EinCarPrep`) and its patterns sent as one
+  256-byte block; only the cells whose pose or ground changed are coloured
+  again (`ECarDirty`), and each car row's span of them sent.
 - **Writing VRAM:** a frame goes in during one vertical blank, row by row
   (a row's slots, then its names), so no row shows new names over old
-  patterns. What doesn't fit in the blank is written paced (32 T), and the
-  harness counts no access that comes too fast. The CTC's 1 ms interrupt
+  patterns. Writes go at full speed (an unrolled OUTI, 16 T a byte) while
+  the blank lasts by the clock: the CTC's 16 ms wait, started as the frame
+  was seen, counts down 256 T a step (`EinSpend`, `BLANK_END`). Past it,
+  and for a frame seen late, writes are paced (32 T), and the harness
+  counts no access that comes too fast. The CTC's 1 ms interrupt
   asks the VDP for the frame; once one is seen, it waits 16 ms before
   asking again (the next comes 19.9 ms on), unless it was seen at the
   first poll after such a wait (it may have been waiting). A frame that
@@ -204,7 +209,7 @@ Not yet:
 
 ## 5. Graphics: the name table does the work
 
-For redoing the Einstein's artwork, see `docs/einstein_artwork.md`.
+The native race artwork, postcard format and current pattern allocations are documented in [Einstein artwork](einstein_artwork.md).
 
 As planned, with the details above. Per third (256 patterns each):
 
@@ -233,8 +238,8 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
 `src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
-frame takes longer. In the attract demo, over 300 frames sent, 244 come 4
-TV frames after the last, 45 after 5, 10 after 6 and 1 after 7: 11.8 fps on
+frame takes longer. In the attract demo, over 300 frames sent, 189 come 4
+TV frames after the last, 81 after 5, 26 after 6 and 3 after 7: 11.2 fps on
 average (`make test-einstein` wants at least 7). The harness's `fliphist N`
 gives that histogram, and the costliest routines of each frame that took 6
 or more.
@@ -253,19 +258,60 @@ measures the work alone. Taken so:
 | the first speed commit | 1,857 |
 | the second | 1,653 (5.5 a game frame, 9.1 fps) |
 | the third, locked at 4 | 1,287 (4.29, 11.7 fps) |
-| now, locked at 4 | 1,268 (4.23, 11.8 fps) |
-| now, unlocked | 1,166 (3.89, of which about 0.1 waits for the flip) |
+| the fourth, locked at 4 | 1,268 (4.23, 11.8 fps) |
+| the fourth, unlocked | 1,166 (3.89, of which about 0.1 waits for the flip) |
+| the native artwork, locked at 4 | 1,474 (4.91, 10.2 fps) |
+| the native artwork, unlocked | 1,436 (4.79) |
+| now, locked at 4 | 1,343 (4.48, 11.2 fps) |
+| now, unlocked | 1,279 (4.26) |
 
 `profile N` in the harness gives each routine's T-states and calls over N
 TV frames (`profilel N`: local labels apart). A game frame's work is
-about 320K T now: the shared game logic about 130K (pass 1, the hill
+about 340K T now: the shared game logic about 130K (pass 1, the hill
 mapping, the projection, the sprites' XOR chain into screen B), which
 costs the same as on the Spectrum and is left alone so the Spectrum's
-build stays the same; the road's rows about 45K; writing VRAM about 45K
-(the paced bytes' 32 T is VRAM's own limit); the silhouettes about 35K;
-the centre line's sprites about 20K. In the attract demo the road's shape
-changes nearly every frame, so 11 of the 12 road rows are built again a
-frame. Tried and measured:
+build stays the same; the road's rows about 60K, of which the near rows'
+sloped kerbs (below) about 30K; writing VRAM about 45K (half of it the
+bytes, half each write's own work); the silhouettes about 40K; the centre
+line's sprites about 22K; the car's colours about 10K. In the attract
+demo the road's shape changes nearly every frame, so 11 of the 12 road
+rows are built again a frame.
+
+**The near rows' sloped kerbs.** Since the native artwork, a row of 16-23
+whose kerb edge slopes more than `EIN_SLOPE` (4) pixels between its top
+and bottom lines is drawn the exact way, in slots (2-line steps), as a
+tunnel's or a fork's is: about 4.7 rows a frame in the attract demo, at
+about 7K T each more than a ready-made row. Assembled with
+`-DEIN_SLOPE=8` (only edges steeper than 45 degrees exact: a straight
+road's near kerbs become 8-line steps) the benchmark takes 1,317 locked
+(212 frames in 300 at 4) and 1,236 unlocked; with `-DEIN_SLOPE=127` (none,
+the look before the native artwork) 1,272 (256 at 4) and 1,156.
+
+Tried and measured since the native artwork (unlocked, from 1,436):
+
+- kept: the car's colours made and sent only for the cells whose pose or
+  ground changed, not all 256 bytes whenever any did (1,399); a row's
+  road slots taken from the bottom up in a light band and the top down in
+  a dark one, its silhouettes' on from them (`EinSlotRange`): a kerb
+  slot keeps its colour as bands pass, and 8 colour bytes a slot are no
+  longer sent (1,369; colour-only sends 8.6 a frame to 0.1); the dirty
+  list a byte a slot, counted per row, its row's addresses worked out once
+  (1,359); a sloped row's ranges made in `EinRowFast`, not again in
+  `EinRowRanges` (1,350); the blank's budget by the CTC's clock, not in
+  units (1,334); a kerb run's masks, classing and naming in one loop
+  (1,331); the centre line's covered cells from the two mask bytes under
+  its 16 pixels, not the row's 4 and three calls (1,321); a silhouette's
+  mask straight into `EPat`, its mask bits set a byte at a time, its cells'
+  inks only from row 10 (above, nothing reads them) and found by rotates
+  (1,302); the game's keys looked up straight in the rows read
+  (`EinReadInput`, 1,287); a row's ground name worked out once, and
+  unrolled OUTIs in the blank (1,279)
+- dropped: clearing the cells last frame's silhouettes covered below the
+  sky, not XORing them out (no change: most commands start above row 10);
+  a 2 ms wait after the 16 ms one, for fewer polls (one fewer a TV frame,
+  no change)
+
+Before the native artwork:
 
 - cut, for 12.5 fps: the kerb's exact edges (2-line steps) for ready-made
   ones (upright in each row: 8-line steps), in all rows but a tunnel's or
@@ -308,16 +354,17 @@ made much cheaper, or fewer silhouetted cells.
 
 **Memory.** The Spectrum's drawing code that the Einstein never calls
 (road pass 2, the fork's row drawer, the panorama's bitmap, the rolling
-tyres, the crew's close-ups) is left out of its build (`IFNDEF
-EINSTEIN`). That made room for the Einstein's keys, disc and front-end
-code in bank 2. The Einstein's own buffers (the names, the sky's
-attributes, the masks, the panorama's sprite cells, the rows' signatures)
-are in screen A's memory, above the stage overlay ($4800-$5AFF): the game
-code never writes screen A here (`Ceiling` and `TimeWarn` skip it). Left:
-140 bytes in bank 2 (the centre line's sprites are there:
-`src/einstein/dash.asm`), 750 bytes in bank 5, 300 under $4000, 460 in the
-Einstein's buffers ($DB00-$EBFF) and 320 bytes in
-screen A (assertions check each).
+tyres, the crew's close-ups, the car's drawing, and the panorama's and the
+kerbs' unrolled chains) is left out of its build (`IFNDEF EINSTEIN`).
+That made room for the Einstein's keys, disc and front-end code in bank
+2, and at the chains' place ($B900-$BAD7) the ready-made kerb edges' set-up
+(`src/einstein/static.asm`) and the OUTI chain. The Einstein's own buffers
+(the names, the sky's attributes, the masks, the panorama's sprite cells,
+the rows' signatures) are in screen A's memory, above the stage overlay
+($4800-$5AFF): the game code never writes screen A here (`Ceiling` and
+`TimeWarn` skip it). Left: about 110 bytes in bank 2 (and 170 in the
+chains' place), 30 in bank 5, 130 under $4000, 128 in the Einstein's
+buffers ($DB00-$EBFF) and 320 in screen A (assertions check each).
 
 ## 7. Building and testing
 

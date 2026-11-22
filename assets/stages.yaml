@@ -58,7 +58,7 @@ themes:
 # Each return to a region has a new skyline, sky layout and colour treatment.
 # Unlisted inks and papers come from the region above.
 rows:
-  - - {theme: coast, seed: 1}
+  - - {theme: coast, seed: 1, einstein_palette: {grass_l: 0x60, grass_d: 0x20}}
   - - {theme: country, seed: 2}
     - {theme: desert, seed: 3, palette: {sky: 0x78, pano: 0x7a}}
   - - {theme: alpine, seed: 4, vista: bridge}

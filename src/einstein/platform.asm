@@ -63,8 +63,6 @@ KERB_N          EQU 2 * 14                          ; kerb edges: light, dark
 KERB_T1         EQU SLOT_FIRST + 4 * SLOTS_T1       ; 36: the middle third's
 KERB_T2         EQU SLOT_FIRST + 8 * SLOTS_T2       ; 192: the bottom third's
         ASSERT KERB_T1 + KERB_N <= SKY_PAT_T1
-EPicBuf         EQU THEME_CACHE + 4352  ; a picture from the disc, after the front end's
-                                        ; code (make_stages.py FRONTEND_RESERVE)
 SKY_PAT_T1      EQU 64              ; rows 8-9's patterns in the middle third
 PANO_PAT        EQU 128             ; the panorama's
 MIRROR_ROWS     EQU 10
@@ -73,8 +71,10 @@ MIRROR_ROWS     EQU 10
 EIN_BUF         EQU $DB00
 NameBuf         EQU EIN_BUF                     ; the names as drawn (768)
 SlotShadow      EQU NameBuf + 768               ; the slots in VRAM (N_SLOTS x 9)
-DirtyList       EQU SlotShadow + N_SLOTS * SLOT_SIZE    ; (slot, what) per changed slot
-EMirrorBits     EQU DirtyList + 2 * N_SLOTS     ; the sky's cells to be sent: a bit each
+DirtyList       EQU SlotShadow + N_SLOTS * SLOT_SIZE    ; per changed slot, row by row:
+                                                ; its slot in the row, what changed
+EDirtyRowN      EQU DirtyList + N_SLOTS         ; per road row: its changed slots
+EMirrorBits     EQU EDirtyRowN + 12             ; the sky's cells to be sent: a bit each
 EIN_CMDLISTB    EQU EMirrorBits + MIRROR_ROWS * 4   ; the Spectrum's buffer B commands
 EIN_BUF_END     EQU EIN_CMDLISTB + 1 + MAX_SPR * CMD_SIZE
 ; The centre line's sprites, per road row (EinDashRow, EinDashFinish)
@@ -90,8 +90,8 @@ EDashQ          EQU (EDashOut + 12 * 4 + 31) & $FFE0    ; the same as its sprite
                                                 ; EinDashSend sends
 EDashAttr       EQU EDashQ + 12 * 32            ; the attributes, as VRAM holds them
 EDashEnd        EQU EDashAttr + 12 * 4 + 1      ; (then $D0: no more sprites)
-ECarCol         EQU EDashEnd                    ; the car's colours, a new frame's
-        ASSERT ECarCol + 4 * CAR_W * 8 <= $EC00
+ECarCol         EQU (EDashEnd + 7) & $FFF8      ; the car's colours (a cell's 8 in
+        ASSERT ECarCol + 4 * CAR_W * 8 <= $EC00 ; one page: EinCarGroundSync)
 
 ; Buffers in the Spectrum's screen A ($4000-$5AFF), around the resident stage
 ; overlay: every one is made afresh by EinResetDisplay, which follows every
@@ -115,6 +115,23 @@ ERowFk          EQU ERowSig + 12 * SIG_SIZE ; per road row: drawn as a fork
         ASSERT ERowFk + 12 <= $5B00
         ASSERT ART_BITMAP + 512 + 640 <= EPanoSpr
 
+; The stage loader tail-calls resident code before its RAM becomes the sky.
+ESkyPixels      EQU STAGEOV_AT
+EPanoInkBuf     EQU $4D00
+ESkyInks        EQU $4F00
+EObjectUpper    EQU $4700       ; cells in rows 4..11
+EObjectLower    EQU (ECarCol + 256 + 255) & $FF00 ; cells in rows 12..23
+        ASSERT (EObjectUpper & 255) == 0       ; (page-aligned: EinMaterialCell)
+EObjectInks     EQU ESkyInks + 7 * 256
+        ASSERT ESkyPixels + 7 * 256 <= EObjectUpper
+        ASSERT EObjectUpper + 256 <= BaseNames
+        ASSERT EObjectLower + 384 <= $EC00
+EGroundPatterns EQU EObjectInks + 33
+EGroundPapers   EQU EGroundPatterns + 32
+        ASSERT EGroundPapers + 2 <= EPanoSpr
+        ASSERT EMaskU + 24 * MASK_ROW <= EPanoInkBuf
+        ASSERT EPanoInkBuf + 512 <= ESkyInks
+        ASSERT ESkyInks + 7 * 256 <= EPanoSpr
         ORG $0100
         jp EinBoot              ; (the theme cache follows at THEME_CACHE)
 
