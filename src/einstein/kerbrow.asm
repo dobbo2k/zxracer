@@ -19,8 +19,8 @@
 ; is made with both kerbs at once (EinKerbMerged).
 ;
 ; A slot holds two colour bytes, kerb over grass and kerb over road, and a
-; mask of the lines that take the second (SLOT_SIZE 11: EinCommitAt,
-; EinSendSlot), as Graphics II has a colour pair a line.
+; mask of the lines that take the second (SLOT_SIZE 11: EinCommitSlot,
+; EinSendRun), as Graphics II has a colour pair a line.
 ;
 ; Tuned: the pairs loaded unrolled, their extremes kept in registers; each
 ; cell's pairs unrolled, straight into EPat, through EKGe; the cell's name
@@ -197,5 +197,5 @@ EKCG:   db 0                    ; colour bytes: kerb over grass, over road
 EKCR:   db 0
 EKGN:   db 0                    ; the grass's name
 EKMerged:       db 0            ; the runs share a cell
-EComM:  db 0                    ; (EinCommitAt: the lines over the second
+EComM:  db 0                    ; (EinCommitSlot: the lines over the second
 EComC2: db 0                    ; colour byte, and it; 0 but for the kerb)

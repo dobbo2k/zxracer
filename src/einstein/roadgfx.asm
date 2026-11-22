@@ -1577,10 +1577,9 @@ EinForkCells:
 
 
 ; ---------------------------------------------------------------------------
-; EPat (8 pattern bytes) and A (the colour byte) into the row's next slot:
-; noted in DirtyList if VRAM does not already hold them.
-; -> A = the slot's name ($FF: the row's slots are all used)
-EinCommitSlot:
+; A = colour. Allocate the next slot in the row and return its shadow in HL,
+; number in B and colour in C. Carry and A = $FF if the row is full.
+EinAllocSlot:
         ld c, a
         ld hl, ESlotN           ; the next free slot: [ESlotN, ESlotTop)
         ld a, (ESlotTop)
@@ -1591,15 +1590,15 @@ EinCommitSlot:
         jr nz, .down
         ld b, (hl)              ; from the bottom up
         inc (hl)
-        jr EinCommitAt
+        jr .address
 .down:  ld hl, ESlotTop         ; from the top down
         dec (hl)
         ld b, (hl)
-        jr EinCommitAt
+        jr .address
 .full:  ld a, $FF
+        scf
         ret
-; B = the slot in the row, C = the colour -> A = its name
-EinCommitAt:
+.address:
         ld a, b                 ; HL = its SlotShadow bytes
         add a, a
         add a, a
@@ -1618,7 +1617,48 @@ EinCommitAt:
         ld l, a
         jr nc, .h
         inc h
-.h:     push hl
+.h:     or a                    ; success: HL addresses the slot, B is its number
+        ret
+
+        IFDEF EIN_KERB4
+EKPattern: ds 2                 ; top and bottom four scanlines
+EinCommitKerb:
+        call EinAllocSlot
+        ret c
+        push hl
+        ld de, (EKPattern)
+        ld a, e
+        DUP 4
+        cp (hl)
+        jr nz, .changed
+        inc hl
+        EDUP
+        ld a, d
+        DUP 4
+        cp (hl)
+        jr nz, .changed
+        inc hl
+        EDUP
+        jp EinCommitSlot.samePixels
+.changed:
+        pop hl
+        push hl
+        DUP 4
+        ld (hl), e
+        inc hl
+        EDUP
+        DUP 4
+        ld (hl), d
+        inc hl
+        EDUP
+        jp EinCommitSlot.newColours
+        ENDIF
+
+; EPat holds all eight lines for scenery, portals and the generic road.
+EinCommitSlot:
+        call EinAllocSlot
+        ret c
+        push hl
         ld de, EPat             ; the same pixels? (unrolled)
         DUP 7
         ld a, (de)
@@ -1632,6 +1672,7 @@ EinCommitAt:
         jr nz, .newPat
         inc hl
         IFDEF EIN_KERB
+.samePixels:
         call .colour            ; the same pixels: the same colours?
         jr z, .same
         ELSE
@@ -1658,6 +1699,7 @@ EinCommitAt:
         pop bc
         ex de, hl
         IFDEF EIN_KERB
+.newColours:
         call .colour
         ELSE
         ld a, (hl)

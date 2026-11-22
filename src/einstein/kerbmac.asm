@@ -58,14 +58,11 @@ KALL            EQU (1 << KPAIRS) - 1   ; (every group over road)
         EDUP
         ENDM
 
-; Pair k of a cell (C its first pixel, H = high EKGe): its byte into EPat's
-; two lines; B gets a bit (set: over road), D the AND of the bytes, E the OR.
+; Store the group's byte. Four-line kerbs keep it compact until commit.
+; B gets a bit (set: over road), D the AND of the bytes, E the OR.
         MACRO KPUT k
         IFDEF EIN_KERB4
-        ld (EPat + 4 * k), a
-        ld (EPat + 4 * k + 1), a
-        ld (EPat + 4 * k + 2), a
-        ld (EPat + 4 * k + 3), a
+        ld (EKPattern + k), a
         ELSE
         ld (EPat + 2 * k), a
         ld (EPat + 2 * k + 1), a

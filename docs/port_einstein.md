@@ -14,8 +14,8 @@ and `make test-einstein` (see "Building and testing" at the end).
   `SPEEDRUN`.
 - **Frame rate:** a steady 12.5 fps (a frame every 4 TV frames) where it
   can; the Spectrum's is 16.7. With the kerbs drawn exactly, in 4-line
-  steps (section 6), 240 of 304 displayed-frame intervals in the release
-  attract demo meet the four-refresh target. The average is 11.75 fps.
+  steps (section 6), 243 of 306 displayed-frame intervals in the release
+  attract demo meet the four-refresh target. The average is 11.81 fps.
 
 ## 2. The hardware, as found
 
@@ -266,8 +266,8 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
 `src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
 frame takes longer. In the attract demo with normal timing (`wait16
-GameFrames 20`, then `fliphist 1300`), 240 intervals take 4 TV refreshes,
-50 take 5 and 14 take 6. The average is 11.75 fps, and the longest gap is
+GameFrames 20`, then `fliphist 1300`), 243 intervals take 4 TV refreshes,
+54 take 5 and 9 take 6. The average is 11.81 fps, and the longest gap is
 120 ms. The harness's `fliphist N`
 gives that histogram, and the costliest routines of each frame that took 6
 or more.
@@ -304,7 +304,8 @@ measures the work alone. Taken so:
 | no centre line, ready-made near kerbs, unlocked | 1,017 (3.39) |
 | the kerbs exact, 4-line steps, locked at 4 | 1,315 (4.38, 11.41 fps) |
 | the kerbs exact, 4-line steps, unlocked | 1,239 (4.13) |
-| release with open-road band calculation and cached hill mapping, locked at 4 | 1,301 (4.34, 11.53 fps) |
+| open-road band calculation and cached hill mapping, locked at 4 | 1,301 (4.34, 11.53 fps) |
+| release with batched road uploads and compact kerbs, locked at 4 | 1,292 (4.31, 11.61 fps) |
 
 With normal game timing, `wait16 GameFrames 20` then `fliphist 1300` in Albert
 gave 253/41/12/1 intervals of 4/5/6/7 TV refreshes before the change and
@@ -319,31 +320,31 @@ of 4/5/6/7 refreshes (11.97 fps). On the 300 fixed-step updates, Albert attribut
 The panorama names and both silhouette planes matched the Spider-only build on
 all 320 sampled updates, including 136 with objects across the horizon.
 
-**Einstein-specific work to try on the release.** In Albert, start at
-`wait16 GameFrames 20` and use `profile 1300` or `fliphist 1300` on
-separate boots with normal game timing. The percentages below are shares
-of total emulated CPU time. The proposed savings still need timing tests.
+**Einstein upload and kerb optimisations in the release.** Albert's
+normal-timing attract demo was sampled for 1,300 TV refreshes after
+`wait16 GameFrames 20`. The fixed-step benchmark times the same 300 game
+updates in each build.
 
-1. Batch adjacent changed road slots in `EinUpload`. At the start of each
-   upload for game updates 21–320, read `EDirtyRowN` and `DirtyList`.
-   Count pixels and colours separately within each row, grouping consecutive
-   slot numbers in either direction, up to eight slots per run. The 10,843
-   individual eight-byte transfers form 4,358 runs. A run can share one VDP
-   address setup if streamed in increasing address order. The CPU-side
-   records are 11 bytes apart, so the uploader must step over each tile's
-   colour metadata when sending pixels. Include that work in the benchmark,
-   preserve the vertical-blank budget and paced writes, and finish the
-   slots before sending the row's names.
-2. Specialise the exact four-line kerbs. `EinKerbRow`, `EinKerbRight` and
-   `EinKerbCell` take 11.7% together. Each eight-line tile has two distinct
-   line positions, each repeated four times. Keep those two pattern bytes
-   while classifying the cell and expand them only for a changed tile that
-   needs a slot. The comparison must cover both colour pairs and their mask.
-   A slot previously used by scenery or a tunnel can contain eight independent
-   lines and needs a full comparison.
+| Build | Fixed-step TV refreshes | Fixed-step fps | Normal intervals at 4 / 5 / 6 / 7 refreshes | Normal fps |
+|---|---:|---:|---|---:|
+| Previous release | 1,301 | 11.53 | 240 / 50 / 14 / 0 | 11.75 |
+| Batched road uploads (P1) | 1,297 | 11.57 | 244 / 50 / 10 / 1 | 11.79 |
+| Release with batched uploads and compact kerbs (P1 + P2) | 1,292 | 11.61 | 243 / 54 / 9 / 0 | 11.81 |
+
+The combined build's entire 16 KB VRAM matched the previous release at the road upload
+checkpoint (`EinMirror`) on 320 consecutive fixed-step updates. The harness
+recorded zero fast VRAM accesses.
+
+1. `EinSlotRuns` groups adjacent dirty slots by row and plane. `EinSendRun`
+   streams each group from the lowest address, and the row's names follow
+   both planes.
+2. Four-line kerbs retain two pattern bytes during classification.
+   `EinCommitKerb` expands them into the slot shadow only on a pixel change.
+   All eight previous bytes are checked because a slot can have held scenery
+   or a tunnel tile. Colour and mask changes are tracked independently.
 3. Reduce silhouette reads on busy frames. `EinSprMask` took 33,059
    T-states in one six-refresh interval. Across 300 normal updates, the
-   685 sprite commands covered 5,645 cells in rows 10–23, counting each
+   685 sprite commands covered 5,645 cells in rows 10ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“23, counting each
    cell once per update. At entry to `EinSprCells`, 2,213 of those cells
    (39.2%) held eight zero bytes in screen B. Precompute occupied cells
    for each shifted sprite, taking its vertical alignment and clipping into
@@ -409,7 +410,8 @@ kerb comes from lines 0 and 4 alone, each byte on 4 lines (4-line steps,
 | exact kerbs, rows 12-23, untuned | 1,461 (10.27) | 1,423 (4.74) | 140 / 95 / 40 / 3 at 4 / 5 / 6 / 7 (10.73) |
 | exact kerbs, 2-line steps, tuned (`-DEIN_KERB2`) | 1,392 (10.78) | 1,338 (4.46) | 177 / 81 / 28 / 2 at 4 / 5 / 6 / 7 (11.12) |
 | exact kerbs, 4-line steps, before the shared road optimisation | 1,315 (11.41) | 1,239 (4.13) | 231 / 60 / 12 at 4 / 5 / 6 (11.69) |
-| exact kerbs, 4-line steps, release | 1,301 (11.53) | | 240 / 50 / 14 at 4 / 5 / 6 (11.75) |
+| exact kerbs, 4-line steps, previous release | 1,301 (11.53) | | 240 / 50 / 14 at 4 / 5 / 6 (11.75) |
+| exact kerbs, 4-line steps, release | 1,292 (11.61) | | 243 / 54 / 9 at 4 / 5 / 6 (11.81) |
 
 The untuned version cost about 108K T a game frame more than the block
 kerbs: `EinKerbRow` about 86K (11.9 rows, 7.3K a row: IX-indexed loops and
@@ -429,7 +431,7 @@ rows' code is left out of the build) and `kerbmac.asm` (the macros of
 both).
 
 The slots run short. Over the benchmark's attract demo (`linehist
-EinCommitSlot.full 1300`) a row found its slots all used 362 times with
+EinAllocSlot.full 1300`) a row found its slots all used 362 times with
 the block kerbs (5 a row in rows 12-15), 185 with `-DEIN_KERB2` and 72 with
 the 4-line kerbs (11 a row there). Each is a cell not drawn: with the
 block kerbs, at the benchmark's frame 200, a lorry in row 12 shows its
@@ -571,7 +573,7 @@ the rows' signatures) are in screen A's memory, above the stage overlay
 ($4800-$5AFF): the game code never writes screen A here (`Ceiling` and
 `TimeWarn` skip it). The Spider now reads its pattern and colour sources directly
 from resident art. The normal build (the exact kerbs, in 4-line steps) has
-270 bytes free before the bank 2 tables, 364 below $4000, 128 at the end
+288 bytes free before the bank 2 tables, 268 below $4000, 128 at the end
 of the Einstein's buffers (after `EObjectLower`), 25 before the bank 5
 track cache and 324 at the end of screen A. `-DEIN_KERB2` leaves 92 in
 bank 2; `-DEIN_BLOCKS` 1,104 (and 76 below $4000), with `-DEIN_DASH` 256,

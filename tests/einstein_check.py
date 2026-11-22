@@ -81,6 +81,45 @@ def check_artwork(harness, rom, dsk, sym, outdir):
     print("einstein_check: verified the native sky and scrolling horizon across 15 stages")
 
 
+def check_road_slots(harness, rom, dsk, sym):
+    # At EinMirror the upload has sent the road's names and both tile planes.
+    symbols = {name: int(value, 16) for name, value in
+               (line.split(": EQU ") for line in Path(sym).read_text().splitlines() if ": EQU " in line)}
+    shadow_addr = f"{symbols['SlotShadow']:04X}"
+    stride = symbols["SLOT_SIZE"]
+    commands = ["boot", "SPEEDRUN"]
+    frames = range(20, 141, 5)
+    for frame in frames:
+        commands += ["wait16", "GameFrames", str(frame), "until", "EinMirror", "1",
+                     "mem", shadow_addr, str(stride * symbols["N_SLOTS"]), "vram", "0000", "16384"]
+    values = run(harness, rom, dsk, sym, *commands, "stats")
+    if values["until_EinMirror"] != ["1"] * len(frames) or values["fast_vram_accesses"] != ["0"]:
+        sys.exit("einstein_check: road upload timing failed")
+    checked = 0
+    for frame, ram, vram in zip(frames, values["mem_" + shadow_addr], values["vram_0000"]):
+        shadow, video = bytes.fromhex(ram), bytes.fromhex(vram)
+        offset = 0
+        for row in range(12, 24):
+            count = symbols["SLOTS_T1" if row < 16 else "SLOTS_T2"]
+            first = symbols["SLOT_FIRST"] + (row - (12 if row < 16 else 16)) * count
+            names = symbols["VRAM_NAMES"] + row * 32
+            for tile in set(video[names:names + 32]):
+                if first <= tile < first + count:
+                    pos = offset + (tile - first) * stride
+                    record = shadow[pos:pos + stride]
+                    mask = record[9] if stride == 11 else 0
+                    colours = bytes(record[10] if mask & (1 << y) else record[8] for y in range(8))
+                    addr = (row // 8) * 0x800 + tile * 8
+                    ink = addr + symbols["VRAM_COL"]
+                    if video[addr:addr + 8] != record[:8] or video[ink:ink + 8] != colours:
+                        sys.exit(f"einstein_check: road tile {tile} differs on frame {frame}, row {row}")
+                    checked += 1
+            offset += count * stride
+    if not checked:
+        sys.exit("einstein_check: no road slots were displayed")
+    print(f"einstein_check: {checked} displayed road tiles match their RAM patterns and colours")
+
+
 def main(harness, rom, dsk, sym, outdir):
     wav = os.path.join(outdir, "einstein_check")
     v = run(harness, rom, dsk, sym, "boot", "SPEEDRUN",
@@ -123,6 +162,7 @@ def main(harness, rom, dsk, sym, outdir):
     if failures:
         sys.exit("einstein_check: FAILED: " + "; ".join(failures))
     check_artwork(harness, rom, dsk, sym, outdir)
+    check_road_slots(harness, rom, dsk, sym)
     print("einstein_check: passed")
 
 

@@ -37,7 +37,7 @@ EinKerbRight:
         jp nz, .cell
         ret
 
-; C = the cell's first pixel, EPat its 8 lines (each pair's byte on two), B
+; C = first pixel, EKPattern (four-line mode) or EPat holds the patterns, B
 ; the pairs over road (pair 0 in bit 3), D the AND of the pairs' bytes, E
 ; their OR -> its name: solid if it can be (all kerb, all road, all grass),
 ; else a slot of the kerb's colours over grass and over road, by line. BC
@@ -77,7 +77,11 @@ EinKerbCell:
         ld a, (EKCG)
 .commit:
         push bc
+        IFDEF EIN_KERB4
+        call EinCommitKerb
+        ELSE
         call EinCommitSlot
+        ENDIF
         pop bc
         cp $FF
         jr nz, .name
@@ -116,7 +120,11 @@ EinKerbMerged:
         ld b, 0
         ld de, $FF00
         ld ix, EKP              ; (IX: the pair; IY: its two lines)
+        IFDEF EIN_KERB4
+        ld iy, EKPattern
+        ELSE
         ld iy, EPat
+        ENDIF
 .pair:  ld a, (ix + 4)          ; road: from D, not past E
         sub c
         ld l, a
@@ -151,10 +159,15 @@ EinKerbMerged:
         cpl
         or a
 .put:
+        IFDEF EIN_KERB4
+        ld (iy + 0), a
+        inc iy
+        ELSE
         DUP 8 / KPAIRS
         ld (iy + 0), a
         inc iy
         EDUP
+        ENDIF
         rl b
         ld l, a
         and d
@@ -177,7 +190,7 @@ EinKerbMerged:
         pop iy
         ret
 
-; From EinSendSlot, the VRAM address set: HL = a slot's colour byte, then the
+; From EinSendRun, the VRAM address set: HL = a slot's colour byte, then the
 ; mask of the lines over its second and that one: 8 colour bytes, a line
 ; each. 34 or 35 T a byte: paced enough for the picture's time too.
 EinSendCols:

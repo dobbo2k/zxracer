@@ -181,10 +181,11 @@ blank (30,830 T) any speed is safe.
   250 every 256 T. A write of B bytes goes fast only while the count is at least
   `BLANK_END + 1 + B/8`; the first write that fails sets `EBudget` to 0 for the rest of
   the upload, since the count runs on and restarts at 250.
-- `EinSendSlot` sends one slot: its 8 pattern bytes if bit 6 of its entry is set, its colour
-  on all 8 lines if bit 7 is set. Its fast and paced paths are unrolled. A slot of two
-  colour pairs (its mask, the byte after its colour, not 0) goes through `EinSendCols`:
-  each line's pair, 34 or 35 T a byte, slow enough for the picture's time too.
+- `EinSlotRuns` scans each road row's dirty slots once for pixels and once for colours.
+  `EinSendRun` sets one VRAM address per contiguous run and streams the tiles in increasing
+  address order. Its fast and paced loops step through the strided RAM records. Mixed colour
+  tiles use `EinSendCols` at 34–35 T per byte. Colour runs of 16 or more tiles use paced
+  writes because their worst-case cost exceeds the range of the eight-bit budget argument.
 
 ## 7. The road
 
@@ -228,7 +229,7 @@ did last frame (`EMaskU`), it is composited (`EinRoadCompose`). Last comes `EinD
    group at a time through `EKGe` (a cell's pixels from v on, indexed by v - x0), each
    group's byte on its lines, over grass or over road. A cell all kerb, road or grass is
    a solid name; else a slot with kerb over grass, kerb over road and the mask of the
-   lines over road (`EComM`, `EComC2` for `EinCommitAt`). Where the runs share a cell (a
+   lines over road (`EComM`, `EComC2` for `EinCommitSlot`). Where the runs share a cell (a
    narrow road), `EinKerbMerged` makes [`ERA`, `ERD`) with both. A row with no road is
    grass; one with a group without road, or a run over 119 pixels wide, goes the exact,
    generic way (3). With `-DEIN_BLOCKS` this way is left out, and 1 and 2 are as below.
@@ -289,8 +290,10 @@ back to a paper colour.
   (`EDown`). A light-band row takes its road slots from the bottom up, a dark-band row
   from the top down, and its silhouettes continue on from them. A kerb slot therefore
   keeps its light or dark colour as bands pass, and only its pixels are resent.
-- **`EinCommitSlot`:** takes the next slot. `EinCommitAt` compares `EPat` and the colour
-  with the shadow, copies what differs, and notes the slot.
+- **`EinCommitSlot`:** uses `EinAllocSlot` to take the next slot. It compares `EPat` and the colour
+  with the shadow, copies what differs, and notes the slot. Four-line kerbs use
+  `EinCommitKerb`, which compares both compact bytes against all eight shadow lines and
+  expands them on a pixel mismatch. Both paths share colour comparison and dirty flags.
 - **`DirtyList`:** one byte a changed slot (bits 0-4 the slot in its row, bit 6 pixels,
   bit 7 colour), in row order, counted per row in `EDirtyRowN`.
 - **`EinSlotBase`:** finds a row's shadow and VRAM bases once for the upload.
@@ -572,7 +575,7 @@ from the change and from a reference build, and compare them. For tunnels and fo
   that skips one leaves its pixels in screen B, where a later silhouette would XOR over
   them.
 - **VRAM:** with the picture on, keep accesses 32 T apart. In the interrupt, write through
-  `EinWrite`, `EinFill` or `EinSendSlot`, which follow `EBudget`. Keep interrupts off only
+  `EinWrite`, `EinFill` or `EinSendRun`, which follow `EBudget`. Keep interrupts off only
   briefly: a late frame interrupt leaves less of the blank.
 - **Registers:**
   - The interrupt saves AF, BC, DE, HL, IX and IY but not the alternate set, so the main
@@ -592,7 +595,7 @@ from the change and from a reference build, and compare them. For tunnels and fo
 - **Self-modifying code:**
   - immediates patched at run time: `RunCommand.clipY`, `EinSlopeRow`'s run constants,
     `EinWrite`'s chain entry;
-  - an IX displacement reaching across buffers: `EinDashRedo`'s ±96 from `EMaskPOld`.
+  - an IX displacement reaching across buffers: `EinDashRedo`'s Â±96 from `EMaskPOld`.
 
   Keep the patched instructions' layout when editing them.
 - **Space:** check the assertions' areas (section 3) before adding code. Code that runs
