@@ -1,8 +1,10 @@
 ; ---------------------------------------------------------------------------
-; Einstein: the centre line's sprites (src/einstein/roadgfx.asm calls
-; EinDashRow, EinDashNone and EinDashFinish for its rows; flip.asm
-; EinDashSend and EinDashReset). In bank 2's code: the platform code below
-; $4000 is full.
+; Einstein: the sprites. The tail lamps' overlays (EinTailLamps) always;
+; the centre line's sprites only with -DEIN_DASH (src/einstein/roadgfx.asm
+; calls EinDashRow, EinDashNone and EinDashFinish for its rows; flip.asm
+; EinDashSend and EinDashReset). Without it the road has no centre line:
+; about 24K T a game frame less (docs/port_einstein.md, section 6). In bank
+; 2's code: the platform code below $4000 is full.
 ; The centre line: a 16x16 sprite a road row (sprite k for row 12 + k, its
 ; patterns 4k on; the top two quarters used), so its pixels are exact at
 ; any x and cost no slot. Per row drawn (EinDashRow): the dashes of its
@@ -11,6 +13,7 @@
 ; car, a silhouette or a tunnel's mouth covers taken out. A row not drawn
 ; again is done again only if what covers it changed (EinDashFinish). What
 ; changed is sent at the start of the next vertical blank (EinDashSend).
+        IFDEF EIN_DASH
 EinDashRow:
         ld a, (ERow)
         ld e, a
@@ -499,15 +502,23 @@ EinDashSend:
         ld b, 12 * 4
         jp EinWrite
 
-; Two fixed sprite overlays give the four lamps their own red highlights.
-; The two overlapping centre-line sprites leave two scanline slots free.
+        ENDIF
+
+; Two fixed sprite overlays give the four lamps their own red highlights:
+; sprites 12 and 13, after the centre line's (-DEIN_DASH: its two
+; overlapping sprites leave two scanline slots free), else 0 and 1.
+        IFDEF EIN_DASH
+TAIL_SPR        EQU 12
+        ELSE
+TAIL_SPR        EQU 0
+        ENDIF
 EinTailLamps:
         ld hl, .pixels
         ld de, VRAM_SPRPAT + 12 * 32
         ld b, 32
         call VdpWrite
         ld hl, .attrs
-        ld de, VRAM_SPRATTR + 12 * 4
+        ld de, VRAM_SPRATTR + TAIL_SPR * 4
         ld b, 9
         jp VdpWrite
 .pixels: db 0,$70,$70
@@ -516,6 +527,7 @@ EinTailLamps:
         ds 13
 .attrs: db 177,100,48,8, 177,143,48,8, $D0
 
+        IFDEF EIN_DASH
 ; At a display reset (VRAM cleared): every row's sprite hidden, its
 ; patterns clear; the attributes sent
 EinDashReset:
@@ -560,3 +572,4 @@ EDashAny2:      db 0            ; any row's patterns to be sent
 EDashAttrNew:   db 0            ; the attributes to be sent
 EDashV:         ds 4            ; a row's bytes: lines 0-3 left, right; 4-7
         ASSERT MASK_ROW == 4
+        ENDIF

@@ -221,7 +221,12 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   `KeyMap` (a keyboard row and key bit per control, read by `ReadInput`):
   presets for Q/A/O/P/SPACE and the Sinclair and Cursor joysticks, or keys
   picked one by one (H and ENTER are kept for pause and the options; a key
-  can't be used twice). A Kempston joystick always works.
+  can't be used twice). A Kempston joystick always works when one is
+  connected: each display reset (`OvResetDisplay`) reads port `$1F` for a
+  frame, and if any read has bits 5-7 set there is none, and `ReadInput`'s
+  `IN` becomes `LD A, $FF`. Without that check, a 128K or +2 with no
+  Kempston read its floating bus (the screen bytes the ULA fetches), and a
+  stray fire bit changed gear now and then (zxsim `-F` reproduces it).
 - H pauses (`src/pause.asm`, in a gap of bank 2): the last frame stays on show
   with PAUSED on the message line and the sound off; no time passes in the
   game.

@@ -1,6 +1,7 @@
 ; ---------------------------------------------------------------------------
 ; Einstein: a sloped row of the near road (rows 16-23), drawn in one pass
 ;
+; Only with -DEIN_SLOPE=n (src/einstein/roadgfx.asm EinStaticRanges).
 ; EinRowFast hands over a row whose kerb edges slope more than EIN_SLOPE
 ; pixels, its ranges made as EinRowRanges makes them. It is drawn the exact
 ; way, as EinRowBase would (src/einstein/roadgfx.asm): its names, its slots,
@@ -98,7 +99,9 @@ EinSlopeRow:
         ld (.end + 1), a
         ld a, (ERC)
         call .run
+        IFDEF EIN_DASH
         call EinDashRow
+        ENDIF
         or 1                    ; (drawn: NZ, no carry)
         ret
 .generic:

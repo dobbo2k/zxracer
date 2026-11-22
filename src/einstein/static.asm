@@ -55,6 +55,7 @@ EinStaticInit:
         add hl, de
         ld a, (EStatC)
         ld (hl), a
+        IFNDEF EIN_KERB         ; (-DEIN_KERB: the middle third's are slots)
         ld a, c
         add a, KERB_T1          ; the middle third's
         ld bc, VRAM_PAT + $800
@@ -63,6 +64,7 @@ EinStaticInit:
         pop bc
         push bc
         push de
+        ENDIF
         ld a, c
         add a, KERB_T2          ; the bottom third's
         ld bc, VRAM_PAT + $1000

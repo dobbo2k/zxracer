@@ -6,17 +6,43 @@
 ; columns CAR_COL on). A pose's lines whose paper is 0 are transparent:
 ; they take the paper of the ground under the cell (ECarGround). Only the
 ; cells whose pose or ground changed are coloured again and sent.
-; (Resident data and code: in bank 5's part, src/main.asm)
+; The top and base images are resident. EinCarSync reads their pixels directly.
 ; ---------------------------------------------------------------------------
 
-; The pose for this frame: a new one's patterns and colours, as drawn
+; Select the pose and its generated delta from the previous pose. The
+; display reset sets CarShownB to $FF, selecting the full-upload row.
 EinCarPrep:
         call CarFrame
         ld a, (CarShownB)
         cp c
         ret z
+        cp $FF
+        jr nz, .old
+        ld a, 7
+.old:   ld b, a
+        add a, a
+        add a, a
+        add a, a
+        sub b
+        add a, c                ; previous * 7 + new
+        ld e, a
+        ld d, 0
+        ld hl, EinCarTransitions
+        add hl, de
+        ld e, (hl)
+        ld hl, EinCarChanges
+        add hl, de
+        ld de, ECarDirty        ; no pending ground edits after WaitFlip
+        push bc
+        ldi                     ; four row masks, then the pattern run list
+        ldi
+        ldi
+        ldi
+        ld (ECarRuns), hl
+        pop bc
         ld a, c
         ld (CarShownB), a
+        add a, a                ; two source pointers and four ground masks
         add a, a
         add a, a
         ld e, a
@@ -27,41 +53,28 @@ EinCarPrep:
         inc hl
         ld d, (hl)
         inc hl
+        ld (EinCarSync.top + 1), de
         push hl
-        ex de, hl
-        ld de, ECarPix
-        ld bc, 192
-        ldir
-        ld de, ECarSourceInks
-        ld c, 192
-        ldir
+        ld hl, 192              ; top inks follow 192 pixel bytes
+        add hl, de
+        ld (EinCarGroundSync.top + 1), hl
         pop hl
         ld e, (hl)
         inc hl
         ld d, (hl)
-        ex de, hl
-        ld de, ECarPix + 192
-        ld c, 64
-        ldir
-        ld de, ECarSourceInks + 192
-        ld c, 64
-        ldir
-        ld a, 1
-        ld (ECarBlock), a
-        ld a, $FF               ; every cell recoloured
-        ld hl, ECarDirty
-        ld (hl), a
         inc hl
-        ld (hl), a
-        inc hl
-        ld (hl), a
-        inc hl
-        ld (hl), a
+        ld (EinCarNames.groundMask + 1), hl
+        ld hl, -192             ; both routines index from the first car cell
+        add hl, de
+        ld (EinCarSync.base + 1), hl
+        ld de, 64               ; base inks follow 64 pixel bytes
+        add hl, de
+        ld (EinCarGroundSync.base + 1), hl
         ret
 ECarGround:     ds 32           ; per car cell: the paper under it (TMS)
 ECarDirty:      ds 4            ; per car row: its cells to be recoloured
 ECarSend:       ds 4            ; (bit k: column CAR_COL + k), then sent
-ECarBlock:      db 0            ; a new pose's patterns to be sent
+ECarRuns:       dw 0            ; pending resident list, or 0 once uploaded
         ASSERT ECarSend == ECarDirty + 4
 
 ; The car's cells whose pose or ground changed (ECarDirty): their colours
@@ -111,23 +124,28 @@ EinCarGroundSync:
         add a, a
         add a, a
         add a, a
-        ld l, a
-        ld h, high ECarSourceInks
+        cp 192
+.top:   ld hl, 0                ; selected by EinCarPrep
+        jr c, .source
+.base:  ld hl, 0
+.source:ld e, a
+        ld d, 0
+        add hl, de
         add a, low ECarCol
         ld e, a
         ld a, high ECarCol
         adc a, 0
         ld d, a
-        ld b, 8
-.line:  ld a, (hl)
+        DUP 8                   ; fixed-size cell; no per-line loop counter
+        ld a, (hl)
         and 15
         ld a, (hl)
-        jr nz, .opaque
+        jr nz, $ + 3
         or c
-.opaque:ld (de), a
-        inc l
+        ld (de), a
+        inc hl                  ; resident ink planes need not be page-aligned
         inc e
-        djnz .line
+        EDUP
         pop hl
         pop de
         pop bc

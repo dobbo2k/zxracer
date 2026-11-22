@@ -42,25 +42,32 @@ def check_artwork(harness, rom, dsk, sym, outdir):
     for stage in route:
         commands += ["stage", str(stage), "frames", "80", "vram", "1B00", "57",
                      "vram", "3800", "416", "vram", "0300", "256",
-                     "vram", "2C00", "512", "shot", str(Path(outdir) / f"round_{stage:02}.ppm")]
+                     "vram", "0C00", "512", "vram", "2C00", "512",
+                     "shot", str(Path(outdir) / f"round_{stage:02}.ppm")]
     values = run(harness, rom, dsk, sym, *commands, "stats")
     horizons = values["vram_2C00"]
     if len(set(horizons)) != 15 or horizons[0] != horizons[-1]:
         sys.exit("einstein_check: scrolling horizon colour planes did not survive stage loading")
-    for stage, shown, inks in zip(route, values["vram_0300"], horizons):
+    for stage, shown, tiles, inks in zip(route, values["vram_0300"], values["vram_0C00"], horizons):
         spec = stages[stage]
         scene = einstein_art.landscape(spec, cfg["themes"][spec["theme"]])
         pixels, _ = einstein_art.planes(scene.crop((0, 24, 256, 32)))
-        _, colours = einstein_art.planes(scene.crop((0, 80, 256, 96)))
+        panorama, colours = einstein_art.planes(scene.crop((0, 80, 256, 96)))
+        if panorama != bytes.fromhex(tiles):
+            sys.exit(f"einstein_check: native panorama patterns differ on stage {stage}")
         if colours != bytes.fromhex(inks):
             sys.exit(f"einstein_check: native panorama colours differ on stage {stage}")
         if pixels != bytes.fromhex(shown):
             sys.exit(f"einstein_check: native sky pixels differ on stage {stage}")
+    # The tail lamps are sprites 0 and 1, or 12 and 13 after the centre
+    # line's twelve in a build with them (-DEIN_DASH).
+    dash = any(line.startswith("EinDashRow:") for line in Path(sym).read_text().splitlines())
+    first = 48 if dash else 0
     for table, tiles in zip(values["vram_1B00"], values["vram_3800"]):
         attrs, patterns = bytes.fromhex(table), bytes.fromhex(tiles)
-        if attrs[48:57] != bytes((177,100,48,8,177,143,48,8,208)):
+        if attrs[first:first + 9] != bytes((177,100,48,8,177,143,48,8,208)):
             sys.exit("einstein_check: tail lamp sprites missing")
-        for n in range(0, 48, 4):
+        for n in range(0, first, 4):
             y, x, tile, _ = attrs[n:n+4]
             for line in range(8):
                 if not 160 <= y + 1 + line < 192:

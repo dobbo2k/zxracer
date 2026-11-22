@@ -19,6 +19,22 @@
 ; emulator/src/core) and the Wonder Boy port's src/platform/einstein.
 ; ---------------------------------------------------------------------------
 
+; The road's kerbs: both edges exact, in 4-line steps (src/einstein/kerbrow.asm:
+; EIN_KERB, EIN_KERB4). -DEIN_KERB2: in 2-line steps. -DEIN_BLOCKS: the
+; ready-made way of before (a kerb's outer edge on a cell's edge, its inner
+; edge upright in the row); with -DEIN_DASH -DEIN_SLOPE=4 too, the look
+; before the speed cut (docs/port_einstein.md, section 6).
+        IFNDEF EIN_BLOCKS
+        IFNDEF EIN_KERB
+        DEFINE EIN_KERB
+        ENDIF
+        IFNDEF EIN_KERB2
+        IFNDEF EIN_KERB4
+        DEFINE EIN_KERB4
+        ENDIF
+        ENDIF
+        ENDIF
+
 ; Ports
 EIN_PSG_SELECT  EQU $02             ; AY register latch
 EIN_PSG_READ    EQU $02             ; (read: the latched register)
@@ -52,17 +68,32 @@ VRAM_SPRPAT     EQU $3800           ; sprite patterns
 ;     edges are ready-made patterns (EinStaticInit), 7 left edges and 7 right
 ;     in the open road's light and dark kerb: the middle third's KERB_T1 on,
 ;     the bottom third's KERB_T2 on. The player's car is CAR_PAT on (224).
-;   the centre line: sprites, one a road row (src/einstein/roadgfx.asm
-;     EinDashRow), its pixels exact at any x.
+;   sprites: the car's two tail-lamp overlays. With -DEIN_DASH (the look
+;     before the speed work's cuts) also the centre line: a sprite a road
+;     row (src/einstein/dash.asm), its pixels exact at any x. Without it the
+;     road has no centre line: the sprites cost about 24K T a game frame.
+        IFDEF EIN_KERB
+SLOTS_T1        EQU 11              ; (the middle third's ready-made kerb edges' room)
+        ELSE
 SLOTS_T1        EQU 5
+        ENDIF
 SLOTS_T2        EQU 22
 SLOT_FIRST      EQU 16
 N_SLOTS         EQU 4 * SLOTS_T1 + 8 * SLOTS_T2     ; 196 in all
+        IFDEF EIN_KERB
+SLOT_SIZE       EQU 11              ; 8 pattern bytes, the colour byte, the lines
+                                    ; over a second (a mask, line 0 in bit 0), it
+        ELSE
 SLOT_SIZE       EQU 9               ; 8 pattern bytes, the colour byte
+        ENDIF
 KERB_N          EQU 2 * 14                          ; kerb edges: light, dark
 KERB_T1         EQU SLOT_FIRST + 4 * SLOTS_T1       ; 36: the middle third's
 KERB_T2         EQU SLOT_FIRST + 8 * SLOTS_T2       ; 192: the bottom third's
+        IFDEF EIN_KERB          ; (no ready-made kerb edges in the middle third)
+        ASSERT SLOT_FIRST + 4 * SLOTS_T1 <= SKY_PAT_T1
+        ELSE
         ASSERT KERB_T1 + KERB_N <= SKY_PAT_T1
+        ENDIF
 SKY_PAT_T1      EQU 64              ; rows 8-9's patterns in the middle third
 PANO_PAT        EQU 128             ; the panorama's
 MIRROR_ROWS     EQU 10
@@ -70,13 +101,14 @@ MIRROR_ROWS     EQU 10
 ; Buffers (not in the COM file)
 EIN_BUF         EQU $DB00
 NameBuf         EQU EIN_BUF                     ; the names as drawn (768)
-SlotShadow      EQU NameBuf + 768               ; the slots in VRAM (N_SLOTS x 9)
+SlotShadow      EQU NameBuf + 768               ; the slots in VRAM (N_SLOTS x SLOT_SIZE)
 DirtyList       EQU SlotShadow + N_SLOTS * SLOT_SIZE    ; per changed slot, row by row:
                                                 ; its slot in the row, what changed
 EDirtyRowN      EQU DirtyList + N_SLOTS         ; per road row: its changed slots
 EMirrorBits     EQU EDirtyRowN + 12             ; the sky's cells to be sent: a bit each
 EIN_CMDLISTB    EQU EMirrorBits + MIRROR_ROWS * 4   ; the Spectrum's buffer B commands
 EIN_BUF_END     EQU EIN_CMDLISTB + 1 + MAX_SPR * CMD_SIZE
+        IFDEF EIN_DASH
 ; The centre line's sprites, per road row (EinDashRow, EinDashFinish)
 EDashX          EQU EIN_BUF_END                 ; its leftmost pixel ($FF: none)
 EDashNew        EQU EDashX + 12                 ; drawn again this frame
@@ -90,6 +122,9 @@ EDashQ          EQU (EDashOut + 12 * 4 + 31) & $FFE0    ; the same as its sprite
                                                 ; EinDashSend sends
 EDashAttr       EQU EDashQ + 12 * 32            ; the attributes, as VRAM holds them
 EDashEnd        EQU EDashAttr + 12 * 4 + 1      ; (then $D0: no more sprites)
+        ELSE
+EDashEnd        EQU EIN_BUF_END                 ; (no centre line: no buffers)
+        ENDIF
 ECarCol         EQU (EDashEnd + 7) & $FFF8      ; the car's colours (a cell's 8 in
         ASSERT ECarCol + 4 * CAR_W * 8 <= $EC00 ; one page: EinCarGroundSync)
 
@@ -112,11 +147,7 @@ ERowSig         EQU EPanoList + 64      ; per road row: what it was drawn from
 ERowFk          EQU ERowSig + 12 * SIG_SIZE ; per road row: drawn as a fork
         ASSERT BaseNames + (24 - PANO_ROW0) * 32 <= ESkyAttr
         ASSERT EMaskU + 24 * MASK_ROW <= EPanoSpr
-ECarSourceInks  EQU $5A00               ; the car's pose's colours as drawn (paper
-                                        ; 0: transparent; page-aligned: EinCarGroundSync
-                                        ; steps L), made afresh with the pose after
-                                        ; every display reset (CarShownB)
-        ASSERT ERowFk + 12 <= ECarSourceInks
+        ASSERT ERowFk + 12 <= SCN_DATA
         ASSERT ART_BITMAP + 512 + 640 <= EPanoSpr
 
 ; The stage loader tail-calls resident code before its RAM becomes the sky.
@@ -147,6 +178,9 @@ EGroundPapers   EQU EGroundPatterns + 32
         INCLUDE "sky.asm"
         INCLUDE "sprites.asm"
         INCLUDE "portal.asm"
+        IFDEF EIN_KERB
+        INCLUDE "kerbcell.asm"  ; (a prototype: the kerbs exact; with kerbrow.asm)
+        ENDIF
         ; (keys.asm, disc.asm, front.asm: in bank 2's code, src/main.asm)
 EinArt:                         ; (the end of the platform code)
         ASSERT $ <= $4000              ; (the stage overlay: src/main.asm)

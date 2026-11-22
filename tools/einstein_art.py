@@ -167,8 +167,6 @@ def race_pack(stage, theme, palette):
     im=landscape(stage,theme)
     sky, ink=planes(im.crop((0,24,256,80)))
     horizon, horizon_ink=planes(im.crop((0,80,256,96)))
-    # The moving object compositor addresses panorama pixels by scanline.
-    horizon=bytes(horizon[(y//8*32+x)*8+y%8] for y in range(16) for x in range(32))
     # In command order, three inks for the upper, middle and lower parts of
     # each projected silhouette, including small objects and tunnel signs.
     materials = {
@@ -200,6 +198,52 @@ def race_pack(stage, theme, palette):
     data=palette+b"".join(make_screens.lz(s) for s in streams)
     assert len(data)<=0x1100
     return data
+
+
+def car_row_masks(cells):
+    """One byte per row, bit zero at the left edge of the Spider."""
+    return [sum(1 << bit for bit in range(8) if cells[row + bit]) for row in range(0, 32, 8)]
+
+
+def car_transitions(frames):
+    """Encode the colour masks and contiguous pattern writes for each pose change."""
+    poses = [(top[:192] + base[:64], top[192:] + base[64:]) for top, base in frames]
+    records = bytearray()
+    offsets = {}
+    rows = []
+    # The last row is for the first pose after a display reset.
+    for previous in [*poses, None]:
+        row = []
+        for pose in poses:
+            pixel_edits, ink_edits = (
+                [previous is None or previous[plane][i:i+8] != data[i:i+8] for i in range(0, 256, 8)]
+                for plane, data in enumerate(pose)
+            )
+            record = bytearray(car_row_masks(ink_edits))
+            # The top and base are separate resident images. Never join a run across them.
+            for first, end in ((0, 24), (24, 32)):
+                cell = first
+                while cell < end:
+                    if not pixel_edits[cell]:
+                        cell += 1
+                        continue
+                    start = cell
+                    while cell < end and pixel_edits[cell]:
+                        cell += 1
+                    record.extend((start * 8, (cell - start) * 8))
+            record.append(255)
+            key = bytes(record)
+            if key not in offsets:
+                offsets[key] = len(records)
+                records.extend(record)
+            row.append(offsets[key])
+        rows.append(row)
+    assert len(records) <= 256
+    asm = ['EinCarTransitions:']
+    asm.extend('        db ' + ','.join(map(str, row)) for row in rows)
+    asm.append('EinCarChanges:')
+    asm.extend('        db ' + ','.join(map(str, records[i:i+16])) for i in range(0, len(records), 16))
+    return asm
 
 
 def cars(path):
@@ -237,12 +281,17 @@ def cars(path):
         pose=(0,1,2,1,1,2,2)[i]
         assert top == frames[pose][0]
         asm.append(f'        dw EinSpiderTop{pose}, EinSpiderBase{i}')
+        inks = top[192:] + bottom[64:]
+        ground_masks = car_row_masks([any((ink & 15) == 0 for ink in inks[i:i+8])
+                                     for i in range(0, 256, 8)])
+        asm.append('        db ' + ','.join(map(str, ground_masks)))
     for i,(top,bottom) in enumerate(frames):
         parts=[(f'EinSpiderBase{i}',bottom)]
         if i<3: parts.append((f'EinSpiderTop{i}',top))
         for label,data in parts:
             asm.append(label+':')
             asm.extend('        db '+','.join(map(str,data[j:j+24])) for j in range(0,len(data),24))
+    asm.extend(car_transitions(frames))
     Path(path).write_text('\n'.join(asm)+'\n',encoding='ascii')
 
 

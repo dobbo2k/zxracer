@@ -521,6 +521,27 @@ ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40
 ; so that is the last thing done.
 OvResetDisplay:
         call WaitFlip
+        IFNDEF EINSTEIN
+        ; ---- a Kempston joystick? One reads 0 in bits 5-7 at all times. With
+        ; none, port $1F floats: on a 128K or +2 the screen bytes the ULA is
+        ; reading, $FF in the border. A pixel byte with bits 5-7 clear passed
+        ; ReadInput's check, and a stray fire bit changed gear. So read for a
+        ; whole frame: ReadInput's IN stays only if every read was clear.
+        ld bc, 1500             ; (51 T a read: a frame and a little more)
+.kemp:  in a, ($1F)
+        and $E0
+        jr nz, .noKemp
+        dec bc
+        ld a, b
+        or c
+        jr nz, .kemp
+        ld hl, $1FDB            ; in a, ($1F)
+        jr .kempSet
+.noKemp:
+        ld hl, $FF3E            ; ld a, $FF: no Kempston
+.kempSet:
+        ld (ReadInput.kemp), hl
+        ENDIF
         ; screen B: bitmap clear; sky rows get the sky attribute, road rows grass
         ld hl, $C000
         ld de, $C001

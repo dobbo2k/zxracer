@@ -406,23 +406,35 @@ ENativeInk: ds 8
 CAR_PAT         EQU 256 - 32            ; 224-255
         ASSERT KERB_T2 + KERB_N <= CAR_PAT
 
-; In the vertical blank: a new pose's patterns, and each car row's cells
-; recoloured (ECarSend), its first changed cell to its last
+; Upload the new pose's contiguous pattern runs directly from resident art.
+; Then send contiguous runs of recoloured cells (including ground changes).
 EinCarSync:
-        ld a, (ECarBlock)
+        ld hl, (ECarRuns)
+        ld a, h
         or a
         jr z, .colours
-        xor a
-        ld (ECarBlock), a
-        ld hl, ECarPix
-        ld de, VRAM_PAT + $1000 + CAR_PAT * 8
-        push de
-        ld b, 128
+        ld de, 0
+        ld (ECarRuns), de
+.pattern:
+        ld a, (hl)              ; byte offset, byte count; $FF terminates
+        cp $FF
+        jr z, .colours
+        inc hl
+        ld b, (hl)
+        inc hl
+        push hl
+        cp 192
+.top:   ld hl, 0                ; source bases patched by EinCarPrep
+        jr c, .pixels
+.base:  ld hl, 0
+.pixels:ld e, a
+        ld d, 0
+        add hl, de
+        ld d, high (VRAM_PAT + $1000 + CAR_PAT * 8)
+        ASSERT low (VRAM_PAT + $1000 + CAR_PAT * 8) == 0
         call EinWrite
-        pop de
-        set 7, e
-        ld b, 128
-        call EinWrite
+        pop hl
+        jr .pattern
 .colours:
         ld hl, ECarSend
         ld c, 0                 ; C: the row's first cell (0, 8, 16, 24)
@@ -431,29 +443,39 @@ EinCarSync:
         jr z, .next
         ld (hl), 0
         push hl
-        ld d, a
-        ld e, c                 ; E: past its last changed cell
-.hi:    inc e
-        srl a
-        jr nz, .hi
-        ld a, d
-        ld b, c                 ; B: its first
-.lo:    rrca
-        jr c, .send
-        inc b
-        jr .lo
-.send:  ld a, e
-        sub b
-        add a, a
-        add a, a
-        add a, a
-        ld d, a                 ; (bytes: 8 a cell)
-        ld a, b
-        add a, a
-        add a, a
-        add a, a
-        ld b, d
         push bc
+        call .runs
+        pop bc
+        pop hl
+.next:  inc hl
+        ld a, c
+        add a, 8
+        ld c, a
+        cp 32
+        jr nz, .row
+        ret
+
+; A = remaining dirty bits (nonzero), C = cell at bit 0.
+.runs:  srl a
+        jr c, .first
+        inc c
+        jr .runs
+.first: ld e, c
+.count: inc c
+        srl a
+        jr c, .count
+        push af
+        push bc
+        ld a, c
+        sub e
+        add a, a
+        add a, a
+        add a, a
+        ld b, a                 ; bytes to upload
+        ld a, e                 ; first cell
+        add a, a
+        add a, a
+        add a, a
         ld e, a                 ; ECarCol + first * 8 -> its colours' VRAM
         add a, low ECarCol
         ld l, a
@@ -464,14 +486,11 @@ EinCarSync:
         ASSERT low (VRAM_COL + $1000 + CAR_PAT * 8) == 0
         call EinWrite
         pop bc
-        pop hl
-.next:  inc hl
-        ld a, c
-        add a, 8
-        ld c, a
-        cp 32
-        jr nz, .row
-        ret
+        pop af
+        inc c                   ; the clear bit that ended the run
+        or a
+        ret z
+        jr .runs
 
 ; The panorama's names for its scroll (as src/horizon.asm DrawHorizon, but
 ; in steps of 8 pixels: one copy; hidden in a tunnel)

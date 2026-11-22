@@ -119,7 +119,11 @@ EinDraw:
         xor a
         ld (EinShape), a
         ld (EinForce), a
+        IFDEF EIN_DASH
         jp EinDashFinish        ; the centre line's sprites
+        ELSE
+        ret
+        ENDIF
 
 ; The row (ERow): has what its cells come from changed since it was drawn?
 ; Its 4 line pairs' D, E, centre line and depth line, its last line's D, E
@@ -259,10 +263,18 @@ EinRow:
         ld (EI), a              ; the row's top line
         call EinRowFast         ; the ready-made way, if it can be
         jp c, EinRowBase        ; (or the exact way)
+        IFDEF EIN_SLOPE
         jp nz, EinRowBase.slotsUsed     ; (a sloped row: EinSlopeRow drew it)
+        ELSE
+        IFDEF EIN_KERB
+        jp nz, EinRowBase.slotsUsed     ; (a near row: EinKerbRow drew it)
+        ENDIF
+        ENDIF
         ld a, 1
         ld (EStatic), a
+        IFDEF EIN_DASH
         call EinDashRow
+        ENDIF
         jp EinRowBase.allSil
 
 ; The row's slots all free (ESlotN 0, ESlotTop its count), the road's taken
@@ -374,6 +386,7 @@ EinRowNames:
         jp EinFillRun
 
 EinRowBase:
+        IFDEF EIN_SLOPE
         ld a, (ESloped)         ; (a sloped row: its ranges made, the exact way)
         or a
         jr z, .ranges
@@ -381,6 +394,7 @@ EinRowBase:
         ld (ESloped), a
         ld (EStatic), a
         jr .ranged
+        ENDIF
 .ranges:
         call EinRowRanges
         call EinStaticRanges    ; (rows 16-23: ready-made edges, ERB / ERC moved)
@@ -416,11 +430,17 @@ EinRowBase:
         pop hl
         ret
 .noLamp:
+        IFDEF EIN_KERB
+        jr .exact               ; (no ready-made rows)
+        ELSE
         ld a, (EStatic)         ; ---- the ready-made patterns
         or a
         jr z, .exact
         call EinStaticCells
+        IFDEF EIN_DASH
         call EinDashRow
+        ENDIF
+        ENDIF
 .allSil:
         call EinSlotRange       ; (no slot of the road's: all the row's for
         jr .slotsUsed           ; silhouettes)
@@ -435,7 +455,9 @@ EinRowBase:
         or a
         jr z, .one
         call EinForkCells
+        IFDEF EIN_DASH
         call EinDashNone        ; (no centre line on a fork's row)
+        ENDIF
         jr .slotsUsed
 .one:   ; ---- the kerb cells, then the centre line
         call EinLineEdges
@@ -460,7 +482,9 @@ EinRowBase:
         ld a, (hl)
 .r0:    ld (EColEnd), a
         call EinKerbCells
+        IFDEF EIN_DASH
         call EinDashRow
+        ENDIF
 .slotsUsed:
         ld a, (ESlotN)          ; the row's slots in use: the road's (silhouettes
         ld (ERowLoNow), a       ; take the rest, on from them; bit 7 of
@@ -497,15 +521,20 @@ EinRowBase:
 ; way: a slope of 2-line steps). A kerb edge's cell is one name: nothing is
 ; sent but the names.
 ; After EinRowRanges: EStatic, and if set, ERB / ERC for the edges' cells.
-; In rows 16-23 an edge whose top and bottom lines are more than EIN_SLOPE
-; pixels apart is drawn the exact way instead (EinRowFast too).
-        IFNDEF EIN_SLOPE        ; (-D: other thresholds, for measuring)
-EIN_SLOPE       EQU 4
-        ENDIF
+; With -DEIN_SLOPE=n (4: the native artwork's first look), in rows 16-23
+; an edge whose top and bottom lines are more than n pixels apart is drawn
+; the exact way instead (EinRowFast too: src/einstein/slope.asm). Without
+; it every such row is ready-made: about 23K T a game frame less
+; (docs/port_einstein.md, section 6).
+        IFDEF EIN_SLOPE
         ASSERT 2 * EIN_SLOPE + 1 < 256
+        ENDIF
 EinStaticRanges:
         xor a
         ld (EStatic), a
+        IFDEF EIN_KERB          ; (no ready-made rows: a row EinKerbRow can't
+        ret                     ; draw goes the exact way)
+        ELSE
         ld a, (ERBand)
         rla
         ret c                   ; (a tunnel's row: its walls' colours, the exact way)
@@ -521,6 +550,7 @@ EinStaticRanges:
         jr z, .take             ; no road: all grass
         ld bc, (ERDE0)          ; B = D0, C = E0
         ld de, (ERDE1)          ; D = D1, E = E1
+        IFDEF EIN_SLOPE
         ld a, (ERow)
         cp 4
         jr c, .mean
@@ -534,6 +564,7 @@ EinStaticRanges:
         add a, EIN_SLOPE
         cp 2 * EIN_SLOPE + 1
         ret nc
+        ENDIF
 .mean:  ld a, b
         add a, d
         rra                     ; (the carry: the sum's bit 8)
@@ -620,6 +651,7 @@ EinStaticCells:
         add a, c
 .r:     ld (hl), a
         ret
+        ENDIF
 
 EStatByte:      ds KERB_N       ; per ready-made pattern: its byte,
 EStatCol:       ds KERB_N       ; its colour byte
@@ -648,6 +680,9 @@ EinRowFast:
         or a
         scf
         ret nz                  ; (a fork's)
+        IFDEF EIN_KERB
+        jp EinKerbRow           ; both kerb edges exact (src/einstein/kerbrow.asm)
+        ELSE
         ld l, c                 ; ---- the top and bottom lines' edges
         ld h, high DEPage
         ld b, (hl)              ; B: D0
@@ -730,6 +765,7 @@ EinRowFast:
         and 31
         inc a
         ld (ERD), a
+        IFDEF EIN_SLOPE
         ld a, (ERow)            ; ---- rows 16-23: an edge sloping more than 4
         cp 4                    ; pixels is drawn the exact way (its slope in
         jr c, .mean             ; 2-line steps)
@@ -772,6 +808,7 @@ EinRowFast:
         jr c, .s3
         ld (hl), a
 .s3:    jp EinSlopeRow          ; (src/einstein/slope.asm)
+        ENDIF
 .mean:  ld a, b                 ; ---- the edges: the lines' mean
         add a, c
         rra
@@ -915,6 +952,7 @@ EFastK:                         ; per third and set: its left edges' first
         db KERB_T2 - 1, KERB_T2 + 7, KERB_T1 - 1, KERB_T1 + 7          ; (less
         db KERB_T2 + 13, KERB_T2 + 21, KERB_T1 + 13, KERB_T1 + 21      ; one),
                                 ; its right edges' first: light, then dark
+        ENDIF
 
 ; A = value, B = count (0-32), HL = destination in a row of BaseNames
 ; (32-aligned: L advances, H stays): the unrolled fill (src/screen.asm)
@@ -1565,9 +1603,16 @@ EinCommitAt:
         ld a, b                 ; HL = its SlotShadow bytes
         add a, a
         add a, a
+        IFDEF EIN_KERB
+        add a, b
+        add a, a
+        add a, b                ; x 11 (SLOT_SIZE; a row's 22 slots: < 256)
+        ASSERT SLOT_SIZE == 11
+        ELSE
         add a, a
         add a, b                ; x 9 (SLOT_SIZE; a row's 24 slots: < 256)
         ASSERT SLOT_SIZE == 9
+        ENDIF
         ld hl, (ESlotPtr)
         add a, l
         ld l, a
@@ -1586,10 +1631,15 @@ EinCommitAt:
         cp (hl)
         jr nz, .newPat
         inc hl
+        IFDEF EIN_KERB
+        call .colour            ; the same pixels: the same colours?
+        jr z, .same
+        ELSE
         ld a, (hl)              ; the same pixels: the same colour?
         cp c
         jr z, .same
         ld (hl), c
+        ENDIF
         ld e, 2                 ; the colour only
         jr .dirty
 .newPat:
@@ -1607,9 +1657,13 @@ EinCommitAt:
         ldi
         pop bc
         ex de, hl
+        IFDEF EIN_KERB
+        call .colour
+        ELSE
         ld a, (hl)
         ld (hl), c
         cp c
+        ENDIF
         ld e, 1                 ; the pixels
         jr z, .dirty
         ld e, 3                 ; and the colour
@@ -1632,6 +1686,44 @@ EinCommitAt:
         ld a, (ESlotName0)      ; its name
         add a, b
         ret
+        IFDEF EIN_KERB
+; HL = the slot's colour byte, C = the colour; EComM, EComC2: the lines over
+; a second colour byte, and it (0, 0: none). Stored; Z: all as they were.
+; EComM, EComC2 back to 0. B, C kept.
+.colour:
+        inc hl                  ; one colour pair, now and before: as ever
+        ld a, (EComM)
+        or (hl)
+        dec hl
+        jr nz, .two
+        ld a, (hl)
+        ld (hl), c
+        cp c
+        ret
+.two:   ld d, 0                 ; (D: how many differ)
+        ld a, (hl)
+        cp c
+        jr z, $ + 3
+        inc d
+        ld (hl), c
+        inc hl
+        ld a, (EComM)
+        cp (hl)
+        jr z, $ + 3
+        inc d
+        ld (hl), a
+        inc hl
+        ld a, (EComC2)
+        cp (hl)
+        jr z, $ + 3
+        inc d
+        ld (hl), a
+        xor a
+        ld (EComM), a
+        ld (EComC2), a
+        or d
+        ret
+        ENDIF
 
 ; ---------------------------------------------------------------------------
 ERow:           db 0            ; road row 0-11 (screen row 12-23)
@@ -1644,7 +1736,9 @@ ERowLoNow:      db 0            ; (EinRowBase: the row's ERowLo, ERowHi)
 ERowHiNow:      db 0
 ESlotTop:       db 0            ; (the free slots: ESlotN .. ESlotTop - 1)
 EDown:          db 0            ; 1: taken from the top down (EinSlotRange)
+        IFDEF EIN_SLOPE
 ESloped:        db 0            ; EinRowFast made a sloped row's ranges
+        ENDIF
 EDirtyEnd:      dw 0            ; DirtyList's end
 ERW0:           db 0            ; kerb widths of its top and bottom lines
 ERW1:           db 0

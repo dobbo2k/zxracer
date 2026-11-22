@@ -10,10 +10,12 @@
 ;   rows 0-9    the sky: mirrored as ever (src/einstein/sky.asm)
 ;   rows 10-11  the panorama: the panorama's pattern XOR the silhouette, in
 ;               a pattern of the cell's own (the middle third's 192-255)
-;   rows 12-23  the road: the road's cell (a solid colour or a slot) XOR the
-;               silhouette, in a slot of the row's own. A silhouette takes
-;               the cell's ink, as on the Spectrum: black on grass and kerbs,
-;               white on the road.
+;   rows 12-23  the road: the silhouette in the object's own ink (a third of
+;               its height each: EObjectInks) over the road cell's colour, in
+;               a slot of the row's own. A cell of two colours (a kerb edge,
+;               a slot drawn the exact way) gives the one most of its pixels
+;               show (EinCellGround), so objects keep their colours across
+;               kerbs, where the Spectrum's take the cell's ink.
 ;
 ; A row is put together again (NameBuf from BaseNames, then its silhouette
 ; cells, then the car's names) if its road or panorama changed, or a
@@ -569,21 +571,26 @@ EinMaterialCell:
         ld l, a
         ret
 
-; B = row (10-11), C = column under a silhouette: its own pattern, the
-; panorama's (copy 0, its column EPanoCol + C) XOR the silhouette
+; B = row (10-11), C = column. A bare line keeps its panorama pixels and
+; colours. A covered line uses the silhouette over the panorama's paper.
 EinPanoCell:
         ld a, (TunInside)       ; (in a tunnel these rows are its ceiling: the
         or a                    ; cell only cleared)
         jp nz, EinSprMask
-        call EinMaterialCell
-        ld a, (hl)
-        rlca
-        rlca
-        rlca
-        rlca
-        ld (.material + 1), a
         call EinSprMask
         ret z
+        call EinMaterialCell
+        ld a, (hl)
+        exx                     ; B' = material ink, C' = ink repeated in both nibbles
+        ld c, a
+        rlca
+        rlca
+        rlca
+        rlca
+        ld b, a
+        or c
+        ld c, a
+        exx
         ld a, b                 ; EPanoSpr + ((row - 10) * 32 + column) * 8
         sub PANO_ROW0
         rrca
@@ -599,16 +606,12 @@ EinPanoCell:
         ld de, EPanoSpr
         add hl, de
         ex de, hl
-        ld a, (EPanoCol)        ; the panorama's bytes: PANO_CACHE + ((row - 10) * 8 + line) * 32 + its column
+        ld a, (EPanoCol)        ; the underlying tile can wrap within its own row
         add a, c
         and 31
         ld l, a
         ld a, b
         sub PANO_ROW0
-        ld h, a
-        push bc
-        push hl                 ; scanline-major panorama pixel offset
-        ld a, h                 ; tile-major ink offset
         rrca
         rrca
         rrca
@@ -618,57 +621,50 @@ EinPanoCell:
         add hl, hl
         add hl, hl
         add hl, hl
-        ld bc, PANO_CACHE + 512
-        add hl, bc
-        push hl
-        pop ix
-        push de
-        ld hl, EPanoInkBuf - EPanoSpr
-        add hl, de
-        push hl
-        pop iy
-        pop de
-        pop hl
+        push bc                 ; restore row and column for the caller
         ld bc, PANO_CACHE
         add hl, bc
+        push hl
+        push de
+        exx                     ; HL'/DE' follow the two colour planes
+        pop hl
+        ld de, EPanoInkBuf - EPanoSpr
+        add hl, de
+        ex de, hl
+        pop hl
+        inc h
+        inc h                   ; source inks start 512 bytes after pixels
+        exx                     ; HL/DE follow the two pixel planes
         ld bc, EPat
-        ld a, 8
-.ln:    push af
-        ld a, (bc)
+.ln:    ld a, (bc)
         or a
         jr z, .bare
-        push af
-        ld a, (ix)
+        ld (de), a
+        exx
+        ld a, (hl)
         and 15
-.material: or 0
-        ld (iy), a
-        rlca
-        rlca
-        rlca
-        rlca
-        cp (iy)
-        ld a, (iy)
+        or b
+        cp c
         jr nz, .ink
         xor $F0
         or $10
-.ink:   ld (iy), a
-        pop af
-        jr .put
-.bare:  ld a, (ix)
-        ld (iy), a
+        jr .ink
+.bare:
         ld a, (hl)
-.put:   ld (de), a
-        inc ix
-        inc iy
-        inc bc
-        inc de
-        push de
-        ld de, 32
-        add hl, de
-        pop de
-        pop af
-        dec a
+        ld (de), a
+        exx
+        ld a, (hl)
+.ink:   ld (de), a
+        inc l                   ; all source and destination cells are 8-aligned
+        inc e
+        exx
+        inc l
+        inc e
+        inc c
+        ld a, c
+        and 7
         jr nz, .ln
+        ASSERT ((PANO_CACHE | EPanoSpr | EPanoInkBuf | EPat) & 7) == 0
         pop bc
         ld a, (EPanoN)          ; to be sent
         ld l, a
@@ -690,18 +686,33 @@ EinPanoCell:
         ld (hl), a
         ret
 
-; In the vertical blank (RequestFlip): the panorama rows' silhouette cells
+; The compositor lists each nonempty tile once, in increasing display order.
+; Join adjacent entries for one pattern write and one colour write per run.
 EinPanoSend:
         ld a, (EPanoN)
         or a
         ret z
         ld b, a
         ld hl, EPanoList
-.c:     push bc
-        ld a, (hl)
+.run:   ld c, (hl)              ; first tile of this run
+        ld a, c
+        ld e, 0
+.more:  inc e
         inc hl
+        dec b                   ; B = entries still to consume
+        jr z, .send
+        inc a
+        cp (hl)
+        jr nz, .send
+        bit 3, e                ; cap the timed write at 8 tiles (64 bytes)
+        jr z, .more
+.send:  push bc
         push hl
-        ld l, a                 ; VRAM: $0800 + (PANO_SPR + idx) * 8, from EPanoSpr + idx * 8
+        ld a, e
+        add a, a
+        add a, a
+        add a, a
+        ld l, c
         ld h, 0
         add hl, hl
         add hl, hl
@@ -713,7 +724,8 @@ EinPanoSend:
         pop hl
         ld bc, EPanoSpr
         add hl, bc
-        ld b, 8
+        ld b, a
+        push bc
         push de
         push hl
         call EinWrite
@@ -721,12 +733,14 @@ EinPanoSend:
         ld de, EPanoInkBuf - EPanoSpr
         add hl, de
         pop de
+        pop bc
         set 5, d
-        ld b, 8
         call EinWrite
         pop hl
         pop bc
-        djnz .c
+        ld a, b
+        or a
+        jr nz, .run
         ret
 
 ; ---------------------------------------------------------------------------
@@ -833,6 +847,16 @@ EinCarNames:
         sla d
         jr nc, .car
         pop af
+        ld c, a                 ; pose edits already in ECarDirty; only a cell
+        ld b, 0                 ; with transparent lines needs a ground edit
+.groundMask:
+        ld hl, EinCarFrames + 4 ; default at first reset, then the current pose
+        add hl, bc
+        ld a, (hl)
+        and e
+        ret z
+        ld e, a
+        ld a, c
         add a, low ECarDirty
         ld l, a
         ld a, high ECarDirty
@@ -866,7 +890,7 @@ EinSprCell:
         ld a, (hl)              ; the road's name there
         call EinGroundPaper
         cp SLOT_FIRST
-        jr nc, .slot
+        call nc, EinCellGround  ; (two colours: the main one, objcolour.asm)
         push af                 ; one ink band from the projected object
         call EinMaterialCell
         ld e, (hl)
@@ -885,65 +909,7 @@ EinSprCell:
         rlca
         rlca
         ld e, d
-        or e
-        jr .commit              ; (its pixels: the silhouette's, in EPat)
-.slot:  ld e, a                  ; a ready-made kerb edge (its third's)?
-        ld a, b
-        cp 16
-        ld a, e
-        jr nc, .b3
-        sub KERB_T1
-        jr .st
-.b3:    sub KERB_T2
-.st:    jr c, .dyn0
-        cp KERB_N
-        jr nc, .dyn0
-        ld l, a                 ; its byte on all 8 lines, its colour
-        ld h, 0
-        push hl
-        ld de, EStatByte
-        add hl, de
-        ld e, (hl)
-        ld hl, EPat             ; (the silhouette's pixels XOR it)
-        ld d, 8
-.xs:    ld a, (hl)
-        xor e
-        ld (hl), a
-        inc l
-        dec d
-        jr nz, .xs
-        pop hl
-        ld de, EStatCol
-        add hl, de
-        ld a, (hl)
-        jr .commit
-.dyn0:  ld a, e
-        sub SLOT_FIRST          ; a slot: its index, its pattern and colour
-        ld l, a
-        ld a, b
-        cp 16
-        ld a, l
-        jr c, .t1
-        add a, 4 * SLOTS_T1
-.t1:    ld l, a
-        ld h, 0
-        ld d, h
-        ld e, l
-        add hl, hl
-        add hl, hl
-        add hl, hl
-        add hl, de
-        ld de, SlotShadow
-        add hl, de
-        ld de, EPat             ; (the silhouette's pixels XOR it)
-        ld b, 8
-.x:     ld a, (de)
-        xor (hl)
-        ld (de), a
-        inc hl
-        inc e
-        djnz .x
-        ld a, (hl)              ; its colour
+        or e                    ; (its pixels: the silhouette's, in EPat)
 .commit:
         call EinCommitSlot
         cp $FF

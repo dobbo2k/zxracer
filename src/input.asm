@@ -26,8 +26,8 @@ ReadInput:
         or c
         ld c, a
         ELSE
-        in a, ($1F)             ; Kempston; ignore if the bus floats high
-        ld b, a
+.kemp:  in a, ($1F)             ; Kempston; ignore if the bus floats high
+        ld b, a                 ; (ld a, $FF with none: OvResetDisplay)
         and $E0
         jr nz, .noKemp
         ld a, b

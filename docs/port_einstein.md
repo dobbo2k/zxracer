@@ -1,7 +1,8 @@
 # Porting Speed Run to the Tatung Einstein
 
 The plan, reviewed against the hardware as Albert's emulation core models
-it, and the port as far as it has got. Build and test with `make einstein`
+it, and the port as far as it has got. The code itself is described in
+[einstein_code.md](einstein_code.md). Build and test with `make einstein`
 and `make test-einstein` (see "Building and testing" at the end).
 
 ## 1. Target
@@ -12,10 +13,10 @@ and `make test-einstein` (see "Building and testing" at the end).
   system tracks, `SPEEDRUN.COM` and `STAGES.DAT`. At the `0:` prompt, type
   `SPEEDRUN`.
 - **Frame rate:** a steady 12.5 fps (a frame every 4 TV frames) where it
-  can; the Spectrum's is 16.7. In the attract demo's worst stretch
-  (steering, curves, hills and scenery every frame), with the native
-  artwork, 7 frames in 10 make it and most of the rest take 5 TV frames:
-  11.5 fps on average. See section 6.
+  can; the Spectrum's is 16.7. With the kerbs drawn exactly, in 4-line
+  steps (section 6), 231 frames in 303 of the attract demo make it and
+  most of the rest take 5 TV frames: 11.7 fps on average (12.45 with the
+  block kerbs, `-DEIN_BLOCKS`; 11.97 before the speed cut).
 
 ## 2. The hardware, as found
 
@@ -95,10 +96,17 @@ What held, and what changed:
    plan wanted hardware sprites for traffic. Instead the Spectrum's own
    code projects traffic and scenery and XORs its silhouettes into screen
    B. Below the sky, screen B holds nothing else (the Spectrum's road
-   isn't drawn there), so every cell a draw command covers is the road's
-   (or the panorama's) cell XOR the silhouette, in a slot of its row's own.
-   A silhouette takes the cell's ink, as on the Spectrum: black on grass
-   and kerbs, white on the road. No 4-a-line limit, and no flicker.
+   isn't drawn there), so every cell a draw command covers is made again in
+   a slot of its row's own: the silhouette in the object's own inks (a
+   third of its height each, from the native artwork) over the cell's
+   ground colour. A cell of two colours (a kerb edge, or a slot drawn the
+   exact way) gives the colour most of its pixels show
+   (`src/einstein/objcolour.asm`), so objects keep their colours as they
+   cross a kerb. (Until 22 November 2026 such a cell was XORed with the
+   silhouette in its own two colours, so an object turned red, white or
+   black there, as the Spectrum's take the cell's ink.) An ink the same as
+   the ground's is drawn black, or white on black. No 4-a-line limit, and
+   no flicker.
 9. **Interrupt sources on real hardware:** the keyboard, ADC and fire
    buttons have interrupt masks (ports $20, $21, $25). Albert doesn't model
    those interrupts. If MOS leaves one enabled, the game's IM2 table (every
@@ -120,20 +128,37 @@ test-einstein`.
 - **The road** (`src/einstein/roadgfx.asm`): pass 1 is the Spectrum's
   (`RoadPrepare`). Per character row, as the Spectrum's `DrawRoadRow`, the
   row is grass, kerb, road, kerb, grass. Solid cells are one name byte.
-  The kerb's edges are ready-made patterns, already in VRAM: each edge is
-  upright within its row, at the mean of the row's top and bottom lines,
-  so a kerb edge costs one name and nothing else is sent (the exact way,
-  in line pairs, made a slope of 2-line steps, at a slot of 8 pattern
-  bytes and a colour byte per cell). A tunnel's rows, a fork's, and a row
-  whose road fits in one cell are still drawn the exact way, in slots,
-  each sent only when it differs from what VRAM holds. A row is drawn
-  again only if its bands moved or what its cells come from changed: its
-  line pairs' edges, centre line and depth line, kept per row (`ERowSig`).
-- **The centre line:** a hardware sprite a road row (16x16, the top half
-  used): its dashes at any pixel, slanted in 4-line steps, from line pairs
-  0 and 2 of the row (light bands only, in road cells, as the Spectrum).
-  Where the car, a silhouette or a tunnel's mouth covers a cell, the
-  sprite's pixels there are taken out. Only what changed is sent.
+  The kerbs are exact (`src/einstein/kerbrow.asm`, `kerbcell.asm`): per
+  row, from its lines' edges and the kerb's width, the cells of the left
+  and right kerb runs are made pixel by pixel, both edges in 4-line steps
+  (lines 0 and 4 of the row; `-DEIN_KERB2`: 2-line steps, from all 4 line
+  pairs), each in a slot of the row's. A slot holds two colour pairs, kerb
+  over grass and kerb over road, and a mask of the lines over the second
+  (Graphics II has a colour pair a line). A cell all kerb, all road or all
+  grass is a solid name. A row the kerb drawer can't draw (a line pair
+  without road, beyond a crest; a run over 119 pixels wide), like a
+  tunnel's rows and a fork's, is drawn the exact way, in slots. A slot is
+  sent only when it differs from what VRAM holds. With `-DEIN_BLOCKS` the
+  kerb's edges are ready-made patterns instead, already in VRAM: each
+  edge upright within its row, at the mean of the row's top and bottom
+  lines, the outer edge on a cell's edge (8 x 8 blocks), so a kerb edge
+  costs one name and nothing else is sent. A row is drawn again only if
+  its bands moved or what its cells come from changed: its line pairs'
+  edges, centre line and depth line, kept per row (`ERowSig`).
+- **No centre line** since the speed cut (section 6). With `-DEIN_DASH` it
+  comes back, with the block kerbs only (`-DEIN_BLOCKS`: with the exact
+  kerbs its buffers don't fit): a hardware sprite a road row (16x16, the top half used),
+  its dashes at any pixel, slanted in 4-line steps, from line pairs 0 and
+  2 of the row (light bands only, in road cells, as the Spectrum). Where
+  the car, a silhouette or a tunnel's mouth covers a cell, the sprite's
+  pixels there are taken out. Only what changed is sent.
+- **The kerbs' look:** the exact kerbs are as wide as the Spectrum's
+  (`RoadRW`), thinner than the blocks, which padded them out to whole
+  cells. Where a far row's narrow road puts both kerbs in one cell, grass
+  beside the road there is drawn as kerb; the grass in kerb cells has no
+  verge texture. With `-DEIN_BLOCKS -DEIN_SLOPE=4`, a near row whose edge
+  slopes more than 4 pixels is drawn the exact way, in 2-line steps
+  (`src/einstein/slope.asm`), as before the speed cut.
 - **The fork:** rows with both branches (`RowFork`) get both spans' kerbs
   and road, and kerb cells hold both branches' pixels.
 - **Tunnels and the gantry** (`src/einstein/portal.asm`): the Spectrum's
@@ -176,9 +201,9 @@ test-einstein`.
   32 cells the bottom third's last patterns. A line whose paper is 0 is
   transparent: it takes the paper of the ground under its cell, noted as
   each car row is drawn (`EinCarNames`). A new pose (steering, smoke) is
-  made ready by the main code (`EinCarPrep`) and its patterns sent as one
-  256-byte block; only the cells whose pose or ground changed are coloured
-  again (`ECarDirty`), and each car row's span of them sent.
+  selected by the main code (`EinCarPrep`). Generated transition records identify the
+  pattern runs to send directly from resident art and the cells whose drawn colours
+  changed. Ground changes also recolour cells with transparent lines.
 - **Writing VRAM:** a frame goes in during one vertical blank, row by row
   (a row's slots, then its names), so no row shows new names over old
   patterns. Writes go at full speed (an unrolled OUTI, 16 T a byte) while
@@ -216,13 +241,16 @@ As planned, with the details above. Per third (256 patterns each):
 | Third | Patterns |
 |---|---|
 | top (rows 0-7) | rows 0-7 mirrored, one pattern a cell |
-| middle (rows 8-15) | 0-15 solid colours, 16-35 slots (rows 12-15, 5 each: silhouettes', and the road's where it is drawn the exact way), 36-63 the kerb's edges, 64-127 rows 8-9 mirrored, 128-191 the panorama (2 rows x 32), 192-255 the panorama's cells under a silhouette |
-| bottom (rows 16-23) | 0-15 solid colours, 16-191 slots (22 a row), 192-219 the kerb's edges, 220-223 free, 224-255 the player's car |
+| middle (rows 8-15) | 0-15 solid colours, 16-59 slots (rows 12-15, 11 each: the kerbs', silhouettes', and the road's where it is drawn the exact way), 60-63 free, 64-127 rows 8-9 mirrored, 128-191 the panorama (2 rows x 32), 192-255 the panorama's cells under a silhouette. (`-DEIN_BLOCKS`: 16-35 slots, 5 a row, 36-63 the kerb's edges) |
+| bottom (rows 16-23) | 0-15 solid colours, 16-191 slots (22 a row), 192-219 the kerb's ready-made edges (used with `-DEIN_BLOCKS`), 220-221 the verges' textures, 222-223 free, 224-255 the player's car |
 
-The kerb's edges: 7 left edges (road from pixel 1-7) and 7 right (road to
-pixel 0-6), in the light kerb and the dark, in each of the road's thirds
-(`EinStaticInit`, at a display reset). The sprites: 12, one a road row,
-their patterns 4k on.
+The kerb's ready-made edges (`-DEIN_BLOCKS`; the bottom third's are
+written in any build): 7 left edges (road from pixel 1-7) and 7 right
+(road to pixel 0-6), in the light kerb and the dark, in each of the road's
+thirds (`EinStaticInit`, at a display reset). The sprites: the tail lamps' two
+highlights (sprites 0 and 1, pattern 48). With `-DEIN_DASH` the centre
+line's 12 come first, one a road row, their patterns 4k on, and the lamps
+are sprites 12 and 13.
 
 Colours come from the Spectrum's attributes. Each Spectrum colour (with
 bright) maps to the nearest TMS colour (`SpecTms` in
@@ -238,8 +266,10 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
 `src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
-frame takes longer. In the attract demo, over 300 frames sent, 213 come 4
-TV frames after the last, 63 after 5 and 23 after 6: 11.5 fps on average (`make test-einstein` wants at least 7). The harness's `fliphist N`
+frame takes longer. In the attract demo with normal timing (`wait16
+GameFrames 20`, then `fliphist 1300`), of 303 frames sent 231 come 4 TV
+frames after the last, 60 after 5 and 12 after 6: 11.7 fps on average
+(12.45 with `-DEIN_BLOCKS`; `make test-einstein` wants at least 7). The harness's `fliphist N`
 gives that histogram, and the costliest routines of each frame that took 6
 or more.
 
@@ -265,12 +295,116 @@ measures the work alone. Taken so:
 | its speed work, unlocked | 1,279 (4.26) |
 | the objects' work, locked at 4 | 1,318 (4.39, 11.4 fps) |
 | the objects' work, unlocked | 1,248 (4.16) |
-| now, locked at 4 | 1,310 (4.37, 11.5 fps) |
-| now, unlocked | 1,235 (4.12) |
+| before the Spider pose deltas, locked at 4 | 1,310 (4.37, 11.45 fps) |
+| before the Spider pose deltas, unlocked | 1,235 (4.12) |
+| Spider pose deltas, locked at 4 | 1,301 (4.34, 11.53 fps) |
+| Spider pose deltas, unlocked | 1,225 (4.08) |
+| Tile-order panorama and batched uploads, locked at 4 | 1,290 (4.30, 11.63 fps) |
+| Tile-order panorama and batched uploads, unlocked | 1,210 (4.03) |
+| no centre line, ready-made near kerbs, locked at 4 | 1,220 (4.07, 12.30 fps) |
+| no centre line, ready-made near kerbs, unlocked | 1,017 (3.39) |
+| the kerbs exact, 4-line steps (now), locked at 4 | 1,315 (4.38, 11.41 fps) |
+| the kerbs exact, 4-line steps (now), unlocked | 1,239 (4.13) |
+
+With normal game timing, `wait16 GameFrames 20` then `fliphist 1300` in Albert
+gave 253/41/12/1 intervals of 4/5/6/7 TV refreshes before the change and
+258/44/6/1 after it (11.84 to 11.93 fps). The fixed-step demo used the straight
+and steering poses. In a separate fixed-step workload that alternated the two
+left smoke puffs every game frame, the same 300 updates took 1,413 refreshes
+before and 1,301 after. All timing runs recorded zero fast VRAM accesses.
+
+The panorama change brought the same normal-timing sample to 264/38/7/1 intervals
+of 4/5/6/7 refreshes (11.97 fps). On the 300 fixed-step updates, Albert attributed
+1,204 T-states per TV refresh to `EinPanoCell` before the change and 684 after.
+The panorama names and both silhouette planes matched the Spider-only build on
+all 320 sampled updates, including 136 with objects across the horizon.
+
+**The speed cut: no centre line, ready-made near kerbs.** At 1,290 locked
+(210 frames at 4 TV frames, 61 at 5, 8 at 6 in the fixed-step demo), the
+graphics that could be simplified were measured one by one (22 November
+2026; each a build of the same tree, locked at 4; 1,200 is every frame at
+4):
+
+| Build | TV frames | fps |
+|---|---|---|
+| as it was | 1,290 | 11.63 |
+| the near kerbs ready-made (`EIN_SLOPE` none) | 1,240 | 12.10 |
+| exact only for edges past 8 pixels (`-DEIN_SLOPE=8`) | 1,271 | 11.80 |
+| no centre line | 1,243 | 12.07 |
+| the centre line in rows 16-23 only | 1,278 | 11.74 |
+| **no centre line, near kerbs ready-made (`-DEIN_BLOCKS` now)** | **1,220** | **12.30** |
+| that, and no scenery nearer than 200 | 1,214 | 12.36 |
+| that, and no hills (pass 1 always flat) | 1,210 | 12.40 |
+| no hills alone | 1,263 | 11.88 |
+| scenery to depth 800, not 1,200 | 1,269 | 11.82 |
+| at most 4 scenery objects, not 8 | 1,288 | 11.65 |
+| no scenery nearer than 200 | 1,278 | 11.74 |
+| no traffic | 1,266 | 11.85 |
+| no scenery, or no objects at all | 1,200 | 12.50 |
+
+The two cuts taken save about 23K T (`EinSlopeRow`) and 24K T (the centre
+line's sprites) a game frame, and in the fixed-step demo 281 frames in 295
+come at 4 (12 at 5, 2 at 6). Objects are the cost left: without them every
+frame makes 4, but trimming them by distance or count gains little. With
+the lock at 3 (`-DEIN_MIN_FRAMES=3`) the new build averages about 14.1 fps
+in the fixed-step demo (224 frames at 3, 91 at 4, 22 at 5, 2 at 6): faster,
+but uneven, so the lock stays at 4. Without objects as well it would hold
+3 (16.7 fps). The old look built with `-DEIN_DASH -DEIN_SLOPE=4`, byte for
+byte as before the cut, until the objects' colours filled bank 2 (below).
+
+**The kerbs exact (the default since 22 November 2026).** The kerb's outer
+edge had always been on a cell's edge (the Spectrum's kerb is a run of
+attribute cells), and since the cut its inner edge was upright in each row
+too: 8 x 8 blocks. `src/einstein/kerbrow.asm` draws every row of the open
+road (12-23) with both edges exact, the kerb as wide as the Spectrum's
+(`RoadRW`). A cell's line can be over grass or over road, so a slot holds
+a second colour byte and a mask of the lines over it (`SLOT_SIZE` 11;
+`EinCommitAt`, `EinSendSlot`, `EinSendCols`). The middle third's
+ready-made kerb edges' patterns are slots (11 a row there, not 5); no row
+is drawn the ready-made way, and one `EinKerbRow` can't draw goes the exact
+way. Where the far rows' narrow road puts both kerbs in one cell, its
+cells are made with both at once (`EinKerbMerged`). By default a cell's
+kerb comes from lines 0 and 4 alone, each byte on 4 lines (4-line steps,
+`EIN_KERB4`); `-DEIN_KERB2` uses all 4 line pairs (2-line steps); and
+`-DEIN_BLOCKS` keeps the ready-made way. Measured (22 November 2026):
+
+| Build | benchmark, locked | unlocked | attract demo, normal timing |
+|---|---|---|---|
+| block kerbs (`-DEIN_BLOCKS`) | 1,220 (12.30 fps) | 1,017 (3.39) | 318 / 3 / 1 at 4 / 5 / 6 TV frames (12.45 fps) |
+| before the cut | 1,290 (11.63) | | 264 / 38 / 7 / 1 at 4 / 5 / 6 / 7 (11.97) |
+| exact kerbs, rows 16-23 only (the first prototype) | 1,326 (11.31) | 1,257 (4.19) | 229 / 62 / 11 at 4 / 5 / 6 (11.69) |
+| the same, the kerb twice as wide | 1,348 (11.13) | | |
+| exact kerbs, rows 12-23, untuned | 1,461 (10.27) | 1,423 (4.74) | 140 / 95 / 40 / 3 at 4 / 5 / 6 / 7 (10.73) |
+| exact kerbs, 2-line steps, tuned (`-DEIN_KERB2`) | 1,392 (10.78) | 1,338 (4.46) | 177 / 81 / 28 / 2 at 4 / 5 / 6 / 7 (11.12) |
+| **exact kerbs, 4-line steps (now)** | **1,315 (11.41)** | **1,239 (4.13)** | **231 / 60 / 12 at 4 / 5 / 6 (11.69)** |
+
+The untuned version cost about 108K T a game frame more than the block
+kerbs: `EinKerbRow` about 86K (11.9 rows, 7.3K a row: IX-indexed loops and
+a call a cell), the slots' commits about 17K more and their sends about 9K,
+less `EinRowFast`'s 19K. Tuned (the same pixels, checked over 30 frames):
+the line groups loaded unrolled, with the runs' extremes in registers
+(`KLOAD`); each cell's groups unrolled straight into `EPat` with their AND
+and OR, through a 256-byte table of a cell's pixels from v on (`EKGe`,
+indexed by v - x0, which caps a run at 119 pixels); a commit of one colour
+pair as cheap as before. In 2-line steps the drawer (`EinKerbRow`,
+`EinKerbRight`, `EinKerbCell`) takes about 60K T a game frame, for about 43
+kerb cells and 11.5 rows; each changed kerb cell costs about 600 T more to
+commit to a slot and to send. 4-line steps halve the groups to load and
+work out, and fewer kerb cells change a frame. The code is in
+`kerbrow.asm` (bank 2), `kerbcell.asm` (below $4000, where the ready-made
+rows' code is left out of the build) and `kerbmac.asm` (the macros of
+both).
+
+The slots run short. Over the benchmark's attract demo (`linehist
+EinCommitSlot.full 1300`) a row found its slots all used 362 times with
+the block kerbs (5 a row in rows 12-15), 185 with `-DEIN_KERB2` and 72 with
+the 4-line kerbs (11 a row there). Each is a cell not drawn: with the
+block kerbs, at the benchmark's frame 200, a lorry in row 12 shows its
+wheels but not its body.
 
 `profile N` in the harness gives each routine's T-states and calls over N
-TV frames (`profilel N`: local labels apart). A game frame's work is
-about 330K T now: the shared game logic about 130K (pass 1, the hill
+TV frames (`profilel N`: local labels apart). Before the speed cut, a
+game frame's work was about 330K T (about 270K since): the shared game logic about 130K (pass 1, the hill
 mapping, the projection, the sprites' XOR chain into screen B), which
 costs the same as on the Spectrum and is left alone so the Spectrum's
 build stays the same; the road's rows about 60K, of which the near rows'
@@ -280,7 +414,8 @@ line's sprites about 22K; the car's colours about 10K. In the attract
 demo the road's shape changes nearly every frame, so 11 of the 12 road
 rows are built again a frame.
 
-**The near rows' sloped kerbs.** Since the native artwork, a row of 16-23
+**The near rows' sloped kerbs** (only with `-DEIN_SLOPE=n` since the speed
+cut above; the figures here are from before it). Since the native artwork, a row of 16-23
 whose kerb edge slopes more than `EIN_SLOPE` (4) pixels between its top
 and bottom lines is drawn the exact way, in slots (2-line steps), as a
 tunnel's or a fork's is: about 4.7 rows a frame in the attract demo, at
@@ -401,11 +536,16 @@ reset's set-up (`src/einstein/reset.asm`). The Einstein's own buffers
 (the names, the sky's attributes, the masks, the panorama's sprite cells,
 the rows' signatures) are in screen A's memory, above the stage overlay
 ($4800-$5AFF): the game code never writes screen A here (`Ceiling` and
-`TimeWarn` skip it), which also holds the car's pose's colours as drawn
-(`ECarSourceInks`, $5A00, made afresh after every display reset). Left:
-about 100 bytes in bank 2 (and 70 in the chains' place), 30 in bank 5, 99
-under $4000, 128 in the Einstein's buffers ($DB00-$EBFF) and 68 in screen
-A (assertions check each).
+`TimeWarn` skip it). The Spider now reads its pattern and colour sources directly
+from resident art. The normal build (the exact kerbs, in 4-line steps) has
+270 bytes free before the bank 2 tables, 364 below $4000, 128 at the end
+of the Einstein's buffers (after `EObjectLower`), 52 before the bank 5
+track cache and 324 at the end of screen A. `-DEIN_KERB2` leaves 92 in
+bank 2; `-DEIN_BLOCKS` 1,104 (and 76 below $4000), with `-DEIN_DASH` 256,
+with `-DEIN_SLOPE=4` 759. Two combinations no longer fit: the look before
+the speed cut (`-DEIN_BLOCKS -DEIN_DASH -DEIN_SLOPE=4`: bank 2, since the
+objects' colours took 144 bytes of it), and the centre line with the exact
+kerbs (`-DEIN_DASH` alone: the buffers).
 
 ## 7. Building and testing
 

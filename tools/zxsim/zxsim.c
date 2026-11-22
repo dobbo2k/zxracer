@@ -34,6 +34,9 @@
  *                   the ROM's timings (no ROM image is needed)
  *   -x PERCENT      play the tape at PERCENT of its speed (default 100)
  *   -48             no $7FFD paging (as a 48K Spectrum)
+ *   -F              no Kempston interface: port $1F reads the floating bus, as
+ *                   on a real 128K or +2 (the byte the ULA is fetching from the
+ *                   shown screen during the picture, else $FF)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,6 +78,21 @@ static inline void contend(uint16_t a) {
     T += pat[lt & 7];
 }
 
+/* The 128K's floating bus: in each display line's first 128 T, 8-T groups
+   of bitmap, attribute, bitmap, attribute (two columns), then 4 idle T;
+   $FF elsewhere. (Approximate timing: enough to show what a read of an
+   unattached port can return.) */
+static uint8_t floating_bus(void) {
+    long t = T - LINE0_T;
+    if (t < 0 || t >= 192L * LINE_T) return 0xff;
+    int y = (int)(t / LINE_T), lt = (int)(t % LINE_T);
+    if (lt >= 128 || (lt & 7) >= 4) return 0xff;
+    int col = (lt >> 3) * 2 + ((lt & 7) >> 1);
+    const uint8_t *scr = ram[(p7ffd & 8) ? 7 : 5];
+    if (lt & 1) return scr[0x1800 + (y >> 3) * 32 + col];
+    return scr[((y & 0xc0) << 5) | ((y & 7) << 8) | ((y & 0x38) << 2) | col];
+}
+
 /* -u: a map of the CPU addresses in [use_lo, use_hi) the program touched
    (bit 0 read, bit 1 written, bit 2 executed) */
 static uint8_t usemap[65536];
@@ -91,6 +109,8 @@ static inline void wr(uint16_t a, uint8_t v) {
 /* ------------------------------------------------------------------ input */
 static uint8_t keyrows[8];     /* bit set = key pressed, row index = high byte bit */
 static uint8_t kempston;
+static int no_kempston;        /* -F: port $1F floats */
+static uint8_t floating_bus(void);
 
 static const char *keynames[8][5] = {
     {"CS", "Z", "X", "C", "V"},
@@ -121,7 +141,7 @@ static uint8_t *tape;          /* (tape boot, see below) */
 static int tape_ear(void);
 
 static uint8_t port_in(uint16_t port) {
-    if ((port & 0xff) == 0x1f) return kempston;
+    if ((port & 0xff) == 0x1f) return no_kempston ? floating_bus() : kempston;
     if (!(port & 1)) {
         uint8_t v = 0x1f;
         for (int r = 0; r < 8; r++)
@@ -853,6 +873,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "-R") && i + 1 < argc) rand_seed = atol(argv[++i]);
         else if (!strcmp(a, "-x") && i + 1 < argc) tape_speed = atol(argv[++i]);
         else if (!strcmp(a, "-48")) no_paging = 1;
+        else if (!strcmp(a, "-F")) no_kempston = 1;
         else if (a[0] != '-') sna = a;
         else { fprintf(stderr, "zxsim: unknown option %s\n", a); return 2; }
     }

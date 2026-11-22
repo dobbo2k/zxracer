@@ -20,6 +20,9 @@ zxsim game.sna [options]
   -s F:file.ppm   screenshot at the end of frame F (repeatable)
   -k F:KEYS       from frame F hold KEYS, e.g. Q+P, none (repeatable)
   -j F:BITS       from frame F set Kempston bits (1 R, 2 L, 4 D, 8 U, 16 F)
+  -F              no Kempston interface: port $1F reads the floating bus (the
+                  screen byte the ULA is fetching, $FF in the border), as on a
+                  real 128K or +2; without -F a Kempston is always there
   -b F            log every border write (frame, T, colour) from frame F
   -p F:file       from frame F accumulate T-states per PC into file
   -w ADDR[:N]     print registers the first N times PC reaches ADDR

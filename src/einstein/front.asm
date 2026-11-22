@@ -281,7 +281,3 @@ EFrontOn:       db 0            ; screen A on show
 EOvClobbered:   db 0            ; the stage overlay drawn over
 EFrontCur:      dw 0            ; the next cell to compare
 ETick:          db 0            ; (the interrupt's 1 ms ticks, front end)
-
-; The car's pose's cells' pixels (src/einstein/car.asm EinCarPrep; their
-; colours as drawn, ECarSourceInks, are in screen A: src/einstein/platform.asm)
-ECarPix:        ds 4 * CAR_W * 8

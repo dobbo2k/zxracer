@@ -11,10 +11,10 @@ The Einstein disk uses native TMS9129 artwork throughout the race, title and fiv
 | 0–23 | Aqua instrument labels on black, score, stage, gold timer, speed and gear | The labels are generated once. The game updates the changing digits, low-time flash and gear text. |
 | 24–79 | Layered clouds, sun and distant landscape | Each of the 224 cells has eight independent pattern and colour bytes. A moving object, message, starting lamp or tunnel wall can cover a cell. Cleared cells recover the original artwork. |
 | 80–95 | Foreground panorama with boats, fields, rock formations or buildings | The 64 patterns scroll in eight-pixel steps. Cells under scenery get a separate composited pattern and colour plane. |
-| 96–191 | Road, kerbs, terrain, signs, traffic and scenery | The road renderer uses sloping edges on near diagonals and reusable patterns on shallow edges. Two bottom-third patterns texture the verges. Moving objects use projected masks with upper, middle and lower inks for their shape and region. |
+| 96–191 | Road, kerbs, terrain, signs, traffic and scenery | The road renderer draws both of each kerb's edges exactly, in 4-line steps, as wide as the Spectrum's kerb, and the road has no centre line (cut for speed). `-DEIN_KERB2` draws the kerbs in 2-line steps; `-DEIN_BLOCKS` in the earlier 8 x 8 blocks (reusable patterns, the outer edge on a cell's edge), where `-DEIN_DASH` can add the lane markers. Two bottom-third patterns texture the verges. Moving objects use projected masks with upper, middle and lower inks for their shape and region. |
 | 160–191 | The 64 × 32 open Spider | Seven poses cover straight driving, steering and two smoke frames per side. The road or verge shows through transparent runs. Two red sprite overlays pick out the four rear lamps. |
 
-The display is 256 × 192. Graphics II allows any two of the fifteen opaque colours in each horizontal run of eight pixels. The art builder chooses those inks independently on each scanline. Interrupt-driven uploads still use the port’s vertical-blank budget and paced-write path. The twelve lane-marker sprites and two lamp sprites stay within the four-sprites-per-scanline limit.
+The display is 256 × 192. Graphics II allows any two of the fifteen opaque colours in each horizontal run of eight pixels. The art builder chooses those inks independently on each scanline. Interrupt-driven uploads still use the port’s vertical-blank budget and paced-write path. The two lamp sprites are the only sprites (with `-DEIN_DASH`, twelve lane-marker sprites come before them, within the four-sprites-per-scanline limit).
 
 ## Editing a route
 
@@ -37,7 +37,7 @@ The fifteen routes and five regions are defined in `assets/stages.yaml`. The sta
 
 `tools/make_einstein.py` writes the Einstein assets to `build/einstein`. A route pack begins with nine palette bytes, followed by four LZ streams holding sky pixels, sky colours, panorama pixels and colours, and the object inks and verge tiles. Packs are read from `STAGES.DAT` at stage changes. The stage loader shares screen A with the landscape cache and reloads its overlay on its next entry. The live race needs no artwork reads from disk between stages.
 
-Middle-third patterns 128–191 hold the panorama and 192–255 hold cells covered by an object. In the bottom third, 192–219 are kerb patterns, 220–221 are verge textures and 224–255 hold the car. Sprite patterns 0–47 hold the lane markers and pattern 48 supplies both pairs of tail lamps. The title and endings use a full bitmap layout while the front end is active.
+Middle-third patterns 16–59 are the road rows' slots (kerb cells and objects), 128–191 hold the panorama and 192–255 hold cells covered by an object. In the bottom third, 16–191 are slots, 192–219 are the block kerbs' patterns (used with `-DEIN_BLOCKS`), 220–221 are verge textures and 224–255 hold the car. Sprite pattern 48 supplies both pairs of tail lamps (and with `-DEIN_DASH` patterns 0–47 hold the lane markers). The title and endings use a full bitmap layout while the front end is active.
 
 ## Building and checking
 

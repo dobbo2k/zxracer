@@ -33,37 +33,13 @@ EinMirrorAll:
 ; patterns hold the cells under silhouettes, src/einstein/sprites.asm);
 ; matching scanline inks for the 64 scrolling patterns
 EinPanoUpload:
+        ld hl, PANO_CACHE       ; both 512-byte planes are already in VDP tile order
         ld de, $0800 + PANO_PAT * 8
-        call VdpAddr
-        ld hl, PANO_CACHE
-        ld b, 2                 ; row
-.blk:   push bc
-        ld c, 0                 ; column
-.col:   push hl
-        ld a, l
-        add a, c
-        ld l, a
-        jr nc, .nc
-        inc h
-.nc:    ld b, 8
-.ln:    ld a, (hl)
-        out (EIN_VDP_DATA), a   ; (the display is off)
-        ld de, 32
-        add hl, de
-        djnz .ln
-        pop hl
-        inc c
-        ld a, c
-        cp 32
-        jr nz, .col
-        ld de, 32 * 8           ; the next row of cells
-        add hl, de
-        pop bc
-        djnz .blk
-        ld hl, PANO_CACHE + 512
+        call .plane
         ld de, VRAM_COL + $0800 + PANO_PAT * 8
+.plane:
         ld b, 0
         call VdpWrite
-        ld de, VRAM_COL + $0800 + PANO_PAT * 8 + 256
+        inc d
         ld b, 0
         jp VdpWrite

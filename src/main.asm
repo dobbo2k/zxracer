@@ -112,8 +112,15 @@ MainLoop:
         INCLUDE "einstein/keys.asm"
         INCLUDE "einstein/disc.asm"
         INCLUDE "einstein/front.asm"
-        INCLUDE "einstein/dash.asm"
+        INCLUDE "einstein/car.asm"
+        INCLUDE "einstein/dash.asm"     ; (the tail lamps; -DEIN_DASH: the centre line)
+        INCLUDE "einstein/objcolour.asm"    ; (an object's ground in a two-colour cell)
+        IFDEF EIN_KERB
+        INCLUDE "einstein/kerbrow.asm"  ; (a prototype: the near kerbs exact)
+        ENDIF
+        IFDEF EIN_SLOPE
         INCLUDE "einstein/slope.asm"    ; (a sloped row of the near road)
+        ENDIF
         ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES
@@ -265,7 +272,6 @@ CmdListB        EQU $10000 - THEME_TOP
         IFDEF EINSTEIN
         INCLUDE "spider.asm"
         INCLUDE "einstein/ground.asm"
-        INCLUDE "einstein/car.asm"
         ELSE
         INCLUDE "car_data.asm"
         ENDIF

@@ -61,7 +61,9 @@ EinUpload:
         ld (EBudget), a         ; was seen; else paced)
         ld hl, DirtyList
         ld (EDirtyPtr), hl
+        IFDEF EIN_DASH
         call EinDashSend        ; (the centre line's sprites)
+        ENDIF
         call EinPanoSend        ; (the panorama's cells under silhouettes)
         ld c, MIRROR_ROWS       ; (the panorama's and the road's rows)
 .row:   push bc
@@ -249,6 +251,11 @@ EinSendSlot:
         add a, a
         ld e, a                 ; (x 8: its pattern)
         add a, b                ; (x 9: its bytes; a row's slots: < 256)
+        IFDEF EIN_KERB
+        add a, b                ; (x 11)
+        add a, b
+        ASSERT SLOT_SIZE == 11
+        ENDIF
         ld hl, (ERowShadow)
         add a, l
         ld l, a
@@ -288,6 +295,13 @@ EinSendSlot:
         add a, high VRAM_COL
         ld d, a
         call VdpAddr
+        IFDEF EIN_KERB
+        inc hl                  ; (or two, by line)
+        ld a, (hl)
+        dec hl
+        or a
+        jp nz, EinSendCols
+        ENDIF
         ld a, (hl)
         DUP 8
         out (EIN_VDP_DATA), a
@@ -319,6 +333,13 @@ EinSendSlot:
         add a, high VRAM_COL
         ld d, a
         call VdpAddr
+        IFDEF EIN_KERB
+        inc hl                  ; (or two, by line)
+        ld a, (hl)
+        dec hl
+        or a
+        jp nz, EinSendCols
+        ENDIF
         ld a, (hl)
         ld c, EIN_VDP_DATA
         DUP 8
@@ -375,6 +396,7 @@ EinArtLength: ld bc, 0
         call .solids
         call EinGroundInit
         call EinStaticInit      ; the bottom third's ready-made patterns
+        IFDEF EIN_DASH
         call EinDashReset       ; the centre line's sprites
         ld hl, EDashAttr
         ld de, VRAM_SPRATTR
@@ -383,6 +405,9 @@ EinArtLength: ld bc, 0
         call EinTailLamps
         xor a
         ld (EDashAttrNew), a
+        ELSE
+        call EinTailLamps       ; (the only sprites)
+        ENDIF
         call EinMirrorAll
         call EinPanoUpload
         ; the names: rows 0-7 the top third's patterns in order, rows 8-9
