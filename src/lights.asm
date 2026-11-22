@@ -9,8 +9,8 @@ LIGHTS_TIME     EQU 230             ; 50 Hz frames
 LIGHTS_GO       EQU 40              ; green (and go) from here; the lamps go at 0
 LAMP_ROW        EQU 3
 LAMP_COL        EQU 11              ; lamps at columns 11, 15, 19 (2 x 2 cells)
-BEEP_RED        EQU 400             ; tone periods
-BEEP_GREEN      EQU 200
+BEEP_RED        EQU (400 * AYN + AYD / 2) / AYD     ; tone periods
+BEEP_GREEN      EQU (200 * AYN + AYD / 2) / AYD
 
 ; A = C = the new lamp state: beep, draw
 LampChange:

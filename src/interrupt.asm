@@ -11,10 +11,17 @@ InitInterrupts:
         ld a, high IM2_TABLE
         ld i, a
         im 2
+        IFDEF EINSTEIN
+        jp EinCtcInit           ; the 50 Hz tick from the CTC (src/einstein/boot.asm)
+        ELSE
         ret
+        ENDIF
 
 ; 50 Hz handler. Counts frames and performs a pending flip at the top of the
 ; frame (before the beam reaches the display), at most every MIN_FRAMES frames.
+        IFDEF EINSTEIN
+Isr     EQU EinIsr              ; (src/einstein/boot.asm: the VDP's frames, polled)
+        ELSE
 Isr:
         push af
         push hl
@@ -46,3 +53,4 @@ Isr:
         pop af
         ei
         reti
+        ENDIF

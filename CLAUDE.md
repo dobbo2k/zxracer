@@ -1,8 +1,10 @@
 # Speed Run: working on the local Windows machine
 
 The game, its design and the build are described in `README.md`, `PLAN.md`
-and `docs/HANDOVER.md` (the move from the cloud). This file covers the local
-setup.
+and `docs/HANDOVER.md` (the move from the cloud); the graphics and artwork in
+`docs/artwork.md`, and the Einstein port's in `docs/einstein_artwork.md`; the
+Einstein port's code in `docs/einstein_code.md`.
+This file covers the local setup.
 
 ## Toolchain: MSYS2 (UCRT64)
 
@@ -76,6 +78,17 @@ Screenshots of an emulator window: start it with `Start-Process -PassThru`,
 wait, then capture `MainWindowHandle` with user32 `PrintWindow` (flag 2) in
 PowerShell. `CopyFromScreen` gives a blank image when the window is covered.
 Both Fuse and ZEsarUX (SDL) capture this way.
+
+## Tatung Einstein port
+
+`make einstein`, `make test-einstein` and `make run-einstein` (Albert) build
+and test `build/einstein/speedrun.dsk`. See docs/port_einstein.md, and
+docs/einstein_code.md for the code. They use
+the einstein repository (`EINSTEIN_REPO` in `local.mk`: XtalDOS, the MOS ROM,
+Albert's core library), and the harness needs Visual Studio's C++ tools.
+The Einstein assembles the same `src/main.asm` with `-DEINSTEIN`. After
+changing a shared file, check that the Spectrum build is still
+byte-identical: `make build/speedrun.tap`, then `cmp` it with `release/`.
 
 ## Conventions
 

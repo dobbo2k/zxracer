@@ -1,20 +1,32 @@
 ; ---------------------------------------------------------------------------
 ; Speed Run - entry point and main loop
-; Target: ZX Spectrum 128K, assembled with sjasmplus
+; Target: ZX Spectrum 128K, assembled with sjasmplus; with -DEINSTEIN the
+; Tatung Einstein (docs/port_einstein.md): the same game at the same
+; addresses in a flat 64K, with src/einstein/ in place of the Spectrum's
+; screen, input, sound out, interrupt and paging.
 ; ---------------------------------------------------------------------------
+        IFDEF EINSTEIN
+        DEVICE NOSLOT64K
+        ELSE
         DEVICE ZXSPECTRUM128
+        ENDIF
         INCLUDE "defs.asm"
+        IFDEF EINSTEIN
+        INCLUDE "einstein/platform.asm" ; the COM file's entry at $0100, the platform code
+        ENDIF
 
         ORG $8000
 start:
         di
         ld sp, STACK_TOP
+        IFNDEF EINSTEIN
         ld a, P7FFD_ROM48 | 7   ; display bank 5, bank 7 paged at $C000
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
         xor a                   ; black border
         out ($FE), a
+        ENDIF
         call InitInterrupts     ; (first: the music stops and starts with ei)
         ei
         call Restart            ; stage 1: packs, display, track state
@@ -23,6 +35,27 @@ start:
 ; Each game frame: logic and the road's shape first - none of it touches
 ; the screen, so it runs while the last frame still waits for its flip -
 ; then, once that buffer is on show, draw the other one and ask for a flip.
+        IFDEF EINSTEIN
+MainLoop:
+        call CheckPause
+        call EinReadInput       ; (ReadInput, the Einstein's way)
+        call UpdatePlayer
+        call RoadPrepare
+        call WaitFlip           ; (the last frame sent: its buffers free)
+        call EinErase           ; traffic and scenery into screen B, as ever
+        call DrawSprites        ; (EinErase: src/einstein/sprites.asm)
+        call EinCarPrep         ; select the native Spider pose for this frame
+        call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
+        call EinSprCells        ; the cells they cover (src/einstein/sprites.asm)
+        call EinPortal          ; and the portal's (src/einstein/portal.asm)
+        call EinHorizon
+        call EinDraw            ; the frame into RAM: names, patterns (src/einstein)
+        call EinCarGroundSync
+        call DrawHud            ; (into screen B: the cells it writes are sent)
+        call EinFlash           ; (the timer's last ten seconds)
+        call RequestFlip        ; then into VRAM, in the vertical blank
+        jr MainLoop
+        ELSE
 MainLoop:
         call CheckPause
         BORDER 1                ; blue: game logic
@@ -48,9 +81,14 @@ MainLoop:
         call DrawHud
         call RequestFlip
         jr MainLoop
+        ENDIF
 
         INCLUDE "interrupt.asm"
+        IFDEF EINSTEIN
+        INCLUDE "einstein/screen.asm"   ; (FillA: the rest is in src/einstein)
+        ELSE
         INCLUDE "screen.asm"
+        ENDIF
         INCLUDE "input.asm"
         INCLUDE "player.asm"
         INCLUDE "road.asm"
@@ -67,6 +105,23 @@ MainLoop:
         INCLUDE "hills.asm"
         INCLUDE "tunnelb2.asm"
         INCLUDE "vars.asm"
+        IFDEF EINSTEIN          ; (in the room the Spectrum's drawing code leaves)
+        INCLUDE "pause.asm"
+        INCLUDE "beep.asm"
+        INCLUDE "gap4.asm"
+        INCLUDE "einstein/keys.asm"
+        INCLUDE "einstein/disc.asm"
+        INCLUDE "einstein/front.asm"
+        INCLUDE "einstein/car.asm"
+        INCLUDE "einstein/dash.asm"     ; (the tail lamps; -DEIN_DASH: the centre line)
+        INCLUDE "einstein/objcolour.asm"    ; (an object's ground in a two-colour cell)
+        IFDEF EIN_KERB
+        INCLUDE "einstein/kerbrow.asm"  ; (a prototype: the near kerbs exact)
+        ENDIF
+        IFDEF EIN_SLOPE
+        INCLUDE "einstein/slope.asm"    ; (a sloped row of the near road)
+        ENDIF
+        ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES
 
@@ -75,6 +130,19 @@ CodeEnd:
 TablesEnd:
         ASSERT TablesEnd <= PANO_LDI_END - 64
         INCLUDE "tyres.asm"     ; (in the gap before the panorama's chain)
+        IFDEF EINSTEIN          ; (no panorama bitmap nor road pass 2: their
+        INCLUDE "einstein/static.asm"   ; chains' room for code)
+        ASSERT $ <= PANO_LDI_END - 64
+; Unrolled OUTI chain for VRAM in the blank (src/einstein/flip.asm
+; EinWrite): entered at OutiEnd - 2*n for n bytes
+        ORG PANO_LDI_END - 64
+        DUP 32
+        outi
+        EDUP
+OutiEnd:
+        ret
+        INCLUDE "einstein/reset.asm"    ; (more of the display reset)
+        ELSE
         ASSERT $ <= PANO_LDI_END - 64
 
 ; Unrolled LDI chain for the panorama: entered at PanoLdiEnd - 2*n
@@ -99,6 +167,7 @@ PanoLdiEnd:
 DualEnd:
         ret
         ASSERT high (DualEnd - 7 * STRIP_PAD) == high DualEnd
+        ENDIF
         INCLUDE "respawn.asm"   ; (small pieces in the gap before the XOR chain)
         INCLUDE "lights.asm"
         ASSERT $ <= XOR_END - 5 * 8
@@ -142,9 +211,11 @@ FillBlock:
         inc l
         EDUP
         ret
+        IFNDEF EINSTEIN
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
         INCLUDE "beep.asm"
         INCLUDE "gap4.asm"
+        ENDIF
         ASSERT $ <= ISR_JP
 
         ORG ISR_JP
@@ -179,7 +250,11 @@ CmdListA:       db 0            ; buffer A's sprite commands
 ; Buffer B's: the top of bank 7, which no theme pack reaches (make_stages.py
 ; keeps THEME_TOP free; bank 7 is paged in all through a game)
 THEME_TOP       EQU 120
+        IFDEF EINSTEIN
+CmdListB        EQU EIN_CMDLISTB    ; (src/einstein/platform.asm: above the shadow screen)
+        ELSE
 CmdListB        EQU $10000 - THEME_TOP
+        ENDIF
         ASSERT 1 + MAX_SPR * CMD_SIZE <= THEME_TOP
 
         INCLUDE "holes.asm"     ; small data in the unused ends of the table pages
@@ -188,9 +263,18 @@ CmdListB        EQU $10000 - THEME_TOP
 ; sprite, the font and the player's car; then code that is not time-critical
 ; (bank 5 is contended). The track cache follows.
         ORG SCN_DATA
+        IFDEF EINSTEIN
+        INCLUDE "einstein_objects.asm"
+        ELSE
         INCLUDE "resident_data.asm"
+        ENDIF
         INCLUDE "font_data.asm"
+        IFDEF EINSTEIN
+        INCLUDE "spider.asm"
+        INCLUDE "einstein/ground.asm"
+        ELSE
         INCLUDE "car_data.asm"
+        ENDIF
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
         INCLUDE "crew.asm"      ; the crew's crash close-ups
@@ -205,6 +289,25 @@ ScnEnd:
 ; Stage packs in banks 0, 1, 3, 4 and 6 (copied to the caches at a stage start)
         INCLUDE "packs.asm"
 
+        IFDEF EINSTEIN
+; The between-stages overlay stays where the Spectrum runs it ($4000: its
+; screen A, plain RAM here), resident: nothing pages over it.
+        ORG $4000
+        OUTPUT "build/einstein/stageov.bin"     ; (into STAGES.DAT too: the front
+        INCLUDE "stageov.asm"                   ; end draws over it)
+        OUTEND
+        ASSERT $ <= STAGEOV_END                 ; (the Einstein's buffers above)
+; The front end: run at THEME_CACHE, from STAGES.DAT (assembled here, out of
+; the COM file's way, for its own file)
+        ORG $C000
+        OUTPUT "build/einstein/frontend.bin"
+        DISP THEME_CACHE
+        INCLUDE "frontend.asm"
+        ENT
+        OUTEND
+        ; the COM file: $0100 up to the stack
+        SAVEBIN "build/einstein/speedrun.com", $0100, STACK_TOP - 256 - $0100
+        ELSE
         IF AUTOPLAY
         SAVESNA "build/video.sna", start
         ELSE
@@ -212,5 +315,6 @@ ScnEnd:
         SAVESNA "build/release.sna", start     ; (no timing bars: the tape is made from this)
         ELSE
         SAVESNA "build/zxracer.sna", start
+        ENDIF
         ENDIF
         ENDIF

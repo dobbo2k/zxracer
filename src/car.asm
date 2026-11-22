@@ -92,6 +92,7 @@ CAR_CLOCK       EQU FrameCount      ; the smoke puffs' and the spin's animation
 DRIFT_LOOK      EQU 40              ; |P| (the bend's push): the car yaws into the bend
 SMOKE_AT        EQU 72              ; ... and its rear tyres smoke (past what steering holds)
 
+        IFNDEF EINSTEIN
 DrawCar:
         call CarFrame           ; C = frame
         ld a, c                 ; frames 3-6 (smoke, spinning): the squeal
@@ -171,7 +172,8 @@ DrawCar:
         ld hl, (CarTopSrc)
         ld bc, CAR_TOP_PX
         add hl, bc
-.attrs: xor a
+.attrs:
+        xor a
         ld (CarAttrDirty), a
         ; attributes. The top cell row is the open cockpit: its paper is
         ; whatever lies underneath (grass, kerb or road: the road renderer
@@ -228,3 +230,5 @@ DrawCar:
         ld bc, CAR_BOT_PX
         add hl, bc
         jr .attr
+
+        ENDIF

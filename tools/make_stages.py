@@ -25,21 +25,21 @@ sys.path.insert(0, os.path.dirname(__file__))
 import make_scenery as scn          # noqa: E402
 from gen_tables import SPLIT_LEN, fork_dx   # noqa: E402
 import make_screens                         # noqa: E402
+import round_art
 import make_music                           # noqa: E402
 
 THEME_CACHE = 0xDB00                # bank 7, after screen buffer B
 THEME_CACHE_SIZE = 0x10000 - THEME_CACHE
 TRACK_CACHE = 0x8000 - 608          # bank 5, after the resident data and code
-FRONTEND_RESERVE = 7168             # room kept in a pack bank for the front-end overlay
+FRONTEND_RESERVE = 4352             # room kept in a pack bank for the front-end overlay
 THEME_TOP = 120                    # the cache's last bytes stay free (src/main.asm: CmdListB)
 PAR_V = 17                         # par times: depth units per 50 Hz frame on a straight
 PAR_K = 1600                       # ... and sqrt(PAR_K / |curve|) on a curve
-STAGEOV_RESERVE = 1792              # ... and for the between-stages overlay (run at $4000)
+STAGEOV_RESERVE = 2304              # ... and for the between-stages overlay (run at $4000)
 TRACK_CACHE_SIZE = 0x8000 - TRACK_CACHE
 PACK_BANKS = [0, 1, 3, 4, 6]
 BANK_SIZE = 0x4000
-PANO_W, PANO_H = 256, 16
-PANO_COPIES, PANO_STEP = 2, 4         # pre-rotated copies of the panorama (src/horizon.asm)
+PANO_H = 16
 SHARED_TYPES = ["sign_r", "sign_l", "fork"]          # in every theme pack
 TYPE_IDS = {"traffic": 0, "sign_r": 1, "sign_l": 2, "fork": 3,   # theme types: 4, 5, 8, 9
             "van": 6, "truck": 7, "sign_tunnel": 10}         # (10: themes with tunnels only)
@@ -54,86 +54,23 @@ TUNNEL_FROM = 5000                  # tunnels: not before this far into a stage
 TUNNEL_MIN, TUNNEL_MAX = 3500, 6000
 
 
-# ---------------------------------------------------------------- horizon
-def ridge(rnd, top, bottom, octaves):
-    phases = [(rnd.random() * 2 * math.pi, k) for k in octaves]
-    raw = [sum(math.sin(2 * math.pi * k * x / PANO_W + ph) / k ** 0.8 for ph, k in phases)
-           for x in range(PANO_W)]
-    lo, hi = min(raw), max(raw)
-    return [top + (v - lo) / (hi - lo) * (bottom - top) for v in raw]
+PALETTE_KEYS = ("sky", "pano", "hud", "time", "grass_l", "grass_d", "kerb_l", "kerb_d", "road")
+PANO_CACHE = (0x10000 - THEME_TOP - 1024) & ~31
 
 
-def panorama(style, seed):
-    """256 x 16 tiling backdrop; 1 = ink."""
-    rnd = random.Random(seed)
-    tops = [PANO_H] * PANO_W
-    holes = set()
-    if style == "mountains":
-        far = ridge(rnd, 1, 13, [1, 2, 3, 5, 8, 13])
-        near = ridge(rnd, 9, 14, [2, 4, 7, 11, 17])
-        tops = [min(a, b) for a, b in zip(far, near)]
-    elif style == "hills":
-        tops = ridge(rnd, 5, 13, [1, 2, 3, 5])
-    elif style == "mesas":
-        tops = [14] * PANO_W
-        x = 0
-        while x < PANO_W:
-            w = rnd.randint(18, 40)
-            h = rnd.choice([3, 5, 7, 9])
-            for k in range(w):
-                slope = min(k, w - 1 - k)
-                t = h + max(0, 3 - slope) * 2
-                xx = (x + k) % PANO_W
-                tops[xx] = min(tops[xx], t)
-            x += w + rnd.randint(4, 24)
-    elif style == "peaks":
-        tops = [12] * PANO_W
-        for _ in range(9):
-            cx, h = rnd.randrange(PANO_W), rnd.randint(1, 8)
-            for d in range(-24, 25):
-                xx = (cx + d) % PANO_W
-                tops[xx] = min(tops[xx], h + abs(d) * 0.55)
-        for x in range(PANO_W):                      # snow caps: dithered tops
-            t = int(tops[x])
-            if t < 6:
-                for y in range(t, t + 3):
-                    if (x + y) % 2:
-                        holes.add((x, y))
-    elif style == "skyline":
-        tops = [15] * PANO_W
-        x = 0
-        while x < PANO_W:
-            w, h = rnd.randint(6, 18), rnd.randint(2, 12)
-            for k in range(w):
-                tops[(x + k) % PANO_W] = h
-            for wy in range(h + 2, PANO_H - 1, 3):  # lit windows: holes
-                for wx in range(x + 2, x + w - 1, 3):
-                    if rnd.random() < 0.5:
-                        holes.add((wx % PANO_W, wy))
-            x += w
-    else:
-        raise SystemExit(f"unknown horizon style {style}")
-    im = Image.new("1", (PANO_W, PANO_H), 0)
-    for x in range(PANO_W):
-        for y in range(max(0, int(tops[x])), PANO_H):
-            if (x, y) not in holes:
-                im.putpixel((x, y), 1)
-    return im
-
-
-def panorama_lines(im):
-    out = ["Panorama:"]
-    for s in range(PANO_COPIES):
-        for y in range(PANO_H):
-            row = []
-            for b in range(32):
-                v = 0
-                for x in range(8):
-                    if im.getpixel(((b * 8 + x + PANO_STEP * s) % PANO_W, y)):
-                        v |= 0x80 >> x
-                row.append(v)
-            out.append("        db " + ", ".join(f"${v:02X}" for v in row))
-    return out
+def stage_art(theme, stage):
+    """A stage's palette, scrolling panorama and protected sky panel."""
+    palette = {**theme["palette"], **stage.get("palette", {})}
+    assert {palette["kerb_l"], palette["kerb_d"]}.isdisjoint(
+        {palette["grass_l"], palette["grass_d"], palette["road"]}), stage
+    style = theme["horizon"]["style"]
+    seed = stage["seed"]
+    horizon = round_art.panorama(style, seed, stage.get("vista"))
+    clouds = round_art.sky(style, seed)
+    # Keep the two shifted copies out of the pack. Only the unshifted copy
+    # travels on tape. The stage overlay computes the other once at load.
+    return bytes(palette[key] for key in PALETTE_KEYS) + make_screens.lz(
+        horizon.tobytes() + clouds.tobytes())
 
 
 # ---------------------------------------------------------------- tracks
@@ -230,6 +167,9 @@ def make_track(row, seed, theme):
         objs += [(ts - 1700, 250, TYPE_IDS["sign_tunnel"]), (ts - 1700, -250, TYPE_IDS["sign_tunnel"]),
                  (ts - 1000, 250, TYPE_IDS["sign_tunnel"])]
     # no scenery right on the road edge near curve signs etc.: keep sorted, unique z
+    # A pair of landmarks outside the racing surface frames the starting grid.
+    # Keep the course's established obstacle positions and random sequence.
+    objs.extend([(320, -260, tid[big]), (380, 256, tid[landmark])])
     objs.sort()
     return merge_hills(segs, hills), objs, stage_len, tunnel
 
@@ -317,14 +257,14 @@ def track_pack(name, segs, objs, stage_len, tunnel=None):
     return out, size
 
 
-def theme_pack(name, theme):
+def theme_pack(name, theme, masters=None):
     pal = theme["palette"]
     # DrawForkRow finds the kerb cells it drew by their attributes
     assert {pal["kerb_l"], pal["kerb_d"]}.isdisjoint(
         {pal["grass_l"], pal["grass_d"], pal["road"]}), name
     types = SHARED_TYPES + theme["types"] + (["sign_tunnel"] if theme.get("tunnels") else [])
     out = [f"        MODULE {name}",
-           "        dw TypeDir, Panorama, Name",
+           "        dw TypeDir, @PANO_CACHE, Name",
            "        db " + ", ".join(str(pal[k]) for k in
                                     ("sky", "pano", "hud", "time", "grass_l", "grass_d",
                                      "kerb_l", "kerb_d", "road")),
@@ -337,18 +277,32 @@ def theme_pack(name, theme):
     out += [f"        dw Scn_{t}" for t in types[5:]]
     out += [f'Name:   db "{theme["name"]}", 0']
     out += make_music.tune_asm(name[6:], "Tune")
-    im = panorama(**theme["horizon"])
-    im.convert("L").point(lambda v: 0 if v else 255).save(f"assets/gfx/horizon_{name[6:]}.png")
-    out += panorama_lines(im)
-    size = 6 + 9 + 2 + make_music.tune_bytes(name[6:]) + 2 * (len(types) + 3) + len(theme["name"]) + 1 + PANO_COPIES * PANO_H * 32
+    if masters is None:
+        im = round_art.panorama(**theme["horizon"])
+        im.convert("L").point(lambda v: 0 if v else 255).save(f"assets/gfx/horizon_{name[6:]}.png")
+    size = 6 + 9 + 2 + make_music.tune_bytes(name[6:]) + 2 * (len(types) + 3) + len(theme["name"]) + 1
     for t in types:
-        consts, dirl, data = scn.emit_type(t)
+        master = masters.get(t) if masters is not None else None
+        consts, dirl, data = scn.emit_type(t, master=master, previews=masters is None)
         out += consts + dirl + data
-        size += scn.type_bytes(t)
+        size += scn.type_bytes(t, master)
     out.append("        ENDMODULE")
-    if size > THEME_CACHE_SIZE - THEME_TOP:
-        raise SystemExit(f"theme {name}: {size} bytes, the cache holds {THEME_CACHE_SIZE - THEME_TOP}")
+    if size > PANO_CACHE - THEME_CACHE:
+        raise SystemExit(f"theme {name}: {size} bytes, the cache holds {PANO_CACHE - THEME_CACHE}")
     return out, size
+
+
+def resident_data(masters=None):
+    # resident sprites (bank 5)
+    res = ["; Generated by tools/make_stages.py - do not edit"]
+    for t in RESIDENT_TYPES:
+        consts, dirl, data = scn.emit_type(t, master=masters.get(t) if masters is not None else None,
+                                         previews=masters is None)
+        res += consts + dirl + data
+    for t, k in TYPE_IDS.items():
+        res.append(f"TYPE_{t.upper()} EQU {k}")
+    res.append(f"SCN_SIZES EQU {len(scn.SIZES)}")
+    return "\n".join(res) + "\n"
 
 
 # ---------------------------------------------------------------- main
@@ -356,44 +310,58 @@ def main(src="assets/stages.yaml", outdir="build"):
     cfg = yaml.safe_load(open(src))
     themes = cfg["themes"]
 
-    # resident sprites (bank 5)
-    res = ["; Generated by tools/make_stages.py - do not edit"]
-    for t in RESIDENT_TYPES:
-        consts, dirl, data = scn.emit_type(t)
-        res += consts + dirl + data
-    for t, k in TYPE_IDS.items():
-        res.append(f"TYPE_{t.upper()} EQU {k}")
-    res.append(f"SCN_SIZES EQU {len(scn.SIZES)}")
-    open(os.path.join(outdir, "resident_data.asm"), "w").write("\n".join(res) + "\n")
+    open(os.path.join(outdir, "resident_data.asm"), "w").write(resident_data())
 
-    # packs
+    packs, stages, art_sizes = stage_packs(cfg)
+    finish_packs(cfg, packs, stages, art_sizes, outdir)
+
+
+def stage_packs(cfg, masters=None):
+    """The theme, track and art packs: -> (packs, stages, art_sizes), packs
+    as (label, lines, size, cache address or None). Also used by
+    tools/make_einstein.py."""
+    themes = cfg["themes"]
     packs = []                                       # (label, lines, size)
     theme_label = {}
     for tname, theme in themes.items():
         label = f"theme_{tname}"
-        lines, size = theme_pack(label, theme)
+        lines, size = theme_pack(label, theme, masters)
         packs.append((label, lines, size, THEME_CACHE))
         theme_label[tname] = label
     stages = []
+    art_sizes = {}
     for r, row in enumerate(cfg["rows"]):
         for k, st in enumerate(row):
             label = f"track_{len(stages)}"
+            art = f"art_{len(stages)}"
+            data = stage_art(themes[st["theme"]], st)
+            assert len(data) <= 0x800, "stage art exceeds the overlay input buffer"
+            art_sizes[art] = len(data)
+            asm = ["        db " + ", ".join(map(str, data[i:i + 32])) for i in range(0, len(data), 32)]
+            packs.append((art, asm, len(data), None))
             segs, objs, stage_len, tunnel = make_track(r, st["seed"], themes[st["theme"]])
             lines, size = track_pack(label, segs, objs, stage_len, tunnel)
-            thin = 2
             while size > TRACK_CACHE_SIZE:          # too long: a little less small scenery
                 small = [i for i, o in enumerate(objs) if o[2] in (5, 9)]
-                drop = set(small[::thin][:max(1, (size - TRACK_CACHE_SIZE + 3) // 4)])
+                if not small:
+                    small = [i for i, (z, _, kind) in enumerate(objs) if kind == 4 and 1000 < z < stage_len - SPLIT_LEN]
+                if not small:
+                    break
+                drop = set(small[::2][:(size - TRACK_CACHE_SIZE + 3) // 4])
                 objs = [o for i, o in enumerate(objs) if i not in drop]
                 lines, size = track_pack(label, segs, objs, stage_len, tunnel)
             if size > TRACK_CACHE_SIZE:
                 raise SystemExit(f"{label}: {size} bytes, the cache holds {TRACK_CACHE_SIZE}")
             packs.append((label, lines, size, TRACK_CACHE))
-            stages.append({"row": r, "col": k, "theme": theme_label[st["theme"]], "track": label,
+            stages.append({"row": r, "col": k, "theme": theme_label[st["theme"]], "track": label, "art": art,
                            "par": par_time(segs, stage_len)})
+    return packs, stages, art_sizes
 
+
+def finish_packs(cfg, packs, stages, art_sizes, outdir):
+    themes = cfg["themes"]
     # title and goal screens: compressed pictures stored with the packs
-    shots = make_screens.build(themes)
+    shots = make_screens.build(make_screens.ending_themes(cfg))
     for name, (raw, packed) in shots.items():
         lines = ["        db " + ", ".join(str(b) for b in packed[i:i + 32])
                  for i in range(0, len(packed), 32)]
@@ -415,7 +383,7 @@ def main(src="assets/stages.yaml", outdir="build"):
         else:
             raise SystemExit("stage packs do not fit in the free banks")
     out = ["; Generated by tools/make_stages.py - do not edit",
-           f"THEME_CACHE EQU ${THEME_CACHE:04X}", f"TRACK_CACHE EQU ${TRACK_CACHE:04X}",
+           f"PANO_CACHE EQU ${PANO_CACHE:04X}", f"THEME_CACHE EQU ${THEME_CACHE:04X}", f"TRACK_CACHE EQU ${TRACK_CACHE:04X}",
            "        SLOT 3"]
     for b in PACK_BANKS:
         out += [f"        PAGE {b}", "        ORG $C000"]
@@ -453,6 +421,14 @@ def main(src="assets/stages.yaml", outdir="build"):
         tab.append(f"        db {left}, {right}, {r + 1}")
         tab.append(f"        dw {st['par']}")                          # par time, 50 Hz frames
         tab.append(f"        db 0")                                    # 16 bytes
+    tab.append("RoundArtTable:")
+    for st in stages:
+        art = st["art"]
+        tab += [f"        db {where[art]}", f"        dw Pack_{art}, {art_sizes[art]}"]
+    tab.append("DashHeader:")
+    header = round_art.dash_header()
+    for y in range(8):
+        tab.append("        db " + ", ".join(map(str, header[y * 32:(y + 1) * 32])))
     tab += ["FrontEndPack:", f"        db {where['frontend']}",
             "        dw Pack_frontend, Pack_frontend_end - Pack_frontend"]
     open(os.path.join(outdir, "stages.asm"), "w").write("\n".join(tab) + "\n")
@@ -465,6 +441,16 @@ def main(src="assets/stages.yaml", outdir="build"):
         print(f"bank {b}: {fill[b]} bytes of packs and pictures")
 
     # where the pictures are, and the endings (resident)
+    sd = screens_data(cfg, stages, lambda name: (str(where[name]), f"Pack_{name}"))
+    open(os.path.join(outdir, "screens_data.asm"), "w").write("\n".join(sd) + "\n")
+
+
+def screens_data(cfg, stages, pic):
+    """build/screens_data.asm's lines: the screens' rows, where the pictures
+    are (pic(name) -> its byte and word: the Spectrum's bank and address,
+    the Einstein's records and first record), the endings, the route map.
+    Also used by tools/make_einstein.py."""
+    themes, rows = cfg["themes"], cfg["rows"]
     last = [st for st in stages if st["row"] == len(rows) - 1]
     sd = ["; Generated by tools/make_stages.py - do not edit",
           f"HISCORE_ROW EQU {make_screens.HISCORE_AT[0]}",
@@ -472,12 +458,12 @@ def main(src="assets/stages.yaml", outdir="build"):
           f"PRESS_ROW EQU {make_screens.PRESS_ROW}"]
     for k, v in make_screens.GOAL_TEXT.items():
         sd.append(f"GOAL_{k.upper()}_ROW EQU {v}")
-    sd += ["ScrTitle:   db " + str(where["scr_title"]), "        dw Pack_scr_title",
+    sd += ["ScrTitle:   db " + pic("scr_title")[0], "        dw " + pic("scr_title")[1],
            "GoalTable:                  ; per last-row stage: bank, picture, ending line"]
     for k, st in enumerate(last):
         tname = st["theme"][6:]
-        sd.append(f"        db {where['scr_goal_' + tname]}")
-        sd.append(f"        dw Pack_scr_goal_{tname}, Ending{k}")
+        sd.append(f"        db {pic('scr_goal_' + tname)[0]}")
+        sd.append(f"        dw {pic('scr_goal_' + tname)[1]}, Ending{k}")
     for k, st in enumerate(last):
         line = "YOU REACHED " + make_screens.ENDINGS[st["theme"][6:]]
         assert len(line) <= 32, line
@@ -494,9 +480,7 @@ def main(src="assets/stages.yaml", outdir="build"):
         sd.append(f"        dw MapName_{t}")
     for t in tnames:
         sd.append(f'MapName_{t}: db "{themes[t]["name"]}", 0')
-    open(os.path.join(outdir, "screens_data.asm"), "w").write("\n".join(sd) + "\n")
-
-
+    return sd
 
 
 if __name__ == "__main__":

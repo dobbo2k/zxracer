@@ -221,7 +221,12 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   `KeyMap` (a keyboard row and key bit per control, read by `ReadInput`):
   presets for Q/A/O/P/SPACE and the Sinclair and Cursor joysticks, or keys
   picked one by one (H and ENTER are kept for pause and the options; a key
-  can't be used twice). A Kempston joystick always works.
+  can't be used twice). A Kempston joystick always works when one is
+  connected: each display reset (`OvResetDisplay`) reads port `$1F` for a
+  frame, and if any read has bits 5-7 set there is none, and `ReadInput`'s
+  `IN` becomes `LD A, $FF`. Without that check, a 128K or +2 with no
+  Kempston read its floating bus (the screen bytes the ULA fetches), and a
+  stray fire bit changed gear now and then (zxsim `-F` reproduces it).
 - H pauses (`src/pause.asm`, in a gap of bank 2): the last frame stays on show
   with PAUSED on the message line and the sound off; no time passes in the
   game.
@@ -578,7 +583,7 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   Extended play also plays a jingle on channel C (`JingleTick`, run each
   interrupt from `SoundTick`, chains beeps). In the last 10 seconds the big
   timer's cells get the FLASH attribute in both screens (no cost per frame;
-  the next display reset clears it) and each second pips.
+  the next display reset clears it), with no beep.
 - **Levels** *(as built)*: `Difficulty` (options key 6) picks a row of
   `DiffTable` in the overlay (start time 80 / 68 / 60 s, checkpoint bonus
   55 / 48 / 44 s), scales the par time (+1/8 easy, -1/16 hard) and the
@@ -607,7 +612,8 @@ or the sound set to the engine): the engine note on A, gravel and hits on B.
 Tunes are written in `tools/make_music.py` in sections (a bass pattern
 following each bar's chord, a drum pattern with a fill for the last bar, and
 the melody in sixteenths with slides `/E5`, arpeggios `@A5.m` and envelope
-changes `!1`) and encoded as byte streams (note, rest, tie, length, loop,
+changes `!1`; or, in a `double` section such as Green Valley's fat bass
+break, no melody: channel C plays the bass line an octave up) and encoded as byte streams (note, rest, tie, length, loop,
 and commands: arpeggio, envelope, slide, vibrato): 320-930 bytes each. The
 player's effects: arpeggios cycle the chord's three notes every interrupt;
 a slide moves from the last pitch to the new note in 2, 4 or 8 equal steps;

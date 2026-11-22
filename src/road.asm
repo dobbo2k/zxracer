@@ -27,6 +27,7 @@
 ; ---------------------------------------------------------------------------
 STRIP_PAD       EQU 12              ; max kerb cells per side per row
 
+        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
 DrawRoad:
         ; per-frame constants: state pages and screen high-byte OR
         ld a, (StatePage)
@@ -55,6 +56,7 @@ DrawRoad:
         djnz .row
         ret
 
+        ENDIF
 ; The road's shape for the next frame (no screen access: it runs while the
 ; last frame waits for its flip). Pass 1 only when the shape changed: the
 ; player moved sideways, or curves, hills or the fork are in view (this
@@ -81,6 +83,10 @@ RoadPrepare:
 .shapeChanged:
         ld hl, (PlayerX)
         ld (Pass1PX), hl
+        IFDEF EINSTEIN
+        ld a, 1                 ; (every row's shape to be drawn again)
+        ld (EinShape), a
+        ENDIF
         call RoadPass1
 .shapeSame:
         jp RoadBands
@@ -445,6 +451,7 @@ RoadBands:
         jr nz, .band
         ret
 
+        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
 ; --------------------------------------------------------------------------
 DrawRoadRow:
         ; both fork branches on screen in this row?
@@ -1280,3 +1287,4 @@ DrawRoadLine:
         dec h
         ld (hl), a
         ret
+        ENDIF

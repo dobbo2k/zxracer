@@ -13,27 +13,22 @@ Ceiling:
         ldi
         ldi
         jr z, .sky
-        ld hl, $4840            ; going in: the backdrop's pixels cleared (both
-        call .clear             ; screens; drawn again on the way out)
+        IFNDEF EINSTEIN         ; (the Einstein: screen B only; screen A's memory
+        ld hl, $4840            ; holds its buffers) going in: the backdrop's pixels
+        call .clear             ; cleared (both screens; drawn again on the way out)
+        ENDIF
         ld hl, $C840
         call .clear
         ld a, $FF
         ld (PanoLastA), a
         ld (PanoLastB), a
-.sky:   ld hl, $5800 + 3 * 32   ; both screens' sky and backdrop rows
+.sky:
+        IFNDEF EINSTEIN
+        ld hl, $5800 + 3 * 32   ; both screens' sky and backdrop rows
         call .paint
+        ENDIF
         ld hl, $D800 + 3 * 32
-.paint: ld a, (PalSky)
-        ld b, 32 * (PANO_ROW0 - 3)
-.s:     ld (hl), a
-        inc hl
-        djnz .s
-        ld a, (PalPano)
-        ld b, 32 * (ROAD_ROW0 - PANO_ROW0)
-.p:     ld (hl), a
-        inc hl
-        djnz .p
-        ret
+.paint: jp PaintRaceSky
 ; HL = the backdrop's first byte (character rows 10-11): its 8 pixel lines
 .clear: ld b, 8
 .cl:    push bc
@@ -111,11 +106,8 @@ GateKind:
         ld b, S_
         cp ROAD_ROW0
         jr nc, .x
-        ld hl, PalPano
-        cp PANO_ROW0
-        jr nc, .p
-        dec hl                  ; (PalSky)
-.p:     ld b, (hl)
+        call SkyRowAttr
+        ld b, a
 .x:     ld hl, GatePat
         ld (hl), b
         inc hl

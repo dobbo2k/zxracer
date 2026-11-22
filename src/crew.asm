@@ -45,6 +45,7 @@ CrewSay:
 .set:   ld (Message), hl
         ret
 
+        IFNDEF EINSTEIN         ; (the crew's close-ups: not on the Einstein yet)
 ; Each frame, before the sprites: the close-ups on the back buffer during a
 ; crash, gone again afterwards.
 DrawCrew:
@@ -139,3 +140,4 @@ DrawCrew:
         ret
 
         INCLUDE "crew_data.asm"
+        ENDIF

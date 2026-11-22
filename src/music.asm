@@ -61,7 +61,7 @@ ChanC:  dw 0, 0                     ; melody
         ds CH_SIZE - 15
 SQ_CHIRP        EQU 24
 SQ_SLIDE        EQU 12
-SQ_NOISE        EQU 4               ; the squeal's grit: a high noise
+SQ_NOISE        EQU (4 * AYN + AYD / 2) / AYD  ; the squeal's grit: a high noise
 SQ_CYCLE        EQU 128
 
 ; (SoundTick, the interrupt's way in: src/musicb2.asm)
@@ -98,7 +98,7 @@ MusicPlay:
         ld e, 10
         ld a, 9
         call AyWrite
-        ld e, 12
+        ld e, GRAVEL_NOISE
         ld a, 6
         call AyWrite
         ld a, 1
@@ -146,7 +146,7 @@ MusicPlay:
         dec (hl)
 .sq:    ld a, (FrameCount)      ; a wavering high tone
         and 6
-        add a, 40
+        add a, SQ_TONE
         ld e, a
         xor a
         call AyWrite
@@ -272,17 +272,17 @@ DrumOut:
 ; dw tone period (0: none)
 DrumTab:        dw DrumKick, DrumSnare, DrumHat, DrumTom, DrumOpen
 DrumTom:        db 14, 0
-                dw 500
+                dw (500 * AYN + AYD / 2) / AYD
                 db 13, 0
-                dw 600
+                dw (600 * AYN + AYD / 2) / AYD
                 db 11, 0
-                dw 720
+                dw (720 * AYN + AYD / 2) / AYD
                 db 9, 0
-                dw 860
+                dw (860 * AYN + AYD / 2) / AYD
                 db 6, 0
-                dw 1000
+                dw (1000 * AYN + AYD / 2) / AYD
                 db 3, 0
-                dw 1150
+                dw (1150 * AYN + AYD / 2) / AYD
                 db 0
 ; (DrumOpen: src/holes.asm)
 

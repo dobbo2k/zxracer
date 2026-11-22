@@ -10,7 +10,7 @@ Output (sjasmplus): per type a directory of SIZES entries, 8 bytes each:
   db width_bytes (incl. shift padding), height, shift_mask, 0
   dw data pointer (shift 0), dw bytes per shift
 shift_mask selects which pixel shifts exist: x & shift_mask picks the copy
-(7 = 8 copies, 6 = 4 copies at 2-px steps, 4 = 2 copies at 4-px steps).
+(7 = 8 copies, 6 = 4 copies at 2 - px steps, 4 = 2 copies at 4 - px steps).
 usage: make_scenery.py out.asm
 """
 import math
@@ -22,108 +22,84 @@ SIZES = [64, 48, 36, 27, 20, 15, 11, 8, 6]       # heights in pixels
 SHIFTS = [2, 2, 4, 4, 4, 8, 8, 8, 8]             # copies per size
 
 
+def master(width, height):
+    image = Image.new("L", (width, height))
+    return image, ImageDraw.Draw(image)
+
+
 def palm():
-    """Master palm tree, 192 x 256 (scaled 1/4 to 48 x 64)."""
-    W, H = 192, 256
-    im = Image.new("L", (W, H), 0)
-    d = ImageDraw.Draw(im)
-    # trunk: a gentle S-curve, tapering from 22 px at the foot to 10 at the top
-    top = (104, 70)
-    pts = []
-    for k in range(41):
-        t = k / 40
-        x = 92 + 18 * math.sin(t * 2.4) + 10 * t
-        y = H - 1 - t * (H - 1 - top[1])
-        pts.append((x, y, 11 - 6 * t))
-    for (x0, y0, r0), (x1, y1, r1) in zip(pts, pts[1:]):
-        d.polygon([(x0 - r0, y0), (x0 + r0, y0), (x1 + r1, y1), (x1 - r1, y1)], 255)
-    for k in range(4, 40, 4):                       # bark rings
-        x, y, r = pts[k]
-        d.line([(x - r, y), (x + r, y)], 0, 2)
-    cx, cy = pts[-1][0], pts[-1][1]
-    # fronds: drooping arcs, thick near the crown, thin at the tips
-    for ang, length, droop in [(-170, 92, 60), (-140, 80, 50), (-110, 60, 30),
-                               (-70, 60, 30), (-40, 82, 52), (-10, 92, 62),
-                               (-90, 40, 10), (160, 70, 70), (20, 70, 70)]:
-        a = math.radians(ang)
-        prev = (cx, cy)
-        for k in range(1, 21):
-            t = k / 20
-            x = cx + math.cos(a) * length * t
-            y = cy + math.sin(a) * length * t + droop * t * t
-            wdt = max(5, int(22 * (1 - t)))
-            d.line([prev, (x, y)], 255, wdt)
-            # leaflets
-            if k % 2 == 0 and t > 0.2:
-                d.line([(x, y), (x + 6 * math.cos(a + 1.2), y + 10)], 255, 5)
-                d.line([(x, y), (x + 6 * math.cos(a - 1.2), y + 10)], 255, 5)
-            prev = (x, y)
-    d.ellipse([cx - 14, cy - 10, cx + 14, cy + 12], 255)   # crown / coconuts
-    return im
+    m, d = master(43, 52)
+    d.polygon([(14, 51), (18, 38), (20, 26), (20, 15), (23, 13), (24, 22), (23, 36), (21, 49), (25, 51)], 255)
+    for y, x in [(23, 21), (28, 21), (34, 20), (40, 19), (45, 17)]:
+        d.line((x, y, x + 2, y - 1), 0)
+    fronds=[[(21, 15), (13, 8), (4, 8), (0, 12), (8, 10), (14, 11)],
+            [(22, 15), (15, 4), (8, 1), (6, 1), (12, 5), (15, 10)],
+            [(22, 15), (20, 7), (21, 0), (23, 2), (24, 7), (23, 12)],
+            [(22, 15), (29, 4), (35, 3), (39, 5), (33, 5), (28, 10)],
+            [(22, 15), (32, 9), (38, 10), (42, 15), (35, 12), (29, 13)],
+            [(21, 15), (32, 15), (38, 19), (40, 25), (35, 20), (28, 18)],
+            [(21, 15), (15, 14), (9, 17), (4, 23), (3, 27), (9, 21), (15, 18)],
+            [(21, 15), (18, 18), (14, 25), (15, 29), (17, 23), (20, 19)],
+            [(21, 15), (27, 17), (30, 22), (30, 28), (28, 24), (24, 19)]]
+    for f in fronds:
+        d.polygon(f, 255)
+    for x, y, side in [(4, 11, -1), (8, 10, -1), (12, 11, -1), (11, 5, -1), (15, 8, -1),
+                       (29, 9, 1), (33, 6, 1), (34, 12, 1), (37, 13, 1), (33, 19, 1), (9, 20, -1)]:
+        d.line((x, y, x + side, y + 3), 255)
+    for x, y in [(18, 14), (21, 13), (24, 15)]:
+        d.point((x, y), 0)
+    d.line((12, 51, 27, 51), 255)
+    return m.resize((192, 256), Image.Resampling.NEAREST)
 
 
 def car():
-    """Master traffic car (rear view of a small hatchback), 256 x 128.
-
-    Drawn as a white body with black holes (windows, lamps, gaps): on the
-    road the XOR sprite shows white with the details in the road's black.
-    """
-    W, H = 256, 128
-    im = Image.new("L", (W, H), 0)
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle([40, 4, 216, 64], radius=24, fill=255)      # cabin
-    d.rounded_rectangle([12, 52, 244, 108], radius=14, fill=255)    # body
-    d.rounded_rectangle([60, 14, 196, 52], radius=12, fill=0)       # rear window
-    d.rectangle([24, 66, 64, 80], fill=0)                           # lamps
-    d.rectangle([192, 66, 232, 80], fill=0)
-    d.rectangle([100, 76, 156, 96], fill=0)                         # number plate
-    d.rectangle([20, 104, 64, 127], fill=255)                       # tyres
-    d.rectangle([192, 104, 236, 127], fill=255)
-    return im
+    m, d = master(40, 20)
+    d.polygon([(1, 12), (5, 9), (9, 3), (12, 2), (28, 2), (33, 9), (38, 10), (39, 15),
+               (37, 17), (3, 17), (0, 15)], 255)
+    d.polygon([(7, 9), (11, 4), (26, 4), (31, 9)], 0)
+    d.line((14, 5, 12, 8), 255)
+    d.line((26, 5, 29, 8), 255)
+    for x in [3, 29]:
+        d.rectangle((x, 11, x + 7, 13), 0)
+        d.line((x + 1, 12, x + 4, 12), 255)
+    d.line((4, 15, 35, 15), 0)
+    d.rectangle((17, 12, 22, 14), 0)
+    d.rectangle((4, 17, 10, 19), 255)
+    d.rectangle((30, 17, 36, 19), 255)
+    return m.resize((256, 128), Image.Resampling.NEAREST)
 
 
 def truck():
-    """Master truck (rear view of a box lorry), 256 x 210: a tall box with
-    two doors, lamps, a bumper and twin tyres."""
-    W, H = 256, 210
-    im = Image.new("L", (W, H), 0)
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle([4, 0, 252, 168], radius=8, fill=255)       # the box
-    d.rectangle([121, 14, 135, 168], fill=0)                        # door seam
-    d.rectangle([12, 8, 244, 16], fill=0)                           # top rail
-    d.rectangle([4, 84, 252, 100], fill=0)                          # a stripe round the box
-    for x in (40, 216):                                             # hinges
-        for y in (36, 132):
-            d.rectangle([x - 18, y, x + 18, y + 10], fill=0)
-    d.rectangle([96, 112, 108, 150], fill=0)                        # handles
-    d.rectangle([148, 112, 160, 150], fill=0)
-    d.rectangle([0, 172, 256, 190], fill=255)                       # bumper
-    d.rectangle([14, 176, 52, 186], fill=0)                         # lamps
-    d.rectangle([204, 176, 242, 186], fill=0)
-    d.rectangle([104, 174, 152, 188], fill=0)                       # plate
-    d.rectangle([10, 192, 84, 209], fill=255)                       # twin tyres
-    d.rectangle([172, 192, 246, 209], fill=255)
-    d.rectangle([46, 192, 48, 209], fill=0)
-    d.rectangle([208, 192, 210, 209], fill=0)
+    im, d = master(39, 34)
+    d.rectangle((1, 0, 37, 25), 255)
+    d.rectangle((3, 2, 35, 22), 0)
+    for x in (4, 20):
+        d.rectangle((x, 3, x + 14, 21), 255)
+        for y in (6, 9, 12):
+            d.line((x + 2, y, x + 12, y), 0)
+        d.rectangle((x + 5, 15, x + 6, 20), 0)
+    d.rectangle((0, 26, 38, 29), 255)
+    for x in (3, 28):
+        d.rectangle((x, 27, x + 6, 28), 0)
+        d.rectangle((x, 30, x + 7, 33), 255)
+        d.line((x + 3, 30, x + 3, 33), 0)
+    d.line((16, 27, 22, 27), 0)
     return im
 
 
 def van():
-    """Master van (rear view), 256 x 160: a high roof, two rear windows on
-    split doors, lamps down the sides."""
-    W, H = 256, 160
-    im = Image.new("L", (W, H), 0)
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle([16, 0, 240, 136], radius=30, fill=255)     # body
-    d.rounded_rectangle([34, 16, 122, 60], radius=8, fill=0)        # windows
-    d.rounded_rectangle([134, 16, 222, 60], radius=8, fill=0)
-    d.rectangle([126, 16, 130, 128], fill=0)                        # door seam
-    d.rectangle([20, 70, 32, 108], fill=0)                          # lamps
-    d.rectangle([224, 70, 236, 108], fill=0)
-    d.rectangle([100, 98, 156, 114], fill=0)                        # plate
-    d.rectangle([8, 124, 248, 140], fill=255)                       # bumper
-    d.rectangle([24, 142, 72, 159], fill=255)                       # tyres
-    d.rectangle([184, 142, 232, 159], fill=255)
+    im, d = master(34, 25)
+    d.polygon([(1, 21), (1, 9), (4, 3), (7, 1), (27, 1), (31, 4), (32, 10), (32, 21)], 255)
+    d.polygon([(5, 10), (6, 4), (15, 4), (15, 10)], 0)
+    d.polygon([(18, 4), (27, 4), (29, 10), (18, 10)], 0)
+    d.line((16, 4, 16, 18), 0)
+    d.line((4, 13, 13, 13), 0)
+    d.line((19, 13, 29, 13), 0)
+    for x in (3, 28):
+        d.rectangle((x, 15, x + 2, 18), 0)
+        d.rectangle((x, 21, x + 3, 24), 255)
+    d.rectangle((13, 16, 20, 18), 0)
+    d.line((4, 20, 29, 20), 0)
     return im
 
 
@@ -136,6 +112,7 @@ def sign(direction):
         d = ImageDraw.Draw(im)
         d.rectangle([70, 70, 90, 159], fill=255)                    # post
         d.rounded_rectangle([4, 4, 156, 92], radius=10, fill=255)    # board
+        d.line((20, 83, 139, 83), 0, 5)
         pts = [(40, 28), (96, 28), (96, 12), (136, 48), (96, 84), (96, 68), (40, 68)]
         if direction < 0:
             pts = [(W - x, y) for x, y in pts]
@@ -155,6 +132,8 @@ def sign_tunnel():
     d.pieslice([34, 18, 126, 110], 180, 360, fill=0)                 # the arch ...
     d.rectangle([34, 63, 126, 84], fill=0)                           # ... and its sides
     d.polygon([(72, 84), (88, 84), (98, 64), (62, 64)], fill=255)    # the road going in
+    d.arc((23, 10, 137, 122), 180, 360, 0, 6)
+    d.line((18, 90, 142, 90), 0, 4)
     return im
 
 
@@ -168,6 +147,9 @@ def fork():
     d.rounded_rectangle([2, 2, 190, 84], radius=10, fill=255)
     d.polygon([(14, 43), (54, 12), (54, 30), (88, 30), (88, 56), (54, 56), (54, 74)], fill=0)
     d.polygon([(178, 43), (138, 12), (138, 30), (104, 30), (104, 56), (138, 56), (138, 74)], fill=0)
+    d.line((16, 80, 176, 80), 0, 4)
+    d.line((47, 93, 47, 113), 0, 5)
+    d.line((142, 93, 142, 113), 0, 5)
     return im
 
 
@@ -179,6 +161,9 @@ def bush():
         d.ellipse([x - r, y - r, x + r, min(111, y + r)], fill=255)
     for x, y in [(70, 40), (120, 30), (40, 66), (160, 60)]:        # leafy gaps
         d.ellipse([x - 6, y - 6, x + 6, y + 6], fill=0)
+    for x, y in ((16, 84), (55, 56), (96, 38), (135, 65)):
+        d.polygon([(x, y), (x + 10, y - 18), (x + 28, y - 19), (x + 13, y - 12)], 0)
+    d.line([(13, 101), (44, 95), (74, 103), (101, 95)], 0, 5)
     return im
 
 
@@ -193,6 +178,10 @@ def cactus():
     d.rectangle([90, 124, 146, 152], fill=255)
     for x in (72, 80, 88):                                             # ribs
         d.line([(x, 30), (x, 250)], fill=0, width=2)
+    d.polygon([(24, 255), (46, 230), (60, 246), (54, 219), (71, 243), (82, 255)], 255)
+    d.line([(25, 109), (25, 150), (40, 161), (61, 161)], 0, 6)
+    d.line([(129, 70), (129, 131), (117, 144)], 0, 6)
+    d.line([(73, 24), (73, 100), (77, 112)], 0, 5)
     return im
 
 
@@ -203,19 +192,23 @@ def rock():
     d.polygon([(6, 111), (20, 50), (60, 18), (118, 8), (162, 34), (186, 80), (190, 111)], fill=255)
     d.line([(70, 30), (96, 70), (90, 111)], fill=0, width=5)          # crack
     d.line([(140, 40), (128, 80)], fill=0, width=4)
+    d.polygon([(15, 85), (58, 29), (87, 27), (63, 44), (46, 71)], 0)
+    d.line([(108, 25), (149, 48), (156, 66)], 0, 7)
+    d.line([(18, 101), (61, 91), (77, 94)], 0, 5)
     return im
 
 
 def pine():
-    """Pine tree: stacked triangles on a short trunk, 160 x 256."""
-    im = Image.new("L", (160, 256), 0)
-    d = ImageDraw.Draw(im)
-    d.rectangle([70, 200, 90, 255], fill=255)
-    for top, base, half in [(4, 80, 40), (40, 140, 58), (90, 210, 78)]:
-        d.polygon([(80, top), (80 - half, base), (80 + half, base)], fill=255)
-    for y in (82, 142):                                                # layer gaps
-        d.line([(40, y), (120, y)], fill=0, width=3)
-    return im
+    m, d = master(27, 42)
+    d.rectangle((12, 16, 15, 41), 255)
+    for x, y, width, height in [(13, 0, 5, 12), (13, 6, 8, 12), (12, 11, 10, 14),
+                             (14, 17, 11, 14), (13, 23, 13, 12)]:
+        d.polygon([(x, y), (x + width//2, y + height//2), (x + width//2 - 1, y + height//2),
+                   (x + width, y + height - 2), (x + 3, y + height - 3), (x + 4, y + height),
+                   (x - width//2, y + height - 2), (x - width, y + height - 1)], 255)
+        d.line((x - 1, y + 4, x - width//2, y + height - 4), 0)
+    d.line((4, 40, 24, 41), 255)
+    return m.resize((160, 256), Image.Resampling.NEAREST)
 
 
 def tree():
@@ -227,36 +220,37 @@ def tree():
         d.ellipse([x - r, y - r, x + r, y + r], fill=255)
     for x, y in [(70, 50), (124, 62), (100, 96), (60, 110)]:
         d.ellipse([x - 7, y - 7, x + 7, y + 7], fill=0)
+    d.polygon([(90, 175), (56, 127), (65, 126), (95, 150), (127, 119), (134, 119), (101, 167)], 255)
+    for x, y in ((30, 91), (54, 64), (79, 45), (104, 67), (138, 83), (84, 109)):
+        d.arc((x, y, x + 37, y + 24), 195, 334, 0, 6)
+    d.polygon([(74, 223), (93, 204), (109, 216), (120, 223)], 255)
     return im
 
 
 def lamp():
-    """Street lamp: a tall post with an arm and a lamp head, 128 x 256."""
-    im = Image.new("L", (128, 256), 0)
-    d = ImageDraw.Draw(im)
-    d.rectangle([56, 30, 66, 255], fill=255)
-    d.rectangle([44, 236, 78, 255], fill=255)                         # base
-    d.rectangle([56, 22, 110, 32], fill=255)                          # arm
-    d.rounded_rectangle([92, 22, 124, 44], radius=6, fill=255)        # lamp head
-    return im
+    m, d = master(29, 48)
+    d.polygon([(7, 47), (9, 28), (10, 11), (12, 6), (20, 4), (22, 6), (14, 8), (13, 27), (13, 47)], 255)
+    d.polygon([(16, 4), (21, 1), (27, 1), (28, 3), (23, 6), (18, 6)], 255)
+    d.line((21, 4, 25, 3), 0)
+    d.line((8, 43, 12, 43), 0)
+    d.rectangle((6, 46, 15, 47), 255)
+    return m.resize((128, 256), Image.Resampling.NEAREST)
 
 
 def tower():
-    """Lifeguard tower: a hut on stilts with a sloping roof, 192 x 256."""
-    im = Image.new("L", (192, 256), 0)
-    d = ImageDraw.Draw(im)
-    for x0, x1 in ((40, 58), (134, 152)):                             # stilts
-        d.polygon([(x0, 255), (x0 + 18, 255), (x1 - 4, 132), (x1 - 22, 132)], fill=255)
-    d.line([(52, 230), (140, 150)], fill=255, width=10)                # bracing
-    d.line([(52, 150), (140, 230)], fill=255, width=10)
-    d.rectangle([24, 120, 168, 134], fill=255)                         # platform
-    d.rectangle([36, 48, 156, 122], fill=255)                          # cabin
-    d.rectangle([54, 64, 90, 96], fill=0)                              # windows
-    d.rectangle([102, 64, 138, 96], fill=0)
-    d.polygon([(14, 50), (96, 8), (178, 50)], fill=255)                # roof
-    d.line([(96, 8), (96, 0)], fill=255, width=6)                      # flag
-    d.polygon([(96, 0), (128, 6), (96, 14)], fill=255)
-    return im
+    m, d = master(24, 45)
+    d.polygon([(5, 42), (9, 13), (16, 13), (20, 42)], 255)
+    d.rectangle((6, 10, 18, 12), 255)
+    d.rectangle((8, 5, 16, 10), 255)
+    d.rectangle((10, 6, 14, 9), 0)
+    d.line((12, 5, 12, 10), 255)
+    d.polygon([(6, 5), (12, 1), (18, 5)], 255)
+    d.point((12, 0), 255)
+    d.polygon([(9, 19), (16, 16), (16, 20), (8, 24)], 0)
+    d.polygon([(8, 30), (17, 26), (18, 30), (7, 35)], 0)
+    d.rectangle((11, 36, 13, 41), 0)
+    d.rectangle((3, 42, 22, 44), 255)
+    return m.resize((192, 256), Image.Resampling.NEAREST)
 
 
 def parasol():
@@ -269,6 +263,10 @@ def parasol():
         d.pieslice([24, 22, 168, 94], a0, a1, fill=0)
     d.rectangle([90, 50, 102, 159], fill=255)                          # pole
     d.ellipse([88, 0, 104, 14], fill=255)
+    d.line([(6, 58), (21, 65), (37, 56), (52, 64), (68, 55), (84, 63), (101, 54), (119, 62), (139, 54), (158, 62), (183, 55)], 255, 7)
+    d.line([(99, 120), (152, 100), (137, 132), (103, 141)], 255, 7)
+    d.line((104, 141, 95, 159), 255, 6)
+    d.line((132, 133, 145, 159), 255, 6)
     return im
 
 
@@ -290,6 +288,10 @@ def windpump():
                 (88 + 60 * math.cos(a), 64 + 60 * math.sin(a))], fill=0, width=5)
     d.ellipse([82, 58, 94, 70], fill=255)
     d.polygon([(130, 56), (174, 40), (174, 88), (130, 72)], fill=255)  # tail vane
+    d.line([(47, 233), (116, 176), (66, 176), (106, 127)], 0, 5)
+    d.ellipse((75, 51, 101, 77), 255)
+    d.ellipse((82, 58, 94, 70), 0)
+    d.polygon([(121, 67), (153, 43), (174, 43), (164, 79)], 255)
     return im
 
 
@@ -304,6 +306,9 @@ def tumbleweed():
         a = rnd.random() * math.pi
         d.line([(x - 18 * math.cos(a), y - 18 * math.sin(a)),
                 (x + 18 * math.cos(a), y + 18 * math.sin(a))], fill=0, width=5)
+    for x, y in ((10, 91), (23, 37), (62, 15), (85, 25), (108, 74)):
+        d.line([(59, 81), (x, y), (x - 5, y - 9)], 255, 5)
+    d.line([(38, 99), (52, 73), (69, 63), (96, 33)], 0, 6)
     return im
 
 
@@ -321,6 +326,13 @@ def chalet():
     d.rectangle([160, 116, 196, 144], fill=0)
     d.rectangle([112, 70, 144, 100], fill=0)
     d.rectangle([110, 182, 146, 223], fill=0)                          # door
+    d.polygon([(155, 56), (155, 14), (174, 14), (174, 75)], 255)
+    d.line([(29, 111), (128, 21), (222, 111)], 0, 7)
+    for x in (65, 174):
+        d.line((x, 116, x, 144), 255, 6)
+    for y in (190, 208):
+        d.line((42, y, 90, y), 0, 5)
+        d.line((150, y, 212, y), 0, 5)
     return im
 
 
@@ -340,6 +352,9 @@ def snowman():
         d.ellipse([74, y, 86, y + 12], fill=0)
     d.line([(48, 84), (6, 52)], fill=255, width=7)                     # arms
     d.line([(112, 84), (154, 52)], fill=255, width=7)
+    d.polygon([(47, 69), (103, 70), (110, 80), (69, 82), (51, 77)], 0)
+    d.polygon([(97, 77), (118, 84), (127, 111), (110, 103)], 255)
+    d.polygon([(81, 52), (106, 56), (80, 60)], 0)
     return im
 
 
@@ -364,6 +379,10 @@ def windmill():
             q = (cx + t * ux, cy + t * uy)
             d.line([(q[0] + 4 * px, q[1] + 4 * py), (q[0] + 18 * px, q[1] + 18 * py)], fill=0, width=4)
     d.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=255)
+    for y in (161, 179, 195):
+        d.line((95, y, 115, y - 4), 0, 5)
+    d.rectangle((123, 199, 135, 213), 0)
+    d.ellipse((104, 78, 120, 94), 0)
     return im
 
 
@@ -376,6 +395,9 @@ def haybales():
         for rr in (r - 14, r - 28, r - 40):                            # the rolled spiral
             if rr > 4:
                 d.arc([cx - rr, cy - rr, cx + rr, cy + rr], 20, 330, fill=0, width=4)
+    for cx in (60, 160):
+        d.arc((cx - 34, 29, cx + 29, 91), 30, 282, 0, 6)
+        d.line((cx - 28, 94, cx - 7, 99), 0, 4)
     return im
 
 
@@ -393,6 +415,8 @@ def billboard():
     d.rectangle([10, 82, 245, 114], fill=255)                          # the sea
     for x in range(20, 240, 40):                                       # waves
         d.arc([x, 88, x + 30, 104], 200, 340, fill=0, width=4)
+    d.line((10, 10, 245, 10), 0, 6)
+    d.line((15, 121, 240, 121), 0, 5)
     return im
 
 
@@ -436,7 +460,16 @@ def scaled(master, h):
     return small.point(lambda v: 255 if v >= 80 else 0)
 
 
-def emit_type(name, label=None):
+def size_indices(name):
+    # Tall roadside silhouettes should read from a distance. Remap their
+    # directory entries at build time, keeping the nearest size at 48 px.
+    tall = {"palm", "citypalm", "tower", "pine", "tree", "windmill", "lamp",
+            "chalet", "cactus", "windpump", "billboard"}
+    lift = 2 if name in tall else 0
+    return [max(1, k - lift) for k in range(len(SIZES))]
+
+
+def emit_type(name, label=None, *, master=None, previews=True):
     """Sprite directory and data for one type.
 
     Returns (consts, directory, data) lists of assembler lines. The
@@ -444,22 +477,23 @@ def emit_type(name, label=None):
     aliases size 1."""
     fn, factor, shifts = TYPES[name]
     label = label or f"Scn_{name}"
-    master = fn()
-    master.save(f"assets/gfx/{name}.png")
+    master = fn() if master is None else master
+    if previews:
+        master.save(f"assets/gfx/{name}.png")
     consts, dirl, data = [], [f"{label}:"], []
-    for k, (h0, nshift) in enumerate(zip(SIZES, shifts)):
-        if k == 0:
-            dirl.append(f"        db {label}_1_w, {label}_1_h, {label}_1_m, 0")
-            dirl.append(f"        dw {label}_1, {label}_1_s")
-            continue
-        h = max(2, round(h0 * factor))
+    indices = size_indices(name)
+    for k in indices:
+        entry = f"{label}_{k}"
+        dirl.append(f"        db {entry}_w, {entry}_h, {entry}_m, 0")
+        dirl.append(f"        dw {entry}, {entry}_s")
+    for k in sorted(set(indices)):
+        nshift = shifts[k]
+        h = max(2, round(SIZES[k] * factor))
         img = scaled(master, h)
         wb = (img.width + 7) // 8 + 1        # one byte of shift padding
         step = 8 // nshift
         mask = {1: 0, 2: 4, 4: 6, 8: 7}[nshift]
         lab = f"{label}_{k}"
-        dirl.append(f"        db {wb}, {h}, {mask}, 0")
-        dirl.append(f"        dw {lab}, {wb * h}")
         consts.append(f"{lab}_w EQU {wb}\n{lab}_h EQU {h}\n{lab}_m EQU {mask}\n{lab}_s EQU {wb * h}")
         data.append(f"{lab}:")
         for s_ in range(0, 8, step):
@@ -473,15 +507,14 @@ def emit_type(name, label=None):
     return consts, dirl, data
 
 
-def type_bytes(name):
+def type_bytes(name, master=None):
     """Bytes of sprite data emit_type produces (for memory planning)."""
     fn, factor, shifts = TYPES[name]
-    master = fn()
+    master = fn() if master is None else master
     tot = 0
-    for k, (h0, nshift) in enumerate(zip(SIZES, shifts)):
-        if k == 0:
-            continue
-        h = max(2, round(h0 * factor))
+    for k in set(size_indices(name)):
+        nshift = shifts[k]
+        h = max(2, round(SIZES[k] * factor))
         wb = (scaled(master, h).width + 7) // 8 + 1
         tot += wb * h * nshift
     return tot + 8 * len(SIZES)

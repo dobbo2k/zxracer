@@ -64,7 +64,7 @@ GameUpdate:
         ld (Time), a
         cp $11
         jr nc, .noSec
-        call TimeWarn           ; the last 10 seconds: the timer flashes, a pip each second
+        call TimeWarn           ; the last 10 seconds: the timer flashes
         ld a, (Time)
         or a
         jr nz, .noSec

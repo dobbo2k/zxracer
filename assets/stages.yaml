@@ -5,22 +5,25 @@
 #
 # Attributes are Spectrum attribute bytes: bit 6 bright, bits 5-3 paper,
 # bits 2-0 ink (0 black, 1 blue, 2 red, 3 magenta, 4 green, 5 cyan, 6 yellow, 7 white).
+# einstein_palette (a theme's or a stage's): the Tatung Einstein's changes to
+# its palette, applied by tools/make_einstein.py only. The TMS9129 has one
+# cyan and one magenta, where the Spectrum has a plain and a bright of each.
 
 themes:
   coast:
     name: SUNNY COAST
     hills: 4                        # hill strength (0: flat)
     types: [palm, bush, tower, parasol]
-    horizon: {style: mountains, seed: 7}
-    palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,
-              grass_l: 0b01100000, grass_d: 0b00100000, kerb_l: 0b01111000, kerb_d: 0b01010000,
+    horizon: {style: harbour, seed: 1}
+    palette: {sky: 0b01101000, pano: 0b01101001, hud: 0x4f, time: 0x46,
+              grass_l: 0x70, grass_d: 0x30, kerb_l: 0b01111000, kerb_d: 0b01010000,
               road: 0b01000111}
   desert:
     name: DESERT HIGHWAY
     hills: 3                        # hill strength (0: flat)
     types: [cactus, rock, windpump, tumbleweed]
     horizon: {style: mesas, seed: 3}
-    palette: {sky: 0b01101000, pano: 0b01101010, hud: 0b01101010, time: 0b01101010,
+    palette: {sky: 0b01101000, pano: 0b01101010, hud: 0x70, time: 0x46,
               grass_l: 0b01110000, grass_d: 0b00110000, kerb_l: 0b01111000, kerb_d: 0b01010000,
               road: 0b01000111}
   alpine:
@@ -29,7 +32,7 @@ themes:
     tunnels: 1                      # a tunnel through the mountain on each stage
     types: [pine, rock, chalet, snowman]
     horizon: {style: peaks, seed: 11}
-    palette: {sky: 0b01101000, pano: 0b01101001, hud: 0b01101001, time: 0b01101010,
+    palette: {sky: 0b01101000, pano: 0b01101001, hud: 0x4f, time: 0x46,
               grass_l: 0b01111000, grass_d: 0b00111000, kerb_l: 0b01010000, kerb_d: 0b01001000,
               road: 0b01000111}
   country:
@@ -37,7 +40,7 @@ themes:
     hills: 6                        # hill strength (0: flat)
     types: [tree, bush, windmill, haybales]
     horizon: {style: hills, seed: 21}
-    palette: {sky: 0b01101000, pano: 0b01101100, hud: 0b01101001, time: 0b01101010,
+    palette: {sky: 0b01101000, pano: 0b01101100, hud: 0x20, time: 0x46,
               grass_l: 0b01100000, grass_d: 0b00100000, kerb_l: 0b01111000, kerb_d: 0b01010000,
               road: 0b01000111}
   sunset:
@@ -45,15 +48,29 @@ themes:
     hills: 4                        # hill strength (0: flat)
     types: [lamp, bush, billboard, citypalm]
     horizon: {style: skyline, seed: 5}
-    palette: {sky: 0b01011000, pano: 0b01011000, hud: 0b01011110, time: 0b01011111,
-              grass_l: 0b01100000, grass_d: 0b00100000, kerb_l: 0b01111000, kerb_d: 0b01010000,
+    palette: {sky: 0b01011000, pano: 0b01011000, hud: 0x0f, time: 0x46,
+              grass_l: 0x58, grass_d: 0x18, kerb_l: 0x68, kerb_d: 0x48,
               road: 0b01000111}
+    einstein_palette: {grass_d: 0x08}   # (dark bands: dark blue, not the sky's magenta)
 
 # Rows of the pyramid, left to right. Each stage: theme and a track seed.
 # Bends get sharper and more frequent row by row; hills come from the theme.
+# Each return to a region has a new skyline, sky layout and colour treatment.
+# Unlisted inks and papers come from the region above.
 rows:
-  - [{theme: coast, seed: 1}]
-  - [{theme: country, seed: 2}, {theme: desert, seed: 3}]
-  - [{theme: alpine, seed: 4}, {theme: coast, seed: 5}, {theme: desert, seed: 6}]
-  - [{theme: country, seed: 7}, {theme: alpine, seed: 8}, {theme: sunset, seed: 9}, {theme: desert, seed: 10}]
-  - [{theme: alpine, seed: 11}, {theme: country, seed: 12}, {theme: coast, seed: 13}, {theme: sunset, seed: 14}, {theme: desert, seed: 15}]
+  - - {theme: coast, seed: 1, einstein_palette: {grass_l: 0x60, grass_d: 0x20}}
+  - - {theme: country, seed: 2}
+    - {theme: desert, seed: 3, palette: {sky: 0x78, pano: 0x7a}}
+  - - {theme: alpine, seed: 4, vista: bridge}
+    - {theme: coast, seed: 5, vista: beacon, palette: {sky: 0x28, pano: 0x29, grass_l: 0x68, grass_d: 0x28},
+       einstein_palette: {grass_d: 0x38}}
+    - {theme: desert, seed: 6, vista: arch, palette: {sky: 0x70, pano: 0x72, grass_l: 0x50, grass_d: 0x10, kerb_d: 0x30}}
+  - - {theme: country, seed: 7, vista: mill, palette: {sky: 0x28, pano: 0x2c, grass_d: 0x30}}
+    - {theme: alpine, seed: 8, vista: gondola, palette: {sky: 0x38, pano: 0x39, hud: 0x0f, kerb_d: 0x68}}
+    - {theme: sunset, seed: 9, vista: wheel}
+    - {theme: desert, seed: 10, vista: needles, palette: {sky: 0x58, pano: 0x5a, kerb_d: 0x18}}
+  - - {theme: alpine, seed: 11, vista: lodge, palette: {sky: 0x28, pano: 0x29, kerb_d: 0x08}}
+    - {theme: country, seed: 12, vista: manor, palette: {sky: 0x70, pano: 0x74, grass_l: 0x30, kerb_d: 0x50}}
+    - {theme: coast, seed: 13, vista: liner, palette: {sky: 0x58, pano: 0x59, grass_l: 0x70, grass_d: 0x38}}
+    - {theme: sunset, seed: 14, vista: bridge, palette: {sky: 0x18, pano: 0x18, kerb_l: 0x70, kerb_d: 0x28}}
+    - {theme: desert, seed: 15, vista: ruins, palette: {sky: 0x30, pano: 0x32, grass_l: 0x38, grass_d: 0x30}}

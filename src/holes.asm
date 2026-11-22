@@ -143,22 +143,22 @@ CrewLines:      ; her line, his reply
         ORG MaskPage + $C0
         ASSERT LaneM2_end <= MaskPage + $C0
 LampGlyph:
-        db $00, $00, $03, $C0, $0F, $F0, $1F, $F8, $3F, $FC, $3F, $FC, $7F, $FE, $7F, $FE
-        db $7F, $FE, $7F, $FE, $3F, $FC, $3F, $FC, $1F, $F8, $0F, $F0, $03, $C0, $00, $00
+        db $07,$E0,$18,$18,$33,$CC,$67,$E6,$4F,$F2,$DF,$FB,$9F,$F9,$BF,$FD
+        db $BF,$FD,$9F,$F9,$DF,$FB,$4F,$F2,$67,$E6,$33,$CC,$18,$18,$07,$E0
 ; the route of the last game (the stage played on each row; $FF: not reached)
 Route:          ds 5, $FF
 ; the music's snare drum (src/music.asm)
-DrumSnare:      db 14, 6
-                dw 250
-                db 13, 7
+DrumSnare:      db 14, (6 * AYN + AYD / 2) / AYD
+                dw (250 * AYN + AYD / 2) / AYD
+                db 13, (7 * AYN + AYD / 2) / AYD
                 dw 0
-                db 11, 8
+                db 11, (8 * AYN + AYD / 2) / AYD
                 dw 0
-                db 9, 9
+                db 9, (9 * AYN + AYD / 2) / AYD
                 dw 0
-                db 6, 10
+                db 6, (10 * AYN + AYD / 2) / AYD
                 dw 0
-                db 3, 10
+                db 3, (10 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= MaskPage + 256
@@ -178,21 +178,21 @@ NoteTab:
         INCLUDE "music_notes.asm"
 ; the music's kick drum and hi-hat (src/music.asm)
 DrumKick:       db 15, 0
-                dw 300
+                dw (300 * AYN + AYD / 2) / AYD
                 db 14, 0
-                dw 600
+                dw (600 * AYN + AYD / 2) / AYD
                 db 12, 0
-                dw 1000
+                dw (1000 * AYN + AYD / 2) / AYD
                 db 10, 0
-                dw 1500
+                dw (1500 * AYN + AYD / 2) / AYD
                 db 7, 0
-                dw 2100
+                dw (2100 * AYN + AYD / 2) / AYD
                 db 4, 0
-                dw 2800
+                dw (2800 * AYN + AYD / 2) / AYD
                 db 0
-DrumHat:        db 10, 1
+DrumHat:        db 10, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 6, 1
+                db 6, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= StripPage + 256
@@ -252,7 +252,7 @@ EngineSounds:
         ld e, 10
 .gr:    ld a, 9
         call AyWrite
-        ld e, 12                ; noise period
+        ld e, GRAVEL_NOISE      ; noise period
         ld a, 6
         call AyWrite
 .mix:
@@ -336,20 +336,15 @@ DemoTraffic:
         ret
 ; (the last ten seconds: moved here from bank 5 for room)
 ; The last 10 seconds (GameUpdate, each second): the big timer's cells
-; FLASH in both screens (the next display reset clears it), and a pip.
-BEEP_WARN       EQU 110
+; FLASH in both screens (the next display reset clears it).
 TimeWarn:
         ld a, (PalTime)
         or $80
+        IFNDEF EINSTEIN         ; (the Einstein: screen B only)
         ld hl, $5800 + 32 + 14
         call .cells
+        ENDIF
         ld hl, $D800 + 32 + 14
-        call .cells
-        ld a, (Time)
-        or a
-        ret z
-        ld de, BEEP_WARN
-        jp StartBeep
 .cells: ld c, 2
 .row:   ld b, 4
 .c:     ld (hl), a
@@ -392,7 +387,7 @@ CrashTick:
         call AyWrite
         ld a, (CrashAge)        ; noise: a crack, deepening
         srl a
-        add a, 6
+        add a, (6 * AYN + AYD / 2) / AYD
         cp 31
         jr c, .np
         ld a, 31
@@ -422,7 +417,7 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
         jr z, .thud
         ld a, (FrameCount)      ; the squeal: a wavering high tone
         and 6
-        add a, 40
+        add a, SQ_TONE
         ld e, a
         ld d, 0
         ld a, 10
@@ -439,7 +434,11 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
         ld d, a
         ld a, 15
         sub e
+        IFDEF EINSTEIN
+        call EinCoarse          ; (the AY at 2 MHz: src/einstein/boot.asm)
+        ELSE
         ld e, 0
+        ENDIF
 .tone:  ld (CrVolA), a
         ld hl, CrMix
         res 0, (hl)             ; tone A
@@ -539,7 +538,7 @@ CrashTickC:                     ; C: debris, a clatter of high notes
         add a, a
         add a, e
         and 31
-        add a, 24
+        add a, (24 * AYN + AYD / 2) / AYD
         ld e, a                 ; a high, jumping pitch
         ld a, 4
         call AyWrite
@@ -605,15 +604,15 @@ UpdateTunnel:
         ld (TunJN), a
         jp Ceiling
 ; The open hi-hat (src/music.asm DrumTab): moved here for room
-DrumOpen:       db 11, 1
+DrumOpen:       db 11, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 9, 1
+                db 9, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 7, 1
+                db 7, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 5, 1
+                db 5, (1 * AYN + AYD / 2) / AYD
                 dw 0
-                db 3, 1
+                db 3, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= FILL_END - 64

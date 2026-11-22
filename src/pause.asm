@@ -9,7 +9,7 @@ CheckPause:
         cp ST_PLAYING
         ret nz
         ld a, PAUSE_ROW
-        in a, ($FE)
+        KEY_IN
         and PAUSE_BIT
         ret nz
         call WaitFlip           ; (the frame just drawn is on show)
@@ -18,19 +18,27 @@ CheckPause:
         call Silence
         ld a, (HudOr)
         push af
+        IFDEF EINSTEIN
+        ld a, $80               ; (screen B: its cells are sent)
+        ELSE
         ld a, (BackBuf)         ; 1: B is drawn next, so A is on show
         dec a
         and $80
+        ENDIF
         ld (HudOr), a
         ld bc, MSG_ROW * 256 + MSG_COL
         ld de, MsgPaused
         call PrintAt
         pop af
         ld (HudOr), a
+        IFDEF EINSTEIN
+        call RequestFlip        ; (PAUSED into VRAM)
+        call WaitFlip
+        ENDIF
         call .release
-.wait:  halt
+.wait:  FRAME_WAIT
         ld a, PAUSE_ROW
-        in a, ($FE)
+        KEY_IN
         and PAUSE_BIT
         jr nz, .wait
         call .release
@@ -45,9 +53,9 @@ CheckPause:
         ld (LastFlip), a
         ret
 .release:
-        halt
+        FRAME_WAIT
         ld a, PAUSE_ROW
-        in a, ($FE)
+        KEY_IN
         and PAUSE_BIT
         jr z, .release
         ret

@@ -4,7 +4,11 @@
 
 ; Build options
         IFNDEF PROFILE
+        IFDEF EINSTEIN
+PROFILE         EQU 0           ; (no border on the Einstein)
+        ELSE
 PROFILE         EQU 1           ; 1 = border colour timing bars
+        ENDIF
         ENDIF
         IFNDEF AUTOPLAY
 AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the game (videos)
@@ -51,12 +55,42 @@ ATTR_KERB_D     EQU %01010000   ; bright red paper, black ink
 
 STRIPE_BIT      EQU $40         ; bit of (z + position) selecting light/dark band
 
+; AY periods: the Spectrum's AY runs at 1.7734 MHz, the Einstein's at 2 MHz,
+; so there a period is AYN / AYD as long for the same pitch: write a period
+; as (p * AYN + AYD / 2) / AYD
+        IFDEF EINSTEIN
+AYN             EQU 1128
+AYD             EQU 1000
+        ELSE
+AYN             EQU 1
+AYD             EQU 1
+        ENDIF
+
 ; Input bits (same layout as Kempston)
 IN_RIGHT        EQU 0
 IN_LEFT         EQU 1
 IN_DOWN         EQU 2
 IN_UP           EQU 3
 IN_FIRE         EQU 4
+
+; Wait for the next TV frame (the Einstein's interrupt comes every 1 ms)
+        MACRO FRAME_WAIT
+        IFDEF EINSTEIN
+        call EinHalt
+        ELSE
+        halt
+        ENDIF
+        ENDM
+
+; A = keyboard half-rows to read (as port $FE's high byte) -> A = their keys
+; (bits 0-4, 0: pressed); the Einstein answers from its own keyboard
+        MACRO KEY_IN
+        IFDEF EINSTEIN
+        call EinSpecIn
+        ELSE
+        in a, ($FE)
+        ENDIF
+        ENDM
 
         MACRO BORDER col
         IF PROFILE

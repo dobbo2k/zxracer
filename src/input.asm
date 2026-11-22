@@ -11,7 +11,7 @@ ReadInput:
         ld c, 0
 .key:   ld a, (hl)              ; keyboard row (port high byte)
         inc hl
-        in a, ($FE)
+        KEY_IN
         and (hl)                ; the key's bit (0: pressed)
         inc hl
         jr nz, .up
@@ -21,14 +21,20 @@ ReadInput:
 .up:    sla e
         dec d
         jr nz, .key
-        in a, ($1F)             ; Kempston; ignore if the bus floats high
-        ld b, a
+        IFDEF EINSTEIN
+        call EinJoy             ; (the analogue stick: src/einstein/keys.asm)
+        or c
+        ld c, a
+        ELSE
+.kemp:  in a, ($1F)             ; Kempston; ignore if the bus floats high
+        ld b, a                 ; (ld a, $FF with none: OvResetDisplay)
         and $E0
         jr nz, .noKemp
         ld a, b
         or c
         ld c, a
 .noKemp:
+        ENDIF
         ld a, c
         ld (Input), a
         ret

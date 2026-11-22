@@ -414,6 +414,10 @@ DrawObject:
         ld a, (SprH)
         ld (hl), a
         inc hl
+        IFDEF EINSTEIN
+        ld a, (ObjType)
+        ld (hl), a
+        ENDIF
         inc hl
         ld (CmdPtr), hl
         ld de, -CMD_SIZE
@@ -495,6 +499,7 @@ MulS8U8:
 
 ; HL -> draw command. XOR the sprite into the back buffer.
 RunCommand:
+        IFNDEF EINSTEIN         ; (the Einstein's car is not drawn here)
         ; does the sprite overlap the player's car block (rows 20-23, cols 12-19)?
         push hl
         ld a, (hl)              ; y top
@@ -519,6 +524,7 @@ RunCommand:
         ld a, 1
         ld (CarDirty), a
 .noCar: pop hl
+        ENDIF
         ld a, (hl)              ; y top
         ld c, a
         inc hl
@@ -548,6 +554,16 @@ RunCommand:
         ld d, (hl)              ; DE = source
         inc hl
         ld b, (hl)              ; height
+        IFDEF EINSTEIN          ; (its lines above .clipY only: erasing, the
+.clipY: ld a, 192               ; panorama's and the road's rows are cleared
+        sub c                   ; as they are read, src/einstein/sprites.asm)
+        ret c
+        ret z
+        cp b
+        jr nc, .hOk
+        ld b, a
+.hOk:
+        ENDIF
         ld iy, .back
         ; first line address
         call .rowAddr

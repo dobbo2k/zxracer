@@ -30,7 +30,7 @@ TitleCycle:
         ld hl, TitleTune
         call z, MusicStart
         ld de, TITLE_FRAMES
-.lp:    halt
+.lp:    FRAME_WAIT
         ld a, (FrameCount)      ; blink the prompt
         and 16
         ld a, $46
@@ -44,7 +44,7 @@ TitleCycle:
         call StartPressed
         jr nz, .start
         ld a, ENTER_ROW         ; ENTER: the options
-        in a, ($FE)
+        KEY_IN
         rra
         jr nc, .opt
         dec de
@@ -114,7 +114,7 @@ HiScreen:
         ld de, TxtBest
         call TallAt
         ld bc, 2 * 256 + 10
-        call SunsetAttrs
+        call DashHeadingAttrs
         ld ix, HiTable
         ld b, 7                 ; screen row
         ld c, 0                 ; entry
@@ -176,7 +176,7 @@ HiScreen:
         ld de, TABLE_FRAMES
 ; DE = frames: wait for a start key (A = 1) or the time (A = 0)
 WaitStart:
-.lp:    halt
+.lp:    FRAME_WAIT
         call StartPressed
         ld a, 1
         ret nz
@@ -267,7 +267,7 @@ Initials:
         ld de, TxtNewHi
         call TallAt
         ld bc, 2 * 256 + 10
-        call SunsetAttrs
+        call DashHeadingAttrs
         ld bc, 6 * 256 + 9
         ld de, TxtYourScore
         call PrintAt
@@ -301,7 +301,7 @@ Initials:
         ld a, $FF
         ld (EntryWas), a        ; (keys held from the game are not presses)
 .show:  call DrawSlots
-.lp:    halt
+.lp:    FRAME_WAIT
         ld hl, (EntryTime)
         dec hl
         ld (EntryTime), hl
@@ -346,7 +346,7 @@ Initials:
         jr c, .keep
         call DrawSlots
         ld b, 50
-.w:     halt
+.w:     FRAME_WAIT
         djnz .w
         ret
 .keep:  call PutLetter          ; (the next one starts from the same letter)
@@ -463,7 +463,7 @@ RouteScreen:
         ld de, TxtRoute
         call TallAt
         ld bc, 1 * 256 + 11
-        call SunsetAttrs
+        call DashHeadingAttrs
         ; every stage: a dim box
         ld b, NUM_STAGES
         ld c, 0
@@ -852,9 +852,9 @@ GoalScreen:
         call .show
         ld a, 60                ; a short beep per second counted
         call Beep
-        halt
-        halt
-        halt
+        FRAME_WAIT
+        FRAME_WAIT
+        FRAME_WAIT
         jr .count
 .done:  ld bc, GOAL_PRESS_ROW * 256 + 9
         ld de, TxtPress
@@ -884,7 +884,7 @@ Options:
         ld de, TxtOptions
         call TallAt
         ld bc, 1 * 256 + 12
-        call SunsetAttrs
+        call DashHeadingAttrs
         ld bc, 5 * 256 + 4
         ld de, TxtOptMenu
         call PrintLines
@@ -928,7 +928,7 @@ Options:
         ld bc, 10 * 256 + 14
         call PrintAt
         call WaitNoKey
-.lp:    halt
+.lp:    FRAME_WAIT
         call ScanKey
         jr nc, .lp
         ld a, e
@@ -987,7 +987,7 @@ Options:
         ld a, $C6
         call AttrRow
         call WaitNoKey
-.get:   halt
+.get:   FRAME_WAIT
         call ScanKey            ; D = row port, C = bit, E = key number
         jr nc, .get
         ld a, e
@@ -1141,7 +1141,7 @@ ScanKey:
         ld e, 0
 .row:   ld a, (hl)
         ld d, a
-        in a, ($FE)
+        KEY_IN
         cpl
         and $1F
         jr nz, .found
@@ -1163,7 +1163,7 @@ ScanKey:
         ret
 
 WaitNoKey:
-        halt
+        FRAME_WAIT
         call ScanKey
         jr c, WaitNoKey
         ret
@@ -1194,11 +1194,15 @@ ScreensEnter:
         call Silence
         xor a
         ld (HudOr), a           ; print into screen A
+        IFDEF EINSTEIN
+        jp EinScreensEnter      ; (src/einstein/front.asm)
+        ELSE
         ld a, P7FFD_ROM48 | P7FFD_SHADOW | 7
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
         ret
+        ENDIF
 
 ; Back to the game: screen A on show, the game draws into B next. Keeps A
 ; (1: a game starts - with a flourish).
@@ -1227,11 +1231,16 @@ BlankAttrs:
         ld bc, 767
         ld (hl), 0
         ldir
-ShowA:  ld a, P7FFD_ROM48 | 7
+ShowA:
+        IFDEF EINSTEIN
+        jp EinFrontOn           ; (screen A into the VDP: src/einstein/front.asm)
+        ELSE
+        ld a, P7FFD_ROM48 | 7
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
         ret
+        ENDIF
 
 ; A = attribute: clear screen A to it, and show A
 ClearA: push af
@@ -1249,16 +1258,16 @@ ClearA: push af
         ldir
         ret
 
-; Sunset stripes along the top and bottom rows
+; Alternating coastal blue and cyan rails on the menu screens
 Stripes:
         ld hl, $5800
         ld de, $5800 + 23 * 32
         ld b, 32
 .s:     ld a, l
         and 1
-        ld a, $50               ; bright red / bright yellow paper
+        ld a, $48               ; blue / cyan paper
         jr z, .p
-        ld a, $70
+        ld a, $68
 .p:     ld (hl), a
         ld (de), a
         inc l
@@ -1267,13 +1276,13 @@ Stripes:
         ret
 
 ; B = row, C = column: tall text there in yellow over red (two rows of 16)
-SunsetAttrs:
+DashHeadingAttrs:
         push bc
-        ld a, $46
+        ld a, $4F
         call AttrRow
         pop bc
         inc b
-        ld a, $42
+        ld a, $4D
 ; B = row, A = attribute: the whole row
 AttrRow:
         push af
@@ -1406,7 +1415,7 @@ TallScore:
 ; Wait until the start keys are released (at most 2 s)
 WaitRelease:
         ld b, 100
-.w:     halt
+.w:     FRAME_WAIT
         push bc
         call ReadInput
         pop bc
@@ -1442,12 +1451,12 @@ Tune:   ld e, (hl)
         ld a, 8
         call AyPut
         pop bc
-.h:     halt
+.h:     FRAME_WAIT
         djnz .h
         ld e, 0                 ; a moment's silence between notes
         ld a, 8
         call AyPut
-        halt
+        FRAME_WAIT
         pop hl
         jr Tune
 
@@ -1504,7 +1513,7 @@ Beep:   ld e, a
         ld e, 12
         ld a, 8
         call AyPut
-        halt
+        FRAME_WAIT
         ld e, 0
         ld a, 8
         jp AyPut
@@ -1539,7 +1548,11 @@ TxtOptMenu:     db "1  KEYBOARD  Q A O P SPACE", 0
                 db "4  CHOOSE YOUR OWN KEYS", 0
                 db "5  SOUND:", 0
                 db "6  LEVEL:", 0
+        IFDEF EINSTEIN
+                db "   JOYSTICK WORKS ANY TIME", 0
+        ELSE
                 db "   KEMPSTON WORKS ANY TIME", 0
+        ENDIF
                 db "   H PAUSES THE GAME", 0
                 db "   ENTER: BACK", 0, 0
 TxtCtrls:       db "ACCELERATE", 0

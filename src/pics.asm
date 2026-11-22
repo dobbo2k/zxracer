@@ -2,6 +2,9 @@
 ; overlay, so it is resident, bank 5).
 ; A = bank, HL = compressed picture in it: unpack into screen A, show it
 ShowPic:
+        IFDEF EINSTEIN          ; (A = its records, HL = the first, in STAGES.DAT)
+        jp EinPicture
+        ENDIF
         or P7FFD_ROM48 | P7FFD_SHADOW
         ld bc, PORT_7FFD
         ld (Paged), a           ; (A <> 0: the title tune is out of reach)

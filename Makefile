@@ -14,7 +14,7 @@ ZXSIM := ./build/zxsim$(EXE)
 # Machine-specific settings (emulator paths); see CLAUDE.md
 -include local.mk
 
-.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet
+.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet einstein test-einstein run-einstein
 all: build/zxracer.sna
 
 build:
@@ -23,10 +23,13 @@ build:
 build/tables.asm: tools/gen_tables.py | build
 	$(PYTHON) tools/gen_tables.py $@
 
+assets/gfx/car.png: tools/make_car.py
+	$(PYTHON) $< $@
+
 build/car_data.asm: tools/png2zx.py assets/gfx/car.png | build
 	$(PYTHON) tools/png2zx.py assets/gfx/car.png $@ CarGfx 64 32 3
 
-build/stages.asm: tools/make_stages.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
+build/stages.asm: tools/make_stages.py tools/round_art.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png | build
 	$(PYTHON) tools/make_stages.py assets/stages.yaml build
 
 build/crew_data.asm: tools/make_crew.py tools/make_screens.py | build
@@ -78,16 +81,13 @@ release: build/speedrun.tap build/video.sna $(ZXSIM) tools/make_inlay.py release
 	mkdir -p release
 	cp build/speedrun.tap build/speedrun.tzx build/inlay_outside.png build/inlay_inside.png release/
 
-# Hand-drawn style cover art (needs Node with Playwright and Chromium to render):
-# the cover, the tape's loading screen made from a 4:3 version of it, and the
-# lettering for the inlay's spine (the last two are kept in assets/gfx, so
-# building the tape does not need Chromium)
-LOADING_STYLE ?= bands              # or dither, flat, light, outline (tools/make_loading.py)
-cover: tools/make_cover.py tools/make_loading.py | build
+assets/gfx/loading.scr: tools/make_screens.py tools/round_art.py tools/make_scenery.py tools/make_font.py assets/gfx/car.png
+	$(PYTHON) tools/make_screens.py --loading
+
+# Print artwork and spine lettering (needs Node with Playwright and Chromium).
+cover: tools/make_cover.py | build
 	mkdir -p release
 	$(PYTHON) tools/make_cover.py release/cover.png build/cover.svg portrait
-	$(PYTHON) tools/make_cover.py build/cover_wide.png build/cover_wide.svg wide
-	$(PYTHON) tools/make_loading.py build/cover_wide.png assets/gfx/loading.scr assets/gfx/loading_preview.png $(LOADING_STYLE)
 	$(PYTHON) tools/make_cover.py assets/gfx/spine.png build/spine.svg spine
 
 # The route map leaflet (needs Chromium too): the stage pyramid as a printed insert
@@ -126,3 +126,54 @@ run-realtape: build/speedrun.tap
 
 clean:
 	rm -rf build
+
+# ---------------------------------------------------------------------------
+# Tatung Einstein (docs/port_einstein.md): build/einstein/speedrun.dsk, a
+# bootable XtalDOS disc with SPEEDRUN.COM (type SPEEDRUN at the 0: prompt).
+# EINSTEIN_REPO (local.mk) is the einstein repository: XtalDOS's system
+# tracks, the MOS ROM and Albert's core for the test harness.
+EINSTEIN_REPO   ?= $(subst \,/,$(USERPROFILE))/OneDrive/Documents/GitHub/einstein
+EINSTEIN_SYSTEM ?= $(EINSTEIN_REPO)/roms/disassembled/Einstein/__XTALDOS131/SYSTEM131.CPM
+EINSTEIN_ROM    ?= $(EINSTEIN_REPO)/roms/Tatung X-TAL MOS v1.2 (1983)(Tatung).rom
+EIN_SRC := $(wildcard src/einstein/*.asm)
+EIN_GEN := build/einstein/einstein_objects.asm build/einstein/spider.asm build/einstein/packs.asm build/einstein/stagepacks.asm build/einstein/music_notes.asm
+EIN_DAT := build/einstein/stages.asm build/einstein/stageov_pack.asm build/einstein/screens_data.asm build/einstein/stages_raw.dat build/einstein/reserve.txt
+
+einstein: build/einstein/speedrun.dsk
+
+build/einstein:
+	mkdir -p build/einstein
+
+$(EIN_GEN) &: tools/einstein_art.py tools/einstein_illustration.py tools/make_einstein.py build/stages.asm | build/einstein
+	$(PYTHON) tools/make_einstein.py gen assets/stages.yaml build/einstein
+
+# every stage's packs, each assembled where it runs, then STAGES.DAT
+build/einstein/stagepacks.stamp: build/einstein/stagepacks.asm
+	$(ASM) --nologo --msg=war -Ibuild -Ibuild/einstein build/einstein/stagepacks.asm
+	touch $@
+
+$(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py tools/make_screens.py
+	$(PYTHON) tools/make_einstein.py dat assets/stages.yaml build/einstein
+
+# the front end and the overlay, assembled with the game, into STAGES.DAT
+build/einstein/STAGES.DAT: build/einstein/speedrun.com build/einstein/stages_raw.dat tools/make_einstein.py
+	$(PYTHON) tools/make_einstein.py patch assets/stages.yaml build/einstein
+
+build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build/einstein
+	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
+
+build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.DAT tools/make_einstein_disk.py
+	$(PYTHON) tools/make_einstein_disk.py -o $@ -s "$(EINSTEIN_SYSTEM)" $< build/einstein/STAGES.DAT
+
+# The harness (Albert's core, Visual Studio's C++ tools): tests/einstein/build_harness.cmd
+EIN_HARNESS := build/einstein/speedrun_check.exe
+$(EIN_HARNESS): tests/einstein/speedrun_check.cpp
+	ALBERT_CORE="$(shell cygpath -w "$(EINSTEIN_REPO)/emulator")" cmd.exe //c "tests\einstein\build_harness.cmd"
+
+test-einstein: build/einstein/speedrun.dsk $(EIN_HARNESS)
+	$(PYTHON) tests/einstein_check.py $(EIN_HARNESS) "$(EINSTEIN_ROM)" build/einstein/speedrun.dsk build/einstein/speedrun.sym build/einstein
+
+# Albert, the Einstein emulator: at XtalDOS's 0: prompt type SPEEDRUN and ENTER
+ALBERT ?= /c/Tatung Einstein/albert/albert.exe
+run-einstein: build/einstein/speedrun.dsk
+	"$(ALBERT)" --disk build/einstein/speedrun.dsk &

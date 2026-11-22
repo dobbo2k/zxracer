@@ -250,6 +250,15 @@ PortalRow:
         inc ix
         ld a, (de)
         inc de
+        cp C_                   ; conceal the sky bitmap behind the ceiling
+        jr nz, .colour
+        ld a, (PtR)
+        sub 6
+        cp 4
+        ld a, C_
+        jr nc, .colour
+        xor a
+.colour:
         cp S_
         jr z, .skip
         ld b, c
@@ -289,3 +298,46 @@ TunEcho:
         call AyWrite
         ld e, %00101010         ; tone A and C, noise B
         jp EngineSounds.mw
+
+; C = character row. Preserve BC, DE and HL.
+SkyRowAttr:
+        ld a, c
+        cp PANO_ROW0
+        ld a, (PalPano)
+        ret nc
+        ld a, c
+        cp 6
+        ld a, (PalSky)
+        ret c
+        cp C_                   ; inside: hide the static cloud bitmap
+        jr nz, .day
+        xor a
+        ret
+.day:   and $38
+        cp $38                  ; white sky: blue cloud shadows
+        ld a, (PalSky)
+        jr nz, .warm
+        or 1
+        ret
+.warm:  and $38
+        cp $18                  ; magenta sky: gold disc or late clouds
+        ld a, (PalSky)
+        jr nz, .white
+        or 6
+        ret
+.white: or 7
+        ret
+
+; HL = first attribute of sky row 3, either screen.
+PaintRaceSky:
+        ld c, 3
+.row:   call SkyRowAttr
+        ld b, 32
+.cell:  ld (hl), a
+        inc hl
+        djnz .cell
+        inc c
+        ld a, c
+        cp ROAD_ROW0
+        jr c, .row
+        ret

@@ -64,11 +64,10 @@ if "entered ROM" in r.stderr:
     ok = False
 im = Image.open(shot).convert("RGB")
 im.save(f"{outdir}/tape_title.png")
-colours = {c for _, c in im.crop((32, 48, 288, 240)).getcolors(1 << 16)}
-for name, v in {"sun": (255, 255, 0), "sunset": (255, 0, 255), "car red": (255, 0, 0)}.items():
-    if v not in colours:
-        print(f"FAIL: no title screen after loading (missing {name})")
-        ok = False
+art = Image.open("assets/gfx/screen_title.png").convert("RGB")
+if im.crop((32, 48, 288, 216)).tobytes() != art.crop((0, 0, 256, 168)).tobytes():
+    print("FAIL: tape boot did not display the Riviera title artwork")
+    ok = False
 if im.getpixel((4, 4)) != (0, 0, 0):
     print("FAIL: the border is not black (timing bars in the release build?)")
     ok = False

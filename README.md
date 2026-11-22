@@ -53,12 +53,12 @@ icons its scenery shapes - `tools/make_leaflet.py`). `make cover` draws `release
 illustration of the title scene (`tools/make_cover.py`: seeded sketchy ink
 lines, hatching, washes and paper grain as SVG, the car and crew drawn
 cleanly, brush lettering from its own letter skeletons, rendered with
-Chromium). It also draws a 4:3 version without the paper texture, which
-`tools/make_loading.py` turns into the tape's loading screen
-(`assets/gfx/loading.scr`: per 8 x 8 cell the best ink / paper pair, the
-pixels between them in 2 x 2 dither patterns), and the spine lettering
-(`assets/gfx/spine.png`); both are kept in the repository, so building the
-tape needs no Chromium.
+Chromium). It also draws the spine lettering. The tape build draws the
+Riviera Spider loading screen from the title artwork in `tools/make_screens.py`.
+
+The 15 stages share five roadside scenery families. Each stage has its own
+palette, scrolling horizon and sky layout. The route entries in
+`assets/stages.yaml` set the colours and landmarks.
 
 ## Layout
 
@@ -67,7 +67,7 @@ src/          Z80 assembly source (main loop, interrupts/flip, road renderer, in
 tools/        gen_tables.py, profile.py, hotspots.py, zxsim/ (headless 128K emulator)
 tests/        cputest.asm (Z80 core self-test), smoke.py (headless run + screenshot checks)
 assets/       stages.yaml (themes, palettes, the stage pyramid), generated artwork
-docs/         Technical notes
+docs/         Technical notes (docs/artwork.md: how every graphic is made and how to change it)
 ```
 
 ## Status
@@ -113,7 +113,7 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   add 48 seconds - 58 and a fanfare for EXTENDED PLAY when you beat the
   stage's par time (worked out from its bends by `tools/make_stages.py`, about
   as fast as the attract-mode driver goes) - and show your stage time; the last
-  row ends at the GOAL. In the last 10 seconds the timer flashes and pips.
+  row ends at the GOAL. In the last 10 seconds the timer flashes.
 - **Levels** (options, key 6): EASY starts with 80 seconds, gives 55 a
   checkpoint, an eighth more par time and half the weaving traffic; NORMAL 68
   and 48; HARD 60 and 44, a sixteenth less par time and half as much weaving
@@ -160,7 +160,8 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   melody on the AY's three channels) that starts at the green light and
   changes with the road, and the title has one too - with fast arpeggio
   chords, pitch slides, vibrato on held notes, slap-style funk bass, tom-roll
-  fills and an epic final section. With the music on there is no engine note:
+  fills, a fat bass doubled an octave up on two channels (Green Valley's drum
+  and bass) and an epic final section. With the music on there is no engine note:
   just tyre squeal (sliding, spinning, and a chirp now and then on a fast
   bend), off-road gravel and bumps, which briefly take over a channel, and
   crashes, which take over all three: a crack that deepens into a rumble, a

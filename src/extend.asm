@@ -135,6 +135,9 @@ JingleRun:
 ; font's digit at double size, 16 x 16 over two cell rows (drawn once a
 ; second, so it is worked out here rather than stored)
 PrintBig:
+        IFDEF EINSTEIN
+        call EinMarkBig         ; (its four cells to be sent: src/einstein/sky.asm)
+        ENDIF
         push de
         push bc
         push hl

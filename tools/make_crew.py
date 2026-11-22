@@ -23,7 +23,7 @@ def her():
     Laid out on the 8x8 cell grid so each cell keeps to two colours: the
     eyes and brows in their own cell row (black on white skin), the nose
     between blushing cheeks below, the mouth in the row under that."""
-    im = Image.new("RGB", (S, S), rgb(RED))
+    im = Image.new("RGB", (S, S), rgb(BLUE))
     d = ImageDraw.Draw(im)
     Y, Wt, K, C, R = rgb(YELLOW), rgb(WHITE), rgb(BLACK), rgb(CYAN), rgb(RED)
     # the perm: a mass of curls down to the shoulders, curl lines in red
@@ -70,6 +70,11 @@ def her():
     d.ellipse([18, 32, 29, 39], fill=R)
     d.rectangle([20, 33, 27, 33], fill=Wt)
     d.rectangle([21, 38, 26, 38], fill=Wt)
+    # A knotted driving scarf and the sunlit curls between face and collar.
+    d.polygon([(16, 40), (24, 43), (31, 39), (29, 44), (22, 46)], fill=R)
+    d.polygon([(28, 43), (35, 42), (40, 46), (32, 45)], fill=R)
+    for x, y in ((3, 22), (10, 8), (35, 4), (41, 29), (5, 36)):
+        d.arc((x - 4, y - 4, x + 4, y + 3), 190, 305, fill=Wt)
     # anger marks
     for x, y in ((44, 2), (40, 5)):
         d.line([(x, y), (x + 3, y)], Wt)
@@ -101,6 +106,13 @@ def him():
     # sheepish grin
     d.line([(19, 31), (21, 30), (23, 31), (25, 30), (27, 31), (29, 30)], K)
     d.line([(23, 26), (24, 28)], K)
+    # Swept hair, mirror streaks in the aviators and broad lapels on the jacket.
+    d.line([(13, 8), (20, 4), (28, 3)], fill=C)
+    d.line([(15, 9), (22, 6), (31, 6)], fill=rgb(BLUE))
+    for x in (16, 27):
+        d.line((x, 22, x + 3, 19), fill=Wt)
+    d.polygon([(12, 39), (17, 37), (24, 47), (17, 44), (19, 42)], fill=C)
+    d.polygon([(27, 46), (32, 38), (36, 40), (31, 42), (33, 43)], fill=C)
     # a bead of sweat
     d.ellipse([39, 12, 42, 17], fill=C)
     d.point((40, 11), C)

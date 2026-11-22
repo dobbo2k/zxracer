@@ -12,7 +12,10 @@ per bar a chord and the melody. Melody tokens, lengths in sixteenths:
             m7, maj7, sus4, 5 power, 8 octave) rooted on A5, cycling fast
   !1        envelope: 0 pluck, 1 sustained lead, 2 soft (no length)
 A tune may set its own steps per bar (e.g. 24: triplet sixteenths) and an
-echo: the bass channel replays the melody in its rests (tune_opts).
+echo: the bass channel replays the melody in its rests (tune_opts). A section
+may double the bass ({"double": 12} after its bars, the bars' melody None):
+the melody channel plays the bass line that many semitones up, with the
+bass's envelope and no vibrato, for a fat bass.
 Long melody notes get vibrato (the player starts it a little into a note).
 
 Encoding, per channel (a byte stream, looping):
@@ -85,6 +88,7 @@ BASS = {
     # 24 steps a bar (triplet sixteenths): a sparse sub bass, its rests for the echo
     "dub":     [(0, 9), (None, 15)],
     "dub2":    [(0, 6), (None, 6), (12, 3), (None, 9)],
+    "roll":    [(0, 6), (0, 3), (12, 3, 1), (0, 3), (7, 3), (12, 3), (7, 3)],
 }
 
 # Drum patterns (one bar) and fills
@@ -96,13 +100,14 @@ DRUMS = {
     "epic":  "K---S---K-K-S---",
     "half":  "K-H-S-H-K-H-S-HH",
 }
-# 24 steps a bar (triplet sixteenths): drum and bass, the hi-hats in triplets
+# 24 steps a bar (triplet sixteenths): drum and bass, every hit on a straight
+# eighth (every third step), so no triplets
 DRUMS.update({
-    "hats": "H-H-H-H-H-H-H-H-H-H-HHHH",
-    "dnb":  "K-H-H-S-H-H-H--KH-S-H-HH",
-    "dnb2": "K-H-H-S-HKH-HSH-H-S-HSHH",
+    "hats": "H--H--H--H--H--H--H--O--",
+    "dnb":  "K--H--S--H--H--K--S--H--",
+    "dnb2": "K--H--S--K--H--K--S--O--",
 })
-TRIPFILL = "S-SS-SS-ST-TT-TT-SSSSSS-"
+DNBFILL = "K--S--S--T--T--T--S--S--"
 FILL = "K-H-S-H-S-SSS-SS"
 TOMS = "S-S-T-T-TTT-TTSS"
 ROLL = "TTT-TT-TT-TTSSSS"
@@ -203,41 +208,37 @@ TUNES = {
             ("B", "@B4.:8 @B4.7:8 !0"),
         ]),
     ]),
-    # drum and bass, F minor: rolling triplet hi-hats, a sparse sub bass and a
-    # sparse lead (octaves 4-5), echoed (later, quieter, a little flat) in the bass's rests.
-    # 24 steps a bar of 3 interrupts: 167 bpm
+    # sunny drum and bass, F major: hi-hats on straight eighths, a sparse sub bass
+    # and a sparse lead (octaves 4-5), echoed (later, quieter, a little flat)
+    # in the bass's rests; then a fat bass break, the bass doubled an octave
+    # up on the melody channel. 24 steps a bar of 3 interrupts: 167 bpm
     "country": (3, [
         ("dub", ENV_BASS, "hats", DRUMS["dnb"], [
-            ("Fm7", "!2 C5:6 G#4:6 -:12"),
-            ("C#maj7", "F4:6 G#4:6 -:12"),
-            ("A#m7", "C#5:6 C5:6 -:12"),
-            ("C7", "A#4:6 E4:6 -:12"),
+            ("Fmaj7", "!2 A4:6 C5:6 -:12"),
+            ("C", "G4:6 C5:6 -:12"),
+            ("Dm7", "A4:6 F4:6 -:12"),
+            ("A#maj7", "D5:6 C5:6 -:12"),
         ]),
-        ("dub", ENV_BASS, "dnb", TRIPFILL, [
-            ("Fm7", "!1 C5:9 D#5:3 C5:6 -:6"),
-            ("C#maj7", "G#4:9 F4:3 G#4:6 -:6"),
-            ("A#m7", "C#5:9 C5:3 A#4:6 -:6"),
-            ("C7", "G4:9 E4:3 G4:6 -:6"),
-            ("Fm7", "F5:6 D#5:3 C5:3 G#4:6 -:6"),
-            ("C#maj7", "/G#5:9 F5:3 C#5:6 -:6"),
-            ("A#m7", "F5:6 C#5:6 A#4:6 -:6"),
-            ("C7", "@C4.7:6 -:6 /E5:6 G5:6"),
+        ("dub", ENV_BASS, "dnb", DNBFILL, [
+            ("F", "!1 C5:9 D5:3 F5:6 -:6"),
+            ("C", "E5:9 D5:3 C5:6 -:6"),
+            ("Dm", "D5:9 E5:3 F5:6 -:6"),
+            ("A#", "/G5:9 F5:3 D5:6 -:6"),
+            ("F", "A5:6 G5:3 F5:3 C5:6 -:6"),
+            ("C", "/G5:9 E5:3 C5:6 -:6"),
+            ("Dm", "F5:6 A5:6 /C6:6 -:6"),
+            ("C", "@C5.sus4:6 @C5.:6 /E5:6 G5:6"),
         ]),
-        ("dub2", ENV_BASS, "dnb2", TRIPFILL, [
-            ("Fm7", "C5:3 F5:3 G#5:6 -:3 G5:3 F5:6"),
-            ("C#maj7", "F5:12 -:6 C#5:6"),
-            ("A#m7", "C#5:3 F5:3 A#5:6 -:3 G#5:3 F5:6"),
-            ("C7", "E5:12 -:6 C5:6"),
-            ("Fm7", "F5:6 G5:6 G#5:9 -:3"),
-            ("C#maj7", "G#5:6 F5:6 C#5:9 -:3"),
-            ("A#m7", "A#5:12 G#5:6 F5:6"),
-            ("C7", "@C4.7:3 -:3 @C4.7:3 -:3 @E4.:6 @G4.7:6"),
-        ]),
-        ("dub", ENV_BASS, "hats", TRIPFILL, [
-            ("C#maj7", "//F5:18 -:6"),
-            ("D#", "//G5:18 -:6"),
-            ("Fm7", "//G#5:18 -:6"),
-            ("C7", "//E5:12 -:6 G4:6"),
+        # the fat bass: no melody, the melody channel plays the bass an octave up
+        ("roll", ENV_HEAVY, "dnb2", DNBFILL, [
+            ("F", None), ("F", None), ("A#", None), ("C", None),
+            ("Dm", None), ("A#", None), ("F", None), ("C", None),
+        ], {"double": 12}),
+        ("dub", ENV_BASS, "hats", DNBFILL, [
+            ("A#", "!1 //D5:18 -:6"),
+            ("C", "//E5:18 -:6"),
+            ("Dm", "//F5:12 -:6 A5:6"),
+            ("C", "//G5:12 E5:6 C5:6"),
         ]),
     ], {"steps": 24, "echo": (9, 1)}),
     # night-time funk on sevenths, D dorian
@@ -316,7 +317,12 @@ def events(tune):
     mel_notes = []                  # (start step, steps, note): plain melody notes, for the echo
     bass_plan = []                  # per section: (env, [(start step, steps, note or None)])
     at = 0
-    for pattern, env, dpat, fill, bars in sections:
+    mel_env = 0
+    for sec in sections:
+        pattern, env, dpat, fill, bars = sec[:5]
+        double = (sec[5] if len(sec) > 5 else {}).get("double")
+        if double:                  # the melody channel doubles the bass
+            melody += [("env", env), ("vib", 0)]
         plan = []
         for k, (chord, line) in enumerate(bars):
             root, minor = chord_parts(chord)
@@ -330,10 +336,17 @@ def events(tune):
                              step[2] if len(step) > 2 else 0))
                 t += length
             assert t - at == steps, (tune, pattern)
-            total = 0
+            if double:
+                assert line is None, (tune, chord)
+                for t0, n, note, slide in plan[-len(BASS[pattern]):]:
+                    melody.append(("rest", n * tick) if note is None else
+                                  ("note", note + double, n * tick, slide, 0))
+                line = ""
+            total = steps if double else 0
             for tok in line.split():
                 if tok.startswith("!"):
-                    melody.append(("env", int(tok[1:])))
+                    mel_env = int(tok[1:])
+                    melody.append(("env", mel_env))
                     continue
                 m = TOKEN.match(tok)
                 assert m, (tune, tok)
@@ -364,6 +377,8 @@ def events(tune):
                 else:
                     drums.append(("drum", DRUM_IDS[ch], tick))
             at += steps
+        if double:                  # back to the lead's envelope and vibrato
+            melody += [("env", mel_env), ("vib", LEAD_VIB)]
         bass_plan.append((env, plan))
 
     # the bass channel: the patterns, and in their rests (with echo) the
