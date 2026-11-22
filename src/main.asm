@@ -113,6 +113,7 @@ MainLoop:
         INCLUDE "einstein/disc.asm"
         INCLUDE "einstein/front.asm"
         INCLUDE "einstein/dash.asm"
+        INCLUDE "einstein/slope.asm"    ; (a sloped row of the near road)
         ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES

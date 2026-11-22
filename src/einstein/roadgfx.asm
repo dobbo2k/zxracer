@@ -18,10 +18,11 @@
 ; ---------------------------------------------------------------------------
 
 ; Every road row into NameBuf, changed slots into SlotShadow and DirtyList
-; A row is drawn again only if its bands moved (the band bytes of its four
-; line pairs) or, pass 1 having run (EinShape), its shape did: what its
-; cells come from (EinRowSame). EinForce: every row (a display reset, in or
-; out of a tunnel).
+; A row is drawn again only if its bands moved (those of its lines 0 and 4,
+; the only ones it uses: its colours are its middle line's, its dashes
+; lines 0 and 4's) or, pass 1 having run (EinShape), its shape did: what
+; its cells come from (EinRowSame). EinForce: every row (a display reset,
+; in or out of a tunnel).
 EinDraw:
         ld hl, DirtyList
         ld (EDirtyEnd), hl
@@ -51,7 +52,6 @@ EinDraw:
         call EinPanoCompose     ; the panorama's rows (src/einstein/sprites.asm)
 .lp:    ld a, (ERow)            ; the row's bands as last drawn
         add a, a
-        add a, a
         add a, low ERowBands
         ld e, a
         ld a, high ERowBands
@@ -65,7 +65,7 @@ EinDraw:
         ld l, a
         ld h, high Band
         ld c, 0                 ; C: draw it
-        ld b, 4
+        ld b, 2
 .bd:    ld a, (de)
         cp (hl)
         jr z, .bs
@@ -73,6 +73,8 @@ EinDraw:
         ld (de), a
         ld c, 1
 .bs:    inc de
+        inc l
+        inc l
         inc l
         inc l
         djnz .bd
@@ -257,6 +259,7 @@ EinRow:
         ld (EI), a              ; the row's top line
         call EinRowFast         ; the ready-made way, if it can be
         jp c, EinRowBase        ; (or the exact way)
+        jp nz, EinRowBase.slotsUsed     ; (a sloped row: EinSlopeRow drew it)
         ld a, 1
         ld (EStatic), a
         call EinDashRow
@@ -313,8 +316,9 @@ k       DEFL 0
 k       DEFL k + 1
         EDUP
 
-EinRowBase:
-        ; its names in BaseNames (rows from PANO_ROW0)
+; The row's names in BaseNames (ERowPtr; to be sent) from its ranges, in its
+; band's colours (EinRowColours): grass, kerb, road, kerb, grass
+EinRowNames:
         ld a, (ERow)
         add a, ROAD_ROW0 - PANO_ROW0
         ld l, a
@@ -333,19 +337,7 @@ EinRowBase:
         ld hl, ERowDrawn + ROAD_ROW0
         add hl, de
         ld (hl), 1
-        ld a, (ESloped)         ; (a sloped row: its ranges made, the exact way)
-        or a
-        jr z, .ranges
-        xor a
-        ld (ESloped), a
-        ld (EStatic), a
-        jr .ranged
-.ranges:
-        call EinRowRanges
-        call EinStaticRanges    ; (rows 16-23: ready-made edges, ERB / ERC moved)
-.ranged:
         call EinRowColours
-        ; ---- names: grass, kerb, road, kerb, grass
         ld hl, (ERowPtr)
         ld a, (ERA)
         ld b, a
@@ -379,7 +371,21 @@ EinRowBase:
         add a, 32
         ld b, a
 .g2:    ld a, 0
-        call EinFillRun
+        jp EinFillRun
+
+EinRowBase:
+        ld a, (ESloped)         ; (a sloped row: its ranges made, the exact way)
+        or a
+        jr z, .ranges
+        xor a
+        ld (ESloped), a
+        ld (EStatic), a
+        jr .ranged
+.ranges:
+        call EinRowRanges
+        call EinStaticRanges    ; (rows 16-23: ready-made edges, ERB / ERC moved)
+.ranged:
+        call EinRowNames
         ; ---- a tunnel's light band, inside it: lamps on the walls beside
         ; the kerbs (as src/road.asm RowAttrs)
         ld a, (ERBand)
@@ -765,10 +771,7 @@ EinRowFast:
         cp (hl)
         jr c, .s3
         ld (hl), a
-.s3:    ld a, 1                 ; (EinRowBase: not made again)
-        ld (ESloped), a
-        scf
-        ret
+.s3:    jp EinSlopeRow          ; (src/einstein/slope.asm)
 .mean:  ld a, b                 ; ---- the edges: the lines' mean
         add a, c
         rra
@@ -853,7 +856,7 @@ EinRowFast:
 .g2:    ld a, 0
         call EinFillRun
         pop iy
-        or a                    ; (done)
+        xor a                   ; (done: Z, no carry)
         ret
 .grass: xor a                   ; no road: all grass
         ld (ERA), a
@@ -866,7 +869,7 @@ EinRowFast:
         call EinGroundName
         call EinFillRun
         pop iy
-        or a
+        xor a
         ret
 ; -> HL: its names (BaseNames), marked to be sent; IX: its colour set
 ; (ERowSets); IY: its kerb edges' names (less one, then the right's
@@ -1683,5 +1686,5 @@ EinShape:       db 1            ; pass 1 ran: rows whose shape changed again
 EinForce:       db 1            ; every row again
 ELastTun:       db 0
 
-ERowBands:      ds 4 * 12       ; per row, the bands it was drawn with
+ERowBands:      ds 2 * 12       ; per row, the bands of its lines 0 and 4 as drawn
 ERowDrawn:      ds 24           ; per screen row: its names to be sent

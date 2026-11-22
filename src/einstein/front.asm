@@ -282,9 +282,6 @@ EOvClobbered:   db 0            ; the stage overlay drawn over
 EFrontCur:      dw 0            ; the next cell to compare
 ETick:          db 0            ; (the interrupt's 1 ms ticks, front end)
 
-; The car's cells as VRAM holds them, for sending only those that changed
-; (src/einstein/sky.asm EinCarSync)
-        ALIGN 256
-ECarPix:        ds 4 * CAR_W * 8        ; the car's cells' pixels
-ECarSourceInks: ds 256                  ; and colours as drawn (paper 0: transparent)
-        ASSERT low ECarSourceInks == 0  ; (EinCarGroundSync steps L)
+; The car's pose's cells' pixels (src/einstein/car.asm EinCarPrep; their
+; colours as drawn, ECarSourceInks, are in screen A: src/einstein/platform.asm)
+ECarPix:        ds 4 * CAR_W * 8

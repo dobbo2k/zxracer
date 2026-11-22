@@ -112,7 +112,11 @@ ERowSig         EQU EPanoList + 64      ; per road row: what it was drawn from
 ERowFk          EQU ERowSig + 12 * SIG_SIZE ; per road row: drawn as a fork
         ASSERT BaseNames + (24 - PANO_ROW0) * 32 <= ESkyAttr
         ASSERT EMaskU + 24 * MASK_ROW <= EPanoSpr
-        ASSERT ERowFk + 12 <= $5B00
+ECarSourceInks  EQU $5A00               ; the car's pose's colours as drawn (paper
+                                        ; 0: transparent; page-aligned: EinCarGroundSync
+                                        ; steps L), made afresh with the pose after
+                                        ; every display reset (CarShownB)
+        ASSERT ERowFk + 12 <= ECarSourceInks
         ASSERT ART_BITMAP + 512 + 640 <= EPanoSpr
 
 ; The stage loader tail-calls resident code before its RAM becomes the sky.

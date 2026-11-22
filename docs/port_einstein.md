@@ -14,8 +14,8 @@ and `make test-einstein` (see "Building and testing" at the end).
 - **Frame rate:** a steady 12.5 fps (a frame every 4 TV frames) where it
   can; the Spectrum's is 16.7. In the attract demo's worst stretch
   (steering, curves, hills and scenery every frame), with the native
-  artwork, 2 frames in 3 make it and most of the rest take 5 TV frames:
-  11.4 fps on average. See section 6.
+  artwork, 7 frames in 10 make it and most of the rest take 5 TV frames:
+  11.5 fps on average. See section 6.
 
 ## 2. The hardware, as found
 
@@ -238,9 +238,8 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
 `src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
-frame takes longer. In the attract demo, over 300 frames sent, 202 come 4
-TV frames after the last, 77 after 5, 19 after 6 and 1 after 7: 11.4 fps on
-average (`make test-einstein` wants at least 7). The harness's `fliphist N`
+frame takes longer. In the attract demo, over 300 frames sent, 213 come 4
+TV frames after the last, 63 after 5 and 23 after 6: 11.5 fps on average (`make test-einstein` wants at least 7). The harness's `fliphist N`
 gives that histogram, and the costliest routines of each frame that took 6
 or more.
 
@@ -264,8 +263,10 @@ measures the work alone. Taken so:
 | the native artwork, unlocked | 1,436 (4.79) |
 | its speed work, locked at 4 | 1,343 (4.48, 11.2 fps) |
 | its speed work, unlocked | 1,279 (4.26) |
-| now, locked at 4 | 1,318 (4.39, 11.4 fps) |
-| now, unlocked | 1,248 (4.16) |
+| the objects' work, locked at 4 | 1,318 (4.39, 11.4 fps) |
+| the objects' work, unlocked | 1,248 (4.16) |
+| now, locked at 4 | 1,310 (4.37, 11.5 fps) |
+| now, unlocked | 1,235 (4.12) |
 
 `profile N` in the harness gives each routine's T-states and calls over N
 TV frames (`profilel N`: local labels apart). A game frame's work is
@@ -283,11 +284,14 @@ rows are built again a frame.
 whose kerb edge slopes more than `EIN_SLOPE` (4) pixels between its top
 and bottom lines is drawn the exact way, in slots (2-line steps), as a
 tunnel's or a fork's is: about 4.7 rows a frame in the attract demo, at
-about 7K T each more than a ready-made row. Assembled with
+about 7K T each more than a ready-made row. Such a row is drawn in one pass
+(`EinSlopeRow`, `src/einstein/slope.asm`): its kerb cells straight from its
+line pairs' edges in pixels, where each kerb run is crossed by its own edge
+alone (else the generic way, as a tunnel's). Assembled with
 `-DEIN_SLOPE=8` (only edges steeper than 45 degrees exact: a straight
-road's near kerbs become 8-line steps) the benchmark takes 1,296 locked
-(225 frames in 300 at 4) and 1,206 unlocked; with `-DEIN_SLOPE=127` (none,
-the look before the native artwork) 1,255 (267 at 4) and 1,126.
+road's near kerbs become 8-line steps) the benchmark takes 1,290 locked
+(230 frames in 300 at 4) and 1,198 unlocked; with `-DEIN_SLOPE=127` (none,
+the look before the native artwork) 1,253 (269 at 4) and 1,124.
 
 Tried and measured since the native artwork (unlocked, from 1,436):
 
@@ -311,7 +315,14 @@ Tried and measured since the native artwork (unlocked, from 1,436):
   of screen B above row 10 only, each cell below cleared as it is read
   back (`EinErase`, `EinSprMask`: 1,252); the rows with silhouette cells
   noted (`ENRows`, `EURows`), so that only they are copied, cleared and
-  mirrored (1,248)
+  mirrored (1,248); a row drawn again for its bands only when those of its
+  lines 0 and 4 move (its others are never used: 1,244); a sloped row in
+  one pass (`EinSlopeRow`, 1,235: the kerb cells' work was near its floor
+  already; the generic line-edge pass and some calls go)
+- measured, not done: a row's names sent only where they changed. Of the
+  12 road rows 9.5 change a frame, in 17 cells on average but spread over
+  24.5, and 2.5 are sent unchanged: about 2-4K T to gain, and comparing
+  names (about 42 T a byte) costs more than sending them (about 28)
 - dropped: clearing the cells last frame's silhouettes covered in a pass of
   their own (no change: the pass cost what the XOR saved); a 2 ms wait
   after the 16 ms one, for fewer polls (one fewer a TV frame, no change);
@@ -390,9 +401,11 @@ reset's set-up (`src/einstein/reset.asm`). The Einstein's own buffers
 (the names, the sky's attributes, the masks, the panorama's sprite cells,
 the rows' signatures) are in screen A's memory, above the stage overlay
 ($4800-$5AFF): the game code never writes screen A here (`Ceiling` and
-`TimeWarn` skip it). Left: about 110 bytes in bank 2 (and 70 in the
-chains' place), 30 in bank 5, 75 under $4000, 128 in the Einstein's
-buffers ($DB00-$EBFF) and 320 in screen A (assertions check each).
+`TimeWarn` skip it), which also holds the car's pose's colours as drawn
+(`ECarSourceInks`, $5A00, made afresh after every display reset). Left:
+about 100 bytes in bank 2 (and 70 in the chains' place), 30 in bank 5, 99
+under $4000, 128 in the Einstein's buffers ($DB00-$EBFF) and 68 in screen
+A (assertions check each).
 
 ## 7. Building and testing
 
