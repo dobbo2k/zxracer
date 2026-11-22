@@ -433,11 +433,17 @@ EinArtLength: ld bc, 0
         ld de, NameBuf + PANO_ROW0 * 32
         ld bc, (24 - PANO_ROW0) * 32
         ldir
-        ld hl, EMaskN           ; no silhouettes on show
-        ld de, EMaskN + 1
-        ld bc, 24 * MASK_ROW - 1
+        ld hl, EMaskN           ; no silhouettes on show (N and U, and their
+        ld de, EMaskN + 1       ; rows' bits)
+        ld bc, 2 * 24 * MASK_ROW - 1
+        ASSERT EMaskU == EMaskN + 24 * MASK_ROW
         ld (hl), 0
         ldir
+        ld hl, ENRows
+        ld b, 6
+.rz:    ld (hl), 0
+        inc hl
+        djnz .rz
         xor a
         ld (EPanoN), a
         call EinPortalReset

@@ -25,35 +25,61 @@ MASK_ROW        EQU 4               ; bytes of a mask row: a bit a column
 ; After DrawSprites: EMaskN, the cells the new commands cover, and EMaskU,
 ; those and the cells the old ones did (last frame's EMaskN: the commands
 ; EraseSprites took away); the sky's cells in EMaskU to be mirrored
+; Only the rows that have any (ENRows, EURows) are copied and cleared.
 EinSprCells:
-        ld hl, EMaskN           ; U = last frame's N
-        ld de, EMaskU
-        ld a, 24 * MASK_ROW / 16
-.u:     DUP 16
-        ldi
-        EDUP
-        dec a
-        jr nz, .u
-        ld hl, EMaskN           ; N clear (interrupts on: a late frame
-        xor a                   ; interrupt would leave less of the blank)
-        ld b, 24 * MASK_ROW / 16
-.z:     DUP 16
-        ld (hl), a
+        ld hl, EURows           ; U's rows that N has none in now: cleared
+        ld de, ENRows
+        ld c, 0                 ; (C: the first of these 8 rows)
+.u0:    ld a, (de)
+        cpl
+        and (hl)
+        call nz, .uclr
         inc hl
-        EDUP
-        djnz .z
+        inc de
+        ld a, c
+        add a, 8
+        ld c, a
+        cp 24
+        jr nz, .u0
+        ld hl, ENRows           ; N's rows: into U, and cleared
+        ld c, 0
+.n0:    ld a, (hl)
+        or a
+        call nz, .ncpy
+        inc hl
+        ld a, c
+        add a, 8
+        ld c, a
+        cp 24
+        jr nz, .n0
+        ld hl, ENRows           ; (U's rows now N's; N's none)
+        ld de, EURows
+        ldi
+        ldi
+        ldi
+        xor a
+        ld (ENRows), a
+        ld (ENRows + 1), a
+        ld (ENRows + 2), a
         ld hl, CmdListB         ; (each cell into U too)
         call .cmds
-        ld b, 0                 ; the sky's rows: mirrored
+        ld a, (EURows)          ; the sky's rows (0-9): mirrored
+        ld e, a
+        ld a, (EURows + 1)
+        and 3
+        ld d, a                 ; (D E: their rows' bits)
+        ld b, 0
         ld hl, EMaskU
 .mr:    ld c, 0
-        call EinMaskAny
-        jr nz, .mb
+        srl d
+        rr e
+        jr c, .mb0
         inc hl                  ; (none in the row)
         inc hl
         inc hl
         inc hl
         jr .mrn
+.mb0:   push de
 .mb:    ld a, (hl)
         inc hl
         or a
@@ -71,10 +97,69 @@ EinSprCells:
 .mnext: ld a, c
         cp 32
         jr nz, .mb
-.mrn:   inc b
-        ld a, b
-        cp MIRROR_ROWS
-        jr nz, .mr
+        pop de
+.mrn:   ld a, d
+        or e
+        ret z                   ; (no more rows with any)
+        inc b
+        jr .mr
+; A = 8 rows' bits from row C: those rows of U cleared (BC, DE, HL kept)
+.uclr:  push bc
+        push hl
+.ub:    srl a
+        jr nc, .un
+        push af
+        ld a, c
+        add a, a
+        add a, a
+        ld l, a
+        ld h, high EMaskU
+        ASSERT low EMaskU == 0
+        xor a
+        ld (hl), a
+        inc l
+        ld (hl), a
+        inc l
+        ld (hl), a
+        inc l
+        ld (hl), a
+        pop af
+.un:    inc c
+        or a
+        jr nz, .ub
+        pop hl
+        pop bc
+        ret
+; A = 8 rows' bits from row C: those rows of N into U, and cleared
+.ncpy:  push bc
+        push de
+        push hl
+.nb:    srl a
+        jr nc, .nn
+        push af
+        ld a, c
+        add a, a
+        add a, a
+        ld e, a
+        ld d, high EMaskU
+        add a, low EMaskN
+        ld l, a
+        ld h, high EMaskN
+        ASSERT high EMaskN == high (EMaskN + 24 * MASK_ROW - 1)
+        DUP 4
+        ld a, (hl)
+        ld (de), a
+        ld (hl), 0
+        inc l
+        inc e
+        EDUP
+        pop af
+.nn:    inc c
+        or a
+        jr nz, .nb
+        pop hl
+        pop de
+        pop bc
         ret
 ; HL = a command list (a count, then commands): set the cells in N and U
 .cmds:  ld a, (hl)
@@ -132,12 +217,40 @@ EinSprCells:
         push hl
         ld a, 32                ; E columns from C, up to column 31
         sub c
-        jr z, .rowDone
-        jr c, .rowDone
+        jp z, .rowDone
+        jp c, .rowDone
         cp e
         jr c, .n
         ld a, e
 .n:     ld e, a                 ; (E: the row's cells, at least 1)
+        push hl                 ; (the row's bit in ENRows and EURows)
+        ld a, b
+        and 7
+        add a, low EBitTab
+        ld l, a
+        ld h, high EBitTab
+        ASSERT high EBitTab == high (EBitTab + 7)
+        ld d, (hl)              ; D: its bit
+        ld a, b
+        rrca
+        rrca
+        rrca
+        and 3
+        add a, low ENRows
+        ld l, a
+        ld a, high ENRows
+        adc a, 0
+        ld h, a
+        ld a, d
+        or (hl)
+        ld (hl), a
+        inc hl
+        inc hl
+        inc hl
+        ld a, d
+        or (hl)
+        ld (hl), a
+        pop hl
         ld a, b                 ; IX: the row's byte of column C in N (U
         add a, a                ; 96 on), D: its bit
         add a, a
@@ -228,6 +341,17 @@ EinSprCells:
         ld l, 0
         ret
 
+; Last frame's silhouettes out of screen B (src/scenery.asm EraseSprites):
+; their lines above the panorama only. Below, screen B holds nothing else,
+; and EinSprMask clears each cell as it reads it.
+EinErase:
+        ld a, PANO_ROW0 * 8
+        ld (RunCommand.clipY + 1), a
+        call EraseSprites
+        ld a, 192
+        ld (RunCommand.clipY + 1), a
+        ret
+
 ; B = row, C = column, IX = a mask: set its bit (BC, DE, IX kept)
 EinMaskSet:
         push de
@@ -307,9 +431,6 @@ EinPanoCompose:
 .r:     push bc
         call EinComposeStart
         jr z, .next
-        ld a, (TunInside)       ; (in a tunnel these rows are its ceiling)
-        or a
-        jr nz, .portal
         ld ix, EMaskN           ; the cells under a silhouette
         call EinMaskRow
         ld c, 0
@@ -337,7 +458,6 @@ EinPanoCompose:
 .cbn:   ld a, c
         cp 32
         jr nz, .cb
-.portal:
         ld hl, (EComposePtr)    ; then the portal's cells
         call EinPortalCells
 .next:  pop bc
@@ -386,8 +506,9 @@ EinComposeStart:
         or 1                    ; NZ
         ret
 
-; B = row, C = column -> EPat: screen B's 8 bytes of the cell (the
-; silhouette's pixels); Z if there are none (BC kept)
+; B = row (10-23), C = column -> EPat: screen B's 8 bytes of the cell (the
+; silhouette's pixels), the cell cleared (EinErase leaves these rows to
+; this); Z if there are none (BC kept)
 EinSprMask:
         ld a, b
         and $18
@@ -406,6 +527,7 @@ EinSprMask:
         DUP 7
         ld a, (hl)
         ld (de), a
+        ld (hl), 0
         or c
         ld c, a
         inc e
@@ -413,6 +535,7 @@ EinSprMask:
         EDUP
         ld a, (hl)
         ld (de), a
+        ld (hl), 0
         or c
         pop bc
         or a
@@ -449,6 +572,9 @@ EinMaterialCell:
 ; B = row (10-11), C = column under a silhouette: its own pattern, the
 ; panorama's (copy 0, its column EPanoCol + C) XOR the silhouette
 EinPanoCell:
+        ld a, (TunInside)       ; (in a tunnel these rows are its ceiling: the
+        or a                    ; cell only cleared)
+        jp nz, EinSprMask
         call EinMaterialCell
         ld a, (hl)
         rlca
@@ -720,6 +846,8 @@ EinCarNames:
 ; B = row (12-23), C = column under a silhouette: a slot of the row's, the
 ; road's cell XOR the silhouette, in the cell's colours
 EinSprCell:
+        call EinSprMask         ; (read, and cleared)
+        ret z
         ld a, b                 ; (not the car's cells: its names go over)
         cp CAR_ROW
         jr c, .ok
@@ -728,9 +856,7 @@ EinSprCell:
         jr c, .ok
         cp CAR_COL + CAR_W
         ret c
-.ok:    call EinSprMask
-        ret z
-        ld hl, (EComposePtr)
+.ok:    ld hl, (EComposePtr)
         ld a, l
         add a, c
         ld l, a
@@ -834,5 +960,8 @@ ERoadInkT:      db 0
 EPanoCol:       db 0            ; the panorama's column at the left edge
 EPanoIdx:       db 0
 EPanoN:         db 0
+ENRows:         ds 3            ; the rows (a bit each) with any in EMaskN,
+EURows:         ds 3            ; and in EMaskU (EinSprCells)
+        ASSERT EURows == ENRows + 3
 ERowLo:         ds 12           ; per road row: its silhouettes' free slots
 ERowHi:         ds 12           ; (ESlotN, ESlotTop; ERowHi bit 7: EDown)

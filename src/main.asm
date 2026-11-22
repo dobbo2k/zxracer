@@ -42,8 +42,8 @@ MainLoop:
         call UpdatePlayer
         call RoadPrepare
         call WaitFlip           ; (the last frame sent: its buffers free)
-        call EraseSprites       ; traffic and scenery into screen B, as ever
-        call DrawSprites
+        call EinErase           ; traffic and scenery into screen B, as ever
+        call DrawSprites        ; (EinErase: src/einstein/sprites.asm)
         call EinCarPrep         ; select the native Spider pose for this frame
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
         call EinSprCells        ; the cells they cover (src/einstein/sprites.asm)
@@ -133,6 +133,7 @@ TablesEnd:
         EDUP
 OutiEnd:
         ret
+        INCLUDE "einstein/reset.asm"    ; (more of the display reset)
         ELSE
         ASSERT $ <= PANO_LDI_END - 64
 
