@@ -175,11 +175,8 @@ $(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py tools/make_
 build/einstein/STAGES.DAT: build/einstein/speedrun.com build/einstein/stages_raw.dat tools/make_einstein.py
 	$(PYTHON) tools/make_einstein.py patch assets/stages.yaml build/einstein
 
-# EIN_DEFS: assembly options (docs/einstein_code.md), e.g. EIN_DEFS=-DEIN_OBJSPR;
-# touch src/main.asm when changing them
-EIN_DEFS ?=
 build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm | build/einstein
-	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 $(EIN_DEFS) -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
+	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
 
 build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.DAT tools/make_einstein_disk.py
 	$(PYTHON) tools/make_einstein_disk.py -o $@ -s "$(EINSTEIN_SYSTEM)" $< build/einstein/STAGES.DAT

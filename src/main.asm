@@ -46,9 +46,6 @@ MainLoop:
         call DrawSprites        ; (EinErase: src/einstein/sprites.asm)
         call EinCarPrep         ; select the native Spider pose for this frame
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
-        IFDEF EIN_OBJSPR
-        call EinObjSprites      ; the nearest as sprites (src/einstein/objspr.asm)
-        ENDIF
         call EinSprCells        ; the cells they cover (src/einstein/sprites.asm)
         call EinPortal          ; and the portal's (src/einstein/portal.asm)
         call EinHorizon
@@ -225,9 +222,6 @@ FillBlock:
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
         INCLUDE "beep.asm"
         INCLUDE "gap4.asm"
-        ENDIF
-        IFDEF EIN_OBJSPR
-        INCLUDE "einstein/objspr.asm"
         ENDIF
         ASSERT $ <= ISR_JP
 

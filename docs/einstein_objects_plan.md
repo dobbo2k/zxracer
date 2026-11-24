@@ -1,6 +1,6 @@
 # Plan: traffic and scenery drawn the Einstein's own way
 
-A plan (24 November 2026); B's prototype is built: section 5. It follows the road-projection work in
+A plan (24 November 2026); B's prototype was built and dropped: section 5. It follows the road-projection work in
 `docs/port_einstein.md` section 6, which took the fixed-step benchmark from 1,292 to
 1,279 TV frames (locked at 4) and normal play from 11.78 to 11.96 fps. What is left
 between that and a steady 12.5 fps is mostly traffic and scenery.
@@ -143,8 +143,7 @@ most frames should make 4 TV frames, a nearly steady 12.5.
 **A** was estimated again against the code before building it: about 5-7K T a game frame
 (some 0.05 fps), not the 10-13K above. It was not built; B's prototype came first.
 
-**B, the prototype** (`-DEIN_OBJSPR`; off by default, the normal build byte for byte the
-same). Measured first: in the fixed-step demo, vehicles cover only about 2 object cells a
+**B, the prototype** (`-DEIN_OBJSPR`, off by default; commit 9a9d91b, then removed). Measured first: in the fixed-step demo, vehicles cover only about 2 object cells a
 game frame, scenery about 22 (6.4 from objects one sprite in size, 7.4 from those of 2-4
 sprites, 8.4 from bigger ones). So the prototype takes every object type, not only the
 nearest vehicle:
@@ -188,6 +187,6 @@ cache's top above the largest theme pack (theme packs are now limited to 8,128 b
 screen A's free tail. Nothing more fits as things are: neither a colour per 16-line row nor
 the magnified variant of step 3 (half-resolution patterns, the lamps redrawn) was built.
 
-**To decide:** whether the gain (about 0.16 fps in normal play) is worth the look (one
-colour for small objects) and the memory; if so, better colours (a per-type choice of the
-ink, worked out by the build tools) and room for them.
+**Decided: dropped.** The gain (about 0.16 fps in normal play) was not worth the look:
+the palms' green, the traffic's roofs and the parasols' canopies matter more. The code was
+removed in the commit after 9a9d91b, which still holds it (`git show 9a9d91b`).

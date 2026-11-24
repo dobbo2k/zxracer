@@ -48,8 +48,6 @@ THEME_CACHE = 0x0120                        # after the COM file's jump at $0100
 CAPACITY = make_stages.PANO_CACHE - make_stages.THEME_CACHE
 PANO_CACHE = (THEME_CACHE + CAPACITY) & ~31
 EIN_CODE = PANO_CACHE + 1024                # the platform code (src/einstein/platform.asm)
-PACK_TOP = PANO_CACHE - 192                 # theme packs end here (above: -DEIN_OBJSPR's
-                                            # code, src/einstein/platform.asm EIN_PACK_TOP)
 RECORD = 128
 
 
@@ -85,7 +83,7 @@ def gen(cfg, outdir):
             art = einstein_art.race_pack(stage, theme, palette)
             open(os.path.join(outdir, label + ".bin"), "wb").write(art)
             continue
-        top = f"${PACK_TOP:04X}" if label.startswith("theme_") else "$8000"
+        top = "PANO_CACHE" if label.startswith("theme_") else "$8000"
         if label.startswith("theme_"):
             cache = THEME_CACHE             # (the Spectrum's is $DB00)
         out += [f'        OUTPUT "{outdir}/{label}.bin"', f"        ORG ${cache:04X}"] + lines + \

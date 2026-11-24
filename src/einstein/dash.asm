@@ -512,14 +512,9 @@ TAIL_SPR        EQU 12
         ELSE
 TAIL_SPR        EQU 0
         ENDIF
-        IFDEF EIN_OBJSPR
-LAMP_PAT        EQU 63              ; (0-62: the objects', src/einstein/objspr.asm)
-        ELSE
-LAMP_PAT        EQU 12
-        ENDIF
 EinTailLamps:
         ld hl, .pixels
-        ld de, VRAM_SPRPAT + LAMP_PAT * 32
+        ld de, VRAM_SPRPAT + 12 * 32
         ld b, 32
         call VdpWrite
         ld hl, .attrs
@@ -530,7 +525,7 @@ EinTailLamps:
         ds 13
         db 0,$E0,$E0
         ds 13
-.attrs: db 177,100,LAMP_PAT*4,8, 177,143,LAMP_PAT*4,8, $D0
+.attrs: db 177,100,48,8, 177,143,48,8, $D0
 
         IFDEF EIN_DASH
 ; At a display reset (VRAM cleared): every row's sprite hidden, its
