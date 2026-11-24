@@ -41,9 +41,9 @@ any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displa
 
 ```
 $4000-$5AFF  Bank 5: screen buffer A
-$5B00-$7B23  Bank 5: resident graphics (car, van and lorry sprites, font,
+$5B00-$7B24  Bank 5: resident graphics (car, van and lorry sprites, font,
              player car), the music player, the ways into the stage loader
-             and the front end, the tunnels' mouths; 636 bytes free up to
+             and the front end, the tunnels' mouths; 635 bytes free up to
              the track cache (the crew's close-ups were here)
 $7D80-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
              (640 bytes; also the bounce buffer while a theme or the front end
