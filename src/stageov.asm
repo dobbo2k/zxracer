@@ -643,6 +643,9 @@ OvResetDisplay:
         ld hl, $8000
         ld (Pass1PX), hl
         IFDEF EINSTEIN
+        IFDEF EIN_OBJSPR
+        call OvSprPatterns      ; (src/einstein/objsprov.asm)
+        ENDIF
         jp EinResetDisplay      ; screen B into the VDP (src/einstein/flip.asm)
         ELSE
         jp CopyScreenBA
@@ -835,6 +838,9 @@ TrafficRows:
         db 4, 4, 6, 6, 7
         db 5, 4, 6, 8, 10
 
+        IFDEF EIN_OBJSPR
+        INCLUDE "einstein/objsprov.asm" ; (the objects' sprites' patterns)
+        ENDIF
         INCLUDE "stages.asm"    ; the stage table
         ASSERT $ <= ART_INPUT
         ASSERT NUM_ROWS == 5    ; (StageTimes, src/vars.asm)

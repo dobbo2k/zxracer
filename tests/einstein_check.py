@@ -61,11 +61,17 @@ def check_artwork(harness, rom, dsk, sym, outdir):
             sys.exit(f"einstein_check: native sky pixels differ on stage {stage}")
     # The tail lamps are sprites 0 and 1, or 12 and 13 after the centre
     # line's twelve in a build with them (-DEIN_DASH).
-    dash = any(line.startswith("EinDashRow:") for line in Path(sym).read_text().splitlines())
+    # With -DEIN_OBJSPR (traffic and scenery as sprites 2-31) their pattern
+    # is 63 and the objects' sprites may follow them.
+    symbols = Path(sym).read_text().splitlines()
+    dash = any(line.startswith("EinDashRow:") for line in symbols)
+    objspr = any(line.startswith("EinObjSprites:") for line in symbols)
     first = 48 if dash else 0
+    lamp = 252 if objspr else 48
+    lamps = bytes((177, 100, lamp, 8, 177, 143, lamp, 8, 208))
     for table, tiles in zip(values["vram_1B00"], values["vram_3800"]):
         attrs, patterns = bytes.fromhex(table), bytes.fromhex(tiles)
-        if attrs[first:first + 9] != bytes((177,100,48,8,177,143,48,8,208)):
+        if attrs[first:first + (8 if objspr else 9)] != lamps[:8 if objspr else 9]:
             sys.exit("einstein_check: tail lamp sprites missing")
         for n in range(0, first, 4):
             y, x, tile, _ = attrs[n:n+4]

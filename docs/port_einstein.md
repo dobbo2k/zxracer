@@ -343,7 +343,9 @@ back from screen B, 7 of them empty, at about 530 T each - about 3.7K T in
 all, and knowing a cell empty without reading it costs most of that in time,
 or more memory than there is. What is left is mostly traffic and scenery: a
 plan for drawing them the Einstein's own way is in
-[einstein_objects_plan.md](einstein_objects_plan.md).
+[einstein_objects_plan.md](einstein_objects_plan.md). Its prototype of hardware
+sprites for them (`-DEIN_OBJSPR`, off by default) takes normal play from 11.96
+to 12.12 fps, with small objects in one colour; the results are in its section 5.
 
 **Einstein upload and kerb optimisations in the release.** Albert's
 normal-timing attract demo was sampled for 1,300 TV refreshes after

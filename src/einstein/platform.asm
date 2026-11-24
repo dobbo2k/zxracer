@@ -145,6 +145,33 @@ EPanoSpr        EQU $5680               ; the panorama's cells under silhouettes
 EPanoList       EQU EPanoSpr + 64 * 8   ; (64)
 ERowSig         EQU EPanoList + 64      ; per road row: what it was drawn from
 ERowFk          EQU ERowSig + 12 * SIG_SIZE ; per road row: drawn as a fork
+        IFDEF EIN_OBJSPR
+; The objects' sprites (src/einstein/objspr.asm): OvSprPatterns sets up
+; ESprBase, ESprLen and ESprAttr; the rest is EinObjSprites' each frame
+ESprBand        EQU $59C0               ; per band of 8 lines: its sprites
+ESprBest        EQU ESprBand + 24       ; (2)
+ESprPtr         EQU ESprBest + 2        ; (2)
+ESprLeft        EQU ESprPtr + 2
+ESprN           EQU ESprLeft + 1
+ESprType        EQU ESprN + 1
+ESprPat         EQU ESprType + 1
+ESprX           EQU ESprPat + 1
+ESprTop         EQU ESprX + 1
+ESprR           EQU ESprTop + 1
+ESprC           EQU ESprR + 1
+ESprQ1          EQU ESprC + 1
+ESprQ2          EQU ESprQ1 + 1
+ESprNext        EQU ESprQ2 + 1          ; (OvSprPatterns)
+ESprPass        EQU ESprNext + 1
+ESprBase        EQU $5A00               ; per type and size (10 x 9)
+ESprLen         EQU ESprBase + 10 * 9   ; ESprAttr's bytes to send
+ESprAttr        EQU ESprLen + 1         ; sprites 2-31's attributes, then $D0
+        ASSERT ERowFk + 12 <= ESprBand
+        ASSERT high ESprBand == high (ESprBand + 23)
+        ASSERT ESprPass < ESprBase
+        ASSERT high ESprAttr == high (ESprAttr + 30 * 4)
+        ASSERT ESprAttr + 30 * 4 + 1 <= SCN_DATA
+        ENDIF
         ASSERT BaseNames + (24 - PANO_ROW0) * 32 <= ESkyAttr
         ASSERT EMaskU + 24 * MASK_ROW <= EPanoSpr
         ASSERT ERowFk + 12 <= SCN_DATA
@@ -181,6 +208,18 @@ EGroundPapers   EQU EGroundPatterns + 32
         IFDEF EIN_KERB
         INCLUDE "kerbcell.asm"  ; (a prototype: the kerbs exact; with kerbrow.asm)
         ENDIF
+        IFDEF EIN_OBJSPR
+        INCLUDE "objsprcmd.asm" ; (a prototype: objects as sprites; objspr.asm)
+        ENDIF
         ; (keys.asm, disc.asm, front.asm: in bank 2's code, src/main.asm)
 EinArt:                         ; (the end of the platform code)
         ASSERT $ <= $4000              ; (the stage overlay: src/main.asm)
+        IFDEF EIN_OBJSPR
+; The theme cache's top, above the largest theme pack (tools/make_einstein.py
+; PACK_TOP keeps them below): no disc read writes past its length, and the
+; front end's code (run at THEME_CACHE) ends far below
+EIN_PACK_TOP    EQU PANO_CACHE - 192
+        ORG EIN_PACK_TOP
+        INCLUDE "objsprhi.asm"  ; (a prototype: objects as sprites; objspr.asm)
+        ASSERT $ <= PANO_CACHE
+        ENDIF

@@ -1,6 +1,6 @@
 # Plan: traffic and scenery drawn the Einstein's own way
 
-A plan, not yet built (24 November 2026). It follows the road-projection work in
+A plan (24 November 2026); B's prototype is built: section 5. It follows the road-projection work in
 `docs/port_einstein.md` section 6, which took the fixed-step benchmark from 1,292 to
 1,279 TV frames (locked at 4) and normal play from 11.78 to 11.96 fps. What is left
 between that and a steady 12.5 fps is mostly traffic and scenery.
@@ -137,3 +137,57 @@ most frames should make 4 TV frames, a nearly steady 12.5.
   the same as before (`cmp`).
 - **Places.** A tunnel's way in (`-DFIRST_STAGE=3 -DSTART_POS=6977`), the goal's gantry
   (`-DFIRST_STAGE=12`), a fork, and crashes into scenery and traffic.
+
+## 5. Results (24 November 2026)
+
+**A** was estimated again against the code before building it: about 5-7K T a game frame
+(some 0.05 fps), not the 10-13K above. It was not built; B's prototype came first.
+
+**B, the prototype** (`-DEIN_OBJSPR`; off by default, the normal build byte for byte the
+same). Measured first: in the fixed-step demo, vehicles cover only about 2 object cells a
+game frame, scenery about 22 (6.4 from objects one sprite in size, 7.4 from those of 2-4
+sprites, 8.4 from bigger ones). So the prototype takes every object type, not only the
+nearest vehicle:
+
+- `DrawSprites` records the commands without drawing them. After `DrawPortal`,
+  `EinObjSprites` takes them nearest first (lowest bottom line). A command becomes
+  sprites 2-31 if it is drawn whole (no screen edge or crest cuts it), its size has
+  patterns, it is below the HUD and clear of the car's cells, no tunnel or gantry is in
+  view, and every scanline it covers keeps to 4 sprites (counted per band of 8 lines;
+  the lamps take 2 on the car's rows). Its y top then becomes $FF, which `RunCommand`,
+  `EinSprCells` and the next erase pass over. The rest are drawn as ever.
+- Patterns: at each display reset, from the stage overlay, the stage's object sizes
+  (types 0-9) as 16 x 16 patterns, the sizes that take fewest first, into patterns 0-62
+  (the lamps move to 63). Every theme fills 62-63 of them: all sizes of 1 or 2 patterns
+  of every type, and some of 4. An image is aligned to its bottom line, at the exact x of
+  the pre-shifted copy the command drew.
+- One colour a sprite: the object's ink for the middle half of its height, black where
+  that is a verge colour (as `EinSprCell` keeps an object seen).
+
+| Fixed-step benchmark, 300 game frames | Locked at 4 | Unlocked |
+|---|---|---|
+| before | 1,279 (11.73 fps) | 1,176 (3.92 TV frames a game frame) |
+| the prototype | 1,259 (11.92 fps) | 1,114 (3.71) |
+
+In normal timing (`fliphist 1300`) the frames came 261 / 43 / 5 / 1 at 4 / 5 / 6 / 7 TV
+frames before (11.96 fps) and 279 / 31 / 4 / 0 with it (12.12 fps): 89% of frames at 4,
+against 84%. That is about 16K T a game frame on average, against the 30-50K guessed in
+section 2; the big near objects, which cover the most cells, have no patterns.
+
+**Look.** 17 of the 30 benchmark pictures differ, all in the small and middle-sized
+objects: each is one colour (traffic loses its cyan roof, the truck its yellow top, a
+parasol its red canopy, which turns white; palms are black silhouettes), with exact pixels
+over kerbs and verges. Big near objects are cells, as before. On the way into stage 3's
+tunnel and under stage 12's gantry no object is a sprite, and the pictures are those of
+the build before. `tests/einstein_check.py` passes with it.
+
+**Memory.** It fits only just: 185 bytes in bank 2 before the interrupt's jump (the
+Spectrum's pause and beep code there; 3 left), 260 below $4000 (5 left), 177 in the theme
+cache's top above the largest theme pack (theme packs are now limited to 8,128 bytes by
+`tools/make_einstein.py`; alpine's is 8,114), 143 in the stage overlay (7 left); buffers in
+screen A's free tail. Nothing more fits as things are: neither a colour per 16-line row nor
+the magnified variant of step 3 (half-resolution patterns, the lamps redrawn) was built.
+
+**To decide:** whether the gain (about 0.16 fps in normal play) is worth the look (one
+colour for small objects) and the memory; if so, better colours (a per-type choice of the
+ink, worked out by the build tools) and room for them.

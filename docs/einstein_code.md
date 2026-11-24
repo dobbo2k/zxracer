@@ -46,6 +46,10 @@ The Spectrum build must stay byte-identical to `release/`: Einstein-only code go
 | `kerbcell.asm` | below $4000 | `EinKerbCell`, `EinKerbRight`, `EinKerbMerged`: its cells; `EinSendCols` |
 | `kerbmac.asm` | (macros) | `KLOAD`, `KPUT`, `KLEFT`, `KRIGHT`; `KPAIRS`, `KSTEP` (4-line or 2-line steps) |
 | `static.asm` | bank 2 ($B900) | `EinStaticInit`: the ready-made kerb edges, at a display reset |
+| `objspr.asm` | bank 2 ($BD01) | With `-DEIN_OBJSPR` (a prototype): `EinObjSprites`, the frame's objects as sprites where they can be; `EinObjSprInk` |
+| `objsprcmd.asm` | below $4000 | With `-DEIN_OBJSPR`: `EinObjSprite`, one command's checks and scanline budget |
+| `objsprhi.asm` | the theme cache's top ($20E0) | With `-DEIN_OBJSPR`: `EinObjSprAttrs`; `OvSprImage` and `OvSprCount` for the patterns |
+| `objsprov.asm` | the stage overlay | With `-DEIN_OBJSPR`: `OvSprPatterns`, the objects' sprite patterns at a display reset |
 | `reset.asm` | bank 2 (after the OUTI chain) | `EinMirrorAll`, `EinPanoUpload`: more of the display reset |
 | `ground.asm` | bank 5 | The two verge textures: `EinGroundInit`, `EinGroundName`, `EinGroundPaper` |
 | `car.asm` | bank 2 | The native Spider's pose selection, ground colours and pending pattern runs |
@@ -115,7 +119,9 @@ lines), handed out per row. The ready-made kerb edges are 7 left edges (road fro
 
 Sprites are 16x16. Sprites 0-1 are the four tail lamps' red highlights, pattern 48. A $D0
 follows them. With `-DEIN_DASH`, sprites 0-11 are the centre line, one a road row, their
-patterns at 4k, and the lamps are sprites 12-13.
+patterns at 4k, and the lamps are sprites 12-13. With `-DEIN_OBJSPR`, sprites 2-31 are
+traffic and scenery (`EinUpload` sends their attributes first), from patterns 0-62 made at
+each display reset (which then clears VRAM only up to $3800), and the lamps' pattern is 63.
 
 During the front end the screen is a plain bitmap instead: each third's 256 patterns are
 its 256 cells in order.
@@ -530,11 +536,14 @@ Assembly options (`-D`):
 | `EIN_KERB2` | The exact kerbs in 2-line steps, not 4 (11.1 fps) |
 | `EIN_SLOPE=n` | With `EIN_BLOCKS`: the near rows' kerbs drawn exactly where they slope more than n pixels (4: the look before the speed cut) |
 | `EIN_DASH` | With `EIN_BLOCKS`: the centre line's sprites (none by default) |
+| `EIN_OBJSPR` | A prototype: traffic and scenery as hardware sprites where they can be (`docs/einstein_objects_plan.md` section 5); the tail lamps' pattern 63 |
 | `EIN_KERB`, `EIN_KERB4` | (set by `platform.asm` unless `EIN_BLOCKS`; `EIN_KERB4` unless `EIN_KERB2`): the exact kerbs, in 4-line steps; slots of 11 bytes, 11 a row in rows 12-15, the ready-made rows' code left out |
 | `AUTOPLAY=1` | The demo driver plays the game (tunnels, forks, later stages) |
 | `FIRST_STAGE=n`, `START_POS=units` | Start on another stage, or further along it |
 
-After a build with options, `touch src/main.asm` so `make` builds the normal one again.
+`make einstein EIN_DEFS="-D..."` passes options to the Einstein's assembly (`touch
+src/main.asm` first). After a build with options, `touch src/main.asm` so `make` builds the
+normal one again.
 
 ## 16. Testing and measuring
 

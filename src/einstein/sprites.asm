@@ -350,7 +350,11 @@ EinErase:
         ld a, PANO_ROW0 * 8
         ld (RunCommand.clipY + 1), a
         call EraseSprites
+        IFDEF EIN_OBJSPR
+        xor a                   ; (DrawSprites then records them only, for
+        ELSE                    ; EinObjSprites: src/einstein/objspr.asm)
         ld a, 192
+        ENDIF
         ld (RunCommand.clipY + 1), a
         ret
 

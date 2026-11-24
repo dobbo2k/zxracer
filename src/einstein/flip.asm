@@ -64,6 +64,13 @@ EinUpload:
         IFDEF EIN_DASH
         call EinDashSend        ; (the centre line's sprites)
         ENDIF
+        IFDEF EIN_OBJSPR
+        ld hl, ESprAttr         ; (the objects' sprites, src/einstein/objspr.asm)
+        ld de, VRAM_SPRATTR + 2 * 4
+        ld a, (ESprLen)
+        ld b, a
+        call EinWrite
+        ENDIF
         call EinPanoSend        ; (the panorama's cells under silhouettes)
         ld c, MIRROR_ROWS       ; (the panorama's and the road's rows)
 .row:   push bc
@@ -433,8 +440,13 @@ EinArtLength: ld bc, 0
         call VdpOff
         ld hl, $7FFF            ; (the display off: any speed)
         ld (EBudget), hl
+        IFDEF EIN_OBJSPR
+        ld de, 0                ; VRAM but the sprite patterns: 0
+        ld bc, VRAM_SPRPAT
+        ELSE
         ld de, 0                ; all of VRAM: 0
         ld bc, $4000
+        ENDIF
         ld l, 0
         call VdpFill
         ld de, VRAM_SPRATTR     ; no sprites
