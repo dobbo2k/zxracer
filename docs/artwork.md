@@ -28,8 +28,9 @@ sprite families. The figures below describe the Riviera build.
    an ink of its own in the plain grass and road cells it covers (`PLAN.md` 2.2;
    `make ZX_OBJINK=0` turns it off). The colours are `OBJ_INKS` in
    `tools/make_stages.py`; an ink the same as the ground's is drawn black.
-3. **Memory is nearly full.** The car, traffic, font and crew share 27 free
-   resident bytes. Each region also has its own scenery budget in section 10.
+3. **Memory is tight.** The car, traffic, font and the resident code share
+   bank 5; about 630 bytes are free there now that the crew's close-ups are
+   gone. Each region also has its own scenery budget in section 10.
    The pack builder and assembler check these limits.
 
 ## 2. Building and looking at the art
@@ -63,7 +64,7 @@ x 32-287, y 48-239.
 | Art | Source of truth (edit this) | Built by | Generated / preview files | In the game |
 |---|---|---|---|---|
 | Player car (7 frames) | `tools/make_car.py` → `assets/gfx/car.png` | `make_car.py` (run by make), then `png2zx.py` | `build/car_data.asm` | bank 5, `src/car.asm`, `src/tyres.asm` |
-| Crew close-ups (crash) | `tools/make_crew.py` | `make_crew.py` | `assets/gfx/crew.png`, `build/crew_data.asm` | bank 5, `src/crew.asm` |
+| Crew close-ups (crash) | `tools/make_crew.py` | `make_crew.py` (no longer run by `make`) | `assets/gfx/crew.png`, `build/crew_data.asm` | not in the game: taken out of the Spectrum for room (the Einstein never had them) |
 | HUD lettering and numerals | `tools/make_font.py` and `round_art.dash_header` | `make_font.py` and `make_stages.py` | `build/font_data.asm`, `build/stages.asm` | bank 5 font and stage overlay header |
 | Scenery, road signs | `tools/make_scenery.py` (one function per type) | `make_stages.py` calls `make_scenery.emit_type` | `assets/gfx/<type>.png`, packs in `build/packs.asm` | theme cache (bank 7) |
 | Traffic (car, van, lorry) | `tools/make_scenery.py` (`car`, `van`, `truck`) | `make_stages.py` | `assets/gfx/traffic.png`, `van.png`, `truck.png` | bank 5 (resident) |
@@ -144,8 +145,11 @@ The title and goal screens also draw frame 0 of `car.png`.
 ## 5. Crew close-ups and the font
 
 - **Crew** (`tools/make_crew.py`): her and him, 48 × 48 pixels (6 × 6 cells)
-  each, shown either side of the message line after a crash. Drawn as code;
-  two colours per cell. Fixed size in bank 5: redraw freely, but keep 48 × 48.
+  each, once shown either side of the message line after a crash. Drawn as
+  code; two colours per cell. No longer in the game: they (and the crew's
+  lines) were taken out to make room for the tunnels' mouths. The tool
+  and `assets/gfx/crew.png` are kept; `make build/crew_data.asm` still builds
+  the data.
 - **Font** (`tools/make_font.py`): the `G` table, 5 × 7 glyphs written as
   `#` and `.` strings, in 8 × 8 cells, for ASCII 32-90: space, digits,
   punctuation and **capitals only** (no lower case anywhere in the game).
@@ -239,7 +243,8 @@ and a 160 × 32 static sky panel. The region selects `harbour`, `mesas`,
 The optional `vista` adds a feature such as a liner, gondola or rock arch.
 The stage overlay unpacks the art, makes a second panorama shifted by four
 pixels, and draws the sky panel at (48, 48). This leaves room for the message,
-starting lamps and crash portraits. Tunnel ceiling attributes conceal it.
+starting lamps (and once the crash portraits). Tunnel ceiling attributes
+conceal it.
 
 **Route screen:** the front end's route map (`src/frontend.asm`) colours each stage's box by its
 theme, `MAP_PAPER` in `make_stages.py` (a paper colour number per theme).
@@ -309,7 +314,7 @@ MSYS2's PATH and `NODE_PATH` pointing at the global modules (untested).
 
 | Area | Holds | Free |
 |---|---|---|
-| Bank 5 (resident) | car, crew, font, traffic sprites, code | **27 bytes** |
+| Bank 5 (resident) | car, font, traffic sprites, code | **about 630 bytes** |
 | Theme data (8,320 bytes before the stage panorama) | 4 scenery types, signs, tune and name | coast 686, desert 1,260, alpine 206, country 355, sunset 280 |
 | Pack banks 0, 1, 3, 4, 6 | all theme and track packs, title and goal screens, the overlays | depends on compressed art sizes. See the bank totals printed by `make` |
 

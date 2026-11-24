@@ -476,6 +476,15 @@ StageHeaders:
         ld de, Palette
         ld bc, 9
         ldir
+        ld a, (THEME_CACHE + 6) ; a tunnel's way out: the stage's sky, its ink
+        and $F8                 ; hidden (src/tunnelb2.asm PatOut)
+        ld c, a
+        rrca
+        rrca
+        rrca
+        and 7
+        or c
+        ld (PatOut + 2), a
         ld hl, (TRACK_CACHE)
         ld (StTrack), hl
         ld (SegPtr), hl
@@ -620,8 +629,6 @@ OvResetDisplay:
         ld (MsgLastA), hl
         ld (MsgLastB), hl
         xor a
-        ld (CrewShownA), a
-        ld (CrewShownB), a
         ld (CmdListA), a
         ld (CmdListB), a
         ld (LastStraight), a

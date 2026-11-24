@@ -106,7 +106,6 @@ UpdateTraffic:
         ld a, CRASH_FRAMES
         ld (CrashTimer), a
         ld (Spin), a
-        call CrewPickTraffic
         ld a, (Speed)           ; the crash, as hard as the car hit
         call CrashStart
         ld de, SPIN_NUDGE

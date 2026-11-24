@@ -68,7 +68,6 @@ MainLoop:
         call SelectBackBuffer
         BORDER 3                ; magenta: sprites
         call EraseSprites
-        call DrawCrew
         BORDER 2                ; red: road
         call DrawRoad
         BORDER 4                ; green: horizon
@@ -107,6 +106,9 @@ MainLoop:
         INCLUDE "fork.asm"
         INCLUDE "hills.asm"
         INCLUDE "tunnelb2.asm"
+        IFDEF EINSTEIN
+        INCLUDE "tunnelaside.asm"   ; (the Spectrum's: in bank 5, src/tunnel.asm)
+        ENDIF
         INCLUDE "vars.asm"
         IFDEF EINSTEIN          ; (in the room the Spectrum's drawing code leaves)
         INCLUDE "pause.asm"
@@ -173,6 +175,7 @@ DualEnd:
         ENDIF
         INCLUDE "respawn.asm"   ; (small pieces in the gap before the XOR chain)
         INCLUDE "lights.asm"
+Gap2Free:                       ; (src/holes.asm uses the rest)
         ASSERT $ <= XOR_END - 5 * 8
 
 ; Unrolled XOR chain for sprites: entered at XorEnd - 5*n for n bytes
@@ -203,7 +206,6 @@ hv      DEFL 0
         db hv
 hv      DEFL hv + 1
         EDUP
-        INCLUDE "crewtraffic.asm"   ; (in the gap before the fill block)
         INCLUDE "lightshold.asm"
 Gap3Free:                       ; (src/holes.asm uses the rest)
         ASSERT $ <= FILL_END - 64
@@ -237,7 +239,8 @@ TunInside:      db 0            ; the car is in it (the sky is its ceiling)
 TunJ0:          db 0            ; road lines in it this frame: TunJ0 .. TunJ0 + TunJN - 1
 TunJN:          db 0
 GateZ:          dw 0            ; this stage's gantry (src/tunnelb2.asm)
-GateWas:        db 0            ; it was drawn (its sky rows to be painted afresh)
+GateWas:        db 0            ; it or a tunnel's portal was drawn, or Ceiling changed the sky: buffers
+                                ; whose sky rows are to be painted afresh (src/tunnelb2.asm Gate.gone)
 GatePat:        ds 5            ; a gantry row's colours (src/tunnelb2.asm)
 ; (cleared together at a new run)
 MsgThen:        dw 0, 0         ; the messages queued after this one (0: none)
@@ -282,12 +285,14 @@ CmdListB        EQU $10000 - THEME_TOP
         ENDIF
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
-        INCLUDE "crew.asm"      ; the crew's crash close-ups
         INCLUDE "lampdraw.asm"  ; the starting lights' lamps
         INCLUDE "pics.asm"      ; the front end's picture unpacker
         INCLUDE "music.asm"     ; the music player
         INCLUDE "extend.asm"    ; stage times, extended play, weaving traffic
         INCLUDE "tunnel.asm"    ; tunnels
+        IFNDEF EINSTEIN
+        INCLUDE "tunnelaside.asm"   ; (the Einstein's: in bank 2)
+        ENDIF
 PrevHillInputs: ds 2 + 3 * MAX_BOUNDS + 1
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE

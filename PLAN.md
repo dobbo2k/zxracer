@@ -41,10 +41,10 @@ any bank can be paged at `$C000` via port `$7FFD`. Banks 5 and 7 are both displa
 
 ```
 $4000-$5AFF  Bank 5: screen buffer A
-$5B00-$788E  Bank 5: resident graphics (car, van and lorry sprites, font,
-             player car, crew close-ups), the music player, the ways into
-             the stage loader and the front end; 333 bytes free up to the
-             track cache
+$5B00-$7B23  Bank 5: resident graphics (car, van and lorry sprites, font,
+             player car), the music player, the ways into the stage loader
+             and the front end, the tunnels' mouths; 636 bytes free up to
+             the track cache (the crew's close-ups were here)
 $7D80-$7FFF  Bank 5: TRACK CACHE: the current stage's segments and objects
              (640 bytes; also the bounce buffer while a theme or the front end
              is loaded)
@@ -75,8 +75,9 @@ Freeing memory *(as built)*:
   bytes of their page. `zxsim -u` (a map of what a run reads, writes and
   executes) showed nothing touches the rest over whole games, apart from one
   byte after `ScrLo` / `ScrHi` and the state pages (cleared whole by
-  `ResetDisplay`) and two tables read a little past their end. The crew's
-  lines, the high-score table, the route and the lamp graphic live there;
+  `ResetDisplay`) and two tables read a little past their end. The
+  high-score table, the route, the lamp graphic and some of the tunnels'
+  working live there (the crew's lines did);
   `gen_tables.py` marks each table's end and the build asserts nothing grows
   into them. About 390 bytes of holes are still free, the biggest piece
   164 bytes in the strip page.
@@ -517,10 +518,14 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
 - **Crew** *(as built)*: the car sprite's open cockpit row shows his head
   (white ink) and hers (yellow) over whatever lies under the car (ink turns
   black where it matches); his striped shirt and her hair sit on the rear deck.
-  A crash (160 frames) shows their 48×48 close-ups (`tools/make_crew.py`) either
-  side of the message line: one of 8 pairs of lines, hers then his reply.
+  A crash (160 frames) showed their 48×48 close-ups (`tools/make_crew.py`)
+  either side of the message line, with one of 8 pairs of lines, hers then his
+  reply. Neither is in the game now: the close-ups and the lines went to make
+  room for the tunnels' mouths on the Spectrum (the close-ups' code and
+  pictures were in bank 5 with them), and the lines from the Einstein too.
+  A crash still lasts 160 frames.
 - **Collisions** *(as built)*: roadside object → crash (the car stops and
-  swings about while the crew talk, then carries on from nearer the middle);
+  swings about, then carries on from nearer the middle);
   traffic → a bump (the car drops below the vehicle's speed and it is nudged
   ahead), or, hitting one 7+ speed units slower, a spin-out: the crash, but the
   car slides on, slowing hard (48/256 a frame) with the drift-and-smoke frames
@@ -555,7 +560,45 @@ and `tools/hotspots.py` give exact T-state breakdowns from the emulator.
   out is within `EXIT_SEE` (1536): further, the tunnel runs on into the dark
   up to the horizon.
   Road rows it paints are marked (their cached band set to 1) so the road
-  redraws them. About 7% off the frame rate while a tunnel is in view. Room
+  redraws them. The mouth, in detail: it is as wide as the road at the
+  mouth's own depth line (`TunWidth`: beyond a crest the nearest line of the
+  tunnel that shows can be far further in, and the opening grew and shrank
+  as the hill hid lines; close by, with an edge of the road off the screen,
+  its width on the screen made the opening too low, and the arch dropped
+  and left its rows above it); its rows go down to the one the line is nearest
+  the bottom of (the road colours a row by its middle line, so the row was
+  left in the tunnel's colours, white kerbs under the opening); the face
+  starts at the road's first row at the latest (beyond a crest the ground
+  shows the tunnel's line, and blinked in the walls' two blues) and at the
+  sky's top close by (its sum went below 0 and nothing was painted for the
+  last 150-250 units); and once the line is down in the car's rows, all the
+  road above is the tunnel's, so the opening shows its rows (`PatRoad`'s
+  middle run `S_`) as the car's rows do, and only the ceiling and the
+  lamps change on the way in. When no line of the tunnel is on the screen
+  (behind a crest, or round a bend) the sky it was painted on goes back
+  (`GateWas`, `Gate.gone`, as for the gantry). Going in or out, `Ceiling`
+  does not paint the screens' sky at once: the frame still waiting for its
+  flip would show the new sky over its road rows' old portal for a whole
+  frame; each buffer is painted as it is drawn next (`GateWas` = 2, the
+  buffers still to do, counted down in `Gate.gone`; the Einstein puts its
+  frame together from screen B, so it paints at once). None of this costs
+  a T-state while no tunnel or gantry is in view (the autopilot's game,
+  `tests/stagecheck.py`, turns on the frame timing).
+  The way out's sky colour is worked out at a stage start (`PatOut`).
+  When the mouth's line is not on the screen (behind a crest, up a climb
+  off the top of the road area) or has no road on it (round a bend), the
+  mouth is placed as the scenery is, where its depth line lands
+  (`ProjClip`; above the top: at the top), centred on the road there
+  (`CXPage`, off the screen too) and cut off at the road in front
+  (`PtCut`): its face and whatever of the arch and opening shows. (The
+  face came and went with the line, all at once.) Each buffer notes the
+  top row a portal was painted from (`PtTopA`/`PtTopB`); when the next one
+  starts lower (hills), the rows between get the sky again. Room for this
+  came from the crew's close-ups and lines; the two pieces of it in
+  `src/tunnelaside.asm` (`PortalHidden`, `PortalClean`) sit beside
+  `DrawPortal` in bank 5 on the Spectrum and in bank 2 on the Einstein,
+  whose bank 5 has no room for them.
+  About 7% off the frame rate while a tunnel is in view. Room
   came from drawing the timer's big digits from the font (`PrintBig`,
   -250 bytes of bank 5) and moving small routines into bank 2's gaps.
 - **The goal's gantry, tunnel signs, lamps and echo** *(as built)*: `GateZ`

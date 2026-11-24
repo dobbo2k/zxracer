@@ -117,7 +117,6 @@ CPC needs at each:
 | `player.asm` | `Elapsed` up to 8 | the same, if frames take 5 or more |
 | `stage.asm`, `stageov.asm`, `pics.asm` | packs and pictures read from the disc | packs unpacked from banks 4-6 (section 5.11) |
 | `frontend.asm` | screen A shown as a bitmap | section 5.9 |
-| `crew.asm` | left out | left out at first |
 
 Most of these switches mean "not the Spectrum's screen". Before the CPC
 work starts, give that a name of its own: `defs.asm` defines `NATIVE_GFX`
@@ -273,8 +272,8 @@ A starting budget, each theme and stage setting the colours (a
   Pre-shifted copies: one for the near sizes (4-pixel steps, as the
   Spectrum's), two for the far ones.
 - **The car:** the Riviera Spider's poses (straight, steering, smoke) in
-  Mode 0, drawn last. The rolling tyres and the crew's close-ups are left
-  out at first, as on the Einstein.
+  Mode 0, drawn last. The rolling tyres are left out at first, as on the
+  Einstein (the crew's close-ups are gone from the game).
 
 ### 5.7 Sky, panorama, HUD and text
 

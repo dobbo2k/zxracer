@@ -227,8 +227,6 @@ test-einstein`.
 
 Not yet:
 
-- the crew's crash close-ups (their portraits are left out of the Einstein
-  build, for room)
 - speed (section 6)
 
 ## 5. Graphics: the name table does the work

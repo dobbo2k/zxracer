@@ -23,12 +23,15 @@ Ceiling:
         ld (PanoLastA), a
         ld (PanoLastB), a
 .sky:
-        IFNDEF EINSTEIN
-        ld hl, $5800 + 3 * 32   ; both screens' sky and backdrop rows
-        call .paint
+        IFDEF EINSTEIN
+        ld hl, $D800 + 3 * 32   ; the sky and backdrop rows (the frame is put
+        jp PaintRaceSky         ; together from them after this)
+        ELSE
+        ld a, 2                 ; both buffers' sky and backdrop rows, each as
+        ld (GateWas), a         ; it is drawn next (Gate.gone): not at once -
+        ret                     ; the last frame, still to be shown, kept the
+                                ; tunnel's mouth on its road rows under them
         ENDIF
-        ld hl, $D800 + 3 * 32
-.paint: jp PaintRaceSky
 ; HL = the backdrop's first byte (character rows 10-11): its 8 pixel lines
 .clear: ld b, 8
 .cl:    push bc
@@ -88,14 +91,36 @@ Gate:
         or a
         jr z, .gone             ; (over the top of a crest)
 .line:  ld (PtGate), a
-        ld (GateWas), a
+        ld c, a                 ; (under $80: not a tunnel's mouth, DrawPortal)
         jp DrawPortal.atLine
+; Not drawn this frame (nor a tunnel's portal: src/tunnel.asm): the sky rows
+; it was drawn on, or that Ceiling changed, painted afresh (GateWas: their
+; buffers still to do, 2 for both; PortalRow sets it)
 .gone:  ld hl, GateWas
         ld a, (hl)
         or a
         ret z
+        IFDEF EINSTEIN
         ld (hl), 0
-        jp Ceiling.sky          ; the sky it used, both screens
+        ld a, $FF               ; (its whole sky: nothing of a portal left on it)
+        ld (PtTopB), a
+        jp Ceiling.sky
+        ELSE
+        dec a                   ; this buffer's now (its frame is drawn without
+        jr z, .last             ; it), the other's next frame
+        ld a, 1
+.last:  ld (hl), a
+        ld hl, PtTopA           ; (its whole sky: nothing of a portal left on it)
+        ld a, (AttrHi)
+        rla
+        jr nc, .ta
+        inc hl
+.ta:    ld (hl), $FF
+        ld a, (AttrHi)
+        ld h, a
+        ld l, 3 * 32
+        jp PaintRaceSky
+        ENDIF
 
 ; PortalRow for a gantry: C = row, HL = its attributes. Beside it the sky
 ; (on road rows: the road's own); the beam above the opening's top, the
@@ -191,7 +216,8 @@ Cell:   rrca
 PatFace:        db F_, F_, F_, F_, F_
 PatArch:        db F_, A_, A_, A_, F_
 PatSky:         db F_, A_, D_, A_, F_
-PatRoad:        db F_, A_, D_, A_, F_    ; (inside: dark, the road beyond hidden too)
-PatOut:         db C_, C_, 0, C_, C_    ; (the sky, set per frame)
+PatRoad:        db F_, A_, D_, A_, F_    ; (inside: dark, the road beyond hidden too;
+                                        ; close by, S_: src/tunnel.asm DrawPortal)
+PatOut:         db C_, C_, 0, C_, C_    ; (the sky, set at a stage start: src/stageov.asm)
                 db D_, D_, S_, D_, D_
 PatCeil:        db C_, C_, C_, C_, C_   ; (the way out: above the opening)

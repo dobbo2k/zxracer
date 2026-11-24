@@ -83,9 +83,7 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   disappears behind.
 - **Car:** original convertible sprite with steering frames, braking and
   off-road slowdown. Its crew: him (mullet, shades, loud striped 80s shirt)
-  at the wheel and her (big blonde hair) beside him. After a crash, close-ups
-  of the two of them appear while the car spins: she tells him off ("< NICE
-  ONE, GENIUS!"), he answers back ("IT JUMPED OUT! >"). Handling has sideways momentum:
+  at the wheel and her (big blonde hair) beside him. Handling has sideways momentum:
   a bend pushes the car outwards with a force that grows with the square of
   the speed, as real cornering force does. At full speed steering can only
   hold the gentlest bends; the rest carry you wide unless you lift off or

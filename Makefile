@@ -42,6 +42,8 @@ $(OBJINK_STAMP): | build
 build/stages.asm: tools/make_stages.py tools/round_art.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png $(OBJINK_STAMP) | build
 	ZX_OBJINK=$(ZX_OBJINK) $(PYTHON) tools/make_stages.py assets/stages.yaml build
 
+# The crew's crash close-ups (no longer in the game: the Spectrum dropped them
+# for room, the Einstein never had them)
 build/crew_data.asm: tools/make_crew.py tools/make_screens.py | build
 	$(PYTHON) tools/make_crew.py $@
 
@@ -51,7 +53,7 @@ build/music_title.asm: tools/make_music.py | build
 build/font_data.asm: tools/make_font.py | build
 	$(PYTHON) tools/make_font.py $@
 
-build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
+build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) $(ASMFLAGS) $(OBJINK_DEF) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build
@@ -74,7 +76,7 @@ profile: $(ZXSIM) build/zxracer.sna
 
 # Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
 # Release build (no timing bars) and the tape image made from it
-build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
+build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 $(OBJINK_DEF) src/main.asm
 
 build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py assets/gfx/loading.scr src/loader.asm | build
@@ -105,7 +107,7 @@ leaflet: tools/make_leaflet.py assets/stages.yaml | build
 	mkdir -p release
 	$(PYTHON) tools/make_leaflet.py release/route_map.png build/route_map.svg
 
-build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
+build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 $(OBJINK_DEF) src/main.asm
 
 video: $(ZXSIM) build/video.sna
@@ -173,7 +175,7 @@ $(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py tools/make_
 build/einstein/STAGES.DAT: build/einstein/speedrun.com build/einstein/stages_raw.dat tools/make_einstein.py
 	$(PYTHON) tools/make_einstein.py patch assets/stages.yaml build/einstein
 
-build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build/einstein
+build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm | build/einstein
 	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
 
 build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.DAT tools/make_einstein_disk.py

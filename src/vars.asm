@@ -30,6 +30,12 @@ RowB:           db 0
 RowC:           db 0
 RowD:           db 0
 RowBand:        db 0            ; bit 6: dark band, bit 7: in a tunnel
+; (src/tunnel.asm DrawPortal) a mouth behind a crest: the row its painting
+; stops above ($FF: none); per buffer, the top row a portal was painted from
+; ($FF: none since its sky was last painted whole)
+PtCut:          db $FF
+PtTopA:         db $FF
+PtTopB:         db $FF
 RowForced:      db 0
 RowMerged:      db 0
 RowStaleCar:    db 0            ; stale kerb cells under the car (car rows)
@@ -59,10 +65,6 @@ LatF:           dw 0            ; the bend's push P = curvature * speed^2 / 32
 Sliding:        db 0            ; past the grip limit
 Gear:           db 0            ; 0 LOW, 1 HIGH
 FireWas:        db 0            ; fire held last update (gear changes on a press)
-CrewHerLine:    dw MsgNone      ; what they say after this crash
-CrewHisLine:    dw MsgNone
-CrewShownA:     db 0            ; the close-ups are on buffer A / B
-CrewShownB:     db 0
 OldA:           db 0
 OldB:           db 0
 OldC:           db 0

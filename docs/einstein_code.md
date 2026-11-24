@@ -486,7 +486,8 @@ game-over screens run unchanged and draw into screen A.
 | `interrupt.asm` | `InitInterrupts` is `EinCtcInit`; `Isr` is `EinIsr` |
 | `scenery.asm` | `DrawObject` records the type; `RunCommand` without the car check, clipped by `.clipY` |
 | `road.asm` | No pass 2 (`DrawRoad`, `DrawRoadRow`); `RoadPrepare` sets `EinShape` |
-| `horizon.asm`, `fork.asm`, `tyres.asm`, `crew.asm`, `car.asm` | Their drawing left out (`IFNDEF EINSTEIN`) |
+| `horizon.asm`, `fork.asm`, `tyres.asm`, `car.asm` | Their drawing left out (`IFNDEF EINSTEIN`) |
+| `tunnelaside.asm` | In bank 2 (on the Spectrum in bank 5, beside `tunnel.asm`): no room in bank 5 here |
 | `hud.asm`, `extend.asm`, `lampdraw.asm` | The cells they write noted to be sent; screen B only |
 | `tunnelb2.asm`, `holes.asm` | Screen B only (screen A's memory is the Einstein's); `EinCoarse` for the crash's thud |
 | `input.asm` | The joystick from `EinJoy` |
