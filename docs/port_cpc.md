@@ -20,8 +20,8 @@ MAME and WinAPE before the work that depends on them.
   approach (stages read at each checkpoint) and smaller caches; it is not
   planned.
 - **Media:** a `.dsk` in AMSDOS DATA format (one side: 40 tracks of 9
-  sectors of 512 bytes, 178K after the directory). Tape (`.cdt`) is
-  optional and last (section 5.11).
+  sectors of 512 bytes, 178K after the directory). Disc only: no tape
+  (decided, section 10).
 - **Frame rate:** the Spectrum's own pace, not the 25 fps the first draft
   gave. The Spectrum locks a game frame to 3 TV frames (16.7 fps,
   `MIN_FRAMES`), and its heaviest quarter of frames (hills, forks and
@@ -38,8 +38,8 @@ MAME and WinAPE before the work that depends on them.
 | From | What | Use here |
 |---|---|---|
 | Spectrum | the game: `player`, `track`, `hills`, `fork` (its pass-1 part), `traffic`, `game`, `extend`, `respawn`, `tunnel` logic, `scenery`'s projection, the music sequencer, `stages.yaml` and the stage tools | Assembled unchanged from the same `src/main.asm` (section 4) |
-| Einstein port | the `-DEINSTEIN` pattern (one `main.asm`; about 70 switches in 24 shared files by now, section 4); `KEY_IN` and `FRAME_WAIT` macros; `AYN`/`AYD` periods; Spectrum-format screen B as a shadow that platform code converts; `make_einstein.py`'s gen/dat/patch data build; the fixed-step benchmark (`FIXED_ELAPSED`); the frame grid that makes up late frames (`EGrid`, `EIN_DEBT`); its exact speed-ups of the shared projection (`ApplyCurve`, the hill mapping's loop); the native colour artwork masters (`tools/einstein_illustration.py`, `einstein_art.py`) | The same mechanisms with `-DCPC` |
-| Wonder Boy CPC | `hardware.inc` (ports, Gate Array commands, RAM configurations); `screen.asm` (interrupts, CRTC, the flip); `input.asm` (`read_key_row`); `sound.asm` (`ay_write` through the PPI, the register shadow); `sprites.asm` (masks by pen 0 through a table); `fdc.asm` and `disk_loader.asm` (the uPD765 reader, the AMSDOS boot); `tools/cpc/make_dsk.py`, `make_cdt.py`; `tools/cpc_harness.py` with `tools/mame/cpc_harness.lua`; `tools/winape_run.py`; `tools/cpc_profile.py` | Copied into this repository and adapted, as `make_einstein_disk.py` was. Wonder Boy assembles with z80asm, so the sources need sjasmplus syntax |
+| Einstein port | the `-DEINSTEIN` pattern (one `main.asm`; about 70 switches in 24 shared files by now, section 4); `KEY_IN` and `FRAME_WAIT` macros; `AYN`/`AYD` periods; Spectrum-format screen B as a shadow that platform code converts; `make_einstein.py`'s gen/dat/patch data build; the fixed-step benchmark (`FIXED_ELAPSED`); the frame grid that makes up late frames (`EGrid`, `EIN_DEBT`); its exact speed-ups of the shared projection (`ApplyCurve`, the hill mapping's loop); its colour artwork (`tools/einstein_illustration.py`, `einstein_art.py`) as a reference for what each picture shows, not as the CPC's art (5.6) | The same mechanisms with `-DCPC` |
+| Wonder Boy CPC | `hardware.inc` (ports, Gate Array commands, RAM configurations); `screen.asm` (interrupts, CRTC, the flip); `input.asm` (`read_key_row`); `sound.asm` (`ay_write` through the PPI, the register shadow); `sprites.asm` (masks by pen 0 through a table); `fdc.asm` and `disk_loader.asm` (the uPD765 reader, the AMSDOS boot); `tools/cpc/make_dsk.py`; `tools/cpc_harness.py` with `tools/mame/cpc_harness.lua`; `tools/winape_run.py`; `tools/cpc_profile.py` | Copied into this repository and adapted, as `make_einstein_disk.py` was. Wonder Boy assembles with z80asm, so the sources need sjasmplus syntax |
 
 ## 3. Review of the first draft
 
@@ -93,8 +93,8 @@ MAME and WinAPE before the work that depends on them.
     (section 7).
 11. **Tape** was "make_tap.py's TZX blocks with CPC pulse lengths". The
     CPC's loader is the firmware's own format, which Wonder Boy's
-    `make_cdt.py` writes. With 128K needed, tape matters less (section
-    5.11).
+    `make_cdt.py` writes. With 128K needed, tape matters less; it is not
+    made (disc only, section 10).
 12. **The verify list** is mostly settled: the PPI's port C bits (0-3 the
     keyboard row, 4 the cassette motor, 6-7 the AY's function), the
     interrupts' positions (2 lines after VSYNC begins, then every 52) and
@@ -306,11 +306,20 @@ A starting budget, each theme and stage setting the colours (a
   masks. Erasing: none in the road (5.4). Where a sprite reaches rows
   10-11 or the sky, its bytes are noted in that screen's gaps and put back
   from the clean panorama or sky before that screen is drawn again.
-- **Art:** in colour, made by a new `tools/cpc_art.py` from the Einstein's
-  colour masters (`einstein_illustration.py`, `einstein_art.py`), reduced
-  to the theme's pens, at the sizes `make_scenery.py` gives the Spectrum.
-  Pre-shifted copies: one for the near sizes (4-pixel steps, as the
-  Spectrum's), two for the far ones.
+- **Art:** new art for the CPC (decided, section 10), not converted from
+  the Einstein's: drawn for Mode 0's pixels, twice as wide as tall, and
+  for the CPC's 27 colours, each theme within its pens (5.5). New tools,
+  `tools/cpc_illustration.py` for the masters and `tools/cpc_art.py` for
+  the theme packs' bytes, as the Einstein's pair; `docs/cpc_artwork.md`
+  describes it, as `docs/einstein_artwork.md` does the Einstein's. The
+  Spectrum's and the Einstein's pictures show what each object, sky and
+  backdrop is. The sizes stay those `make_scenery.py` gives the Spectrum
+  (the projection and the clipping depend on them). Pre-shifted copies:
+  one for the near sizes (4-pixel steps, as the Spectrum's), two for the
+  far ones.
+- **Placeholder art** while the new art is drawn: the Spectrum's sprites
+  converted to one pen, so that the drawer, the clipping and the speed
+  can be built and measured in phase 3 without waiting for it.
 - **The car:** the Riviera Spider's poses (straight, steering, smoke) in
   Mode 0, drawn last. The rolling tyres are left out at first, as on the
   Einstein (the crew's close-ups are gone from the game).
@@ -331,11 +340,11 @@ A starting budget, each theme and stage setting the colours (a
   pack, drawn into both screens at a stage start; the panorama redrawn
   only when it scrolls (a byte is a 4-pixel step, the Spectrum's near
   step) or where a sprite covered it.
-- **Option: a Mode 1 band for the HUD** (rows 0-5, 256 pixels across, the
-  Spectrum's cells exactly, 4 pens). It needs a mode change at line 48:
-  with R7 = 31, the interrupt at line 42 then 6 lines' wait (about 0.4 ms a
-  TV frame), and it must hold on every CRTC type. Decide in phase 4 from
-  screenshots of both.
+- **The HUD in Mode 0** (decided, section 10): the whole screen is Mode 0,
+  with no mode change part way down. A Mode 1 band for rows 0-5 (the
+  Spectrum's cells exactly, 4 pens) was weighed and not taken: it needed a
+  mode change at line 48 timed from an interrupt, about 0.4 ms of waiting a
+  TV frame, and holding on every CRTC type.
 
 ### 5.8 Sound
 
@@ -372,11 +381,11 @@ The front end draws Spectrum screens into screen A (`$4000`), and on the
 Einstein the whole of screen A is shown as a bitmap. On the CPC:
 
 - **Text screens** (high scores, options, the route map's names, initials):
-  drawn into the shadow and converted as in 5.7. They could use Mode 1
-  whole (no split), giving the Spectrum's cells exactly: decide with 5.7.
-- **Pictures** (the title, the five goal postcards): native Mode 0, 16
-  pens, from the Einstein's postcard builder or `make_screens.py`'s RGB
-  scenes, packed, unpacked into the hidden screen and flipped to. The
+  drawn into the shadow and converted as in 5.7, in Mode 0 with the
+  doubled-pixel font, as the HUD.
+- **Pictures** (the loading screen, the title, the five goal postcards):
+  native Mode 0, 16 pens, new art as the sprites' (5.6), packed, unpacked
+  into the hidden screen and flipped to. The
   printed parts (score, bonus, the blinking prompt) go through the shadow.
 - `FRAME_WAIT` (the Einstein's frame wait, which sends changed cells)
   becomes the CPC's convert-and-flip.
@@ -397,9 +406,8 @@ Einstein the whole of screen A is shown as a bitmap. On the CPC:
   Einstein's: each stage's packs read from the disc at a checkpoint, with
   Wonder Boy's `fdc.asm`.
 - **Space:** the whole game packed should be well under one side's 178K.
-- **Tape (optional, last):** a `.cdt` in the firmware's format at 2,000
-  baud (Wonder Boy's `make_cdt.py`), for a 6128 or an expanded 464. At
-  about 220 bytes a second the game would take 4-6 minutes to load.
+- **No tape:** disc only (section 10). A `.cdt` (Wonder Boy's
+  `make_cdt.py`, 4-6 minutes to load) is not made.
 
 ## 6. The frame budget (estimate)
 
@@ -480,10 +488,11 @@ average.
 | 0 | `NATIVE_GFX`; `-DCPC` assembling with the drawing stubbed; the Wonder Boy tools copied; `local.mk`. **Measure:** the shared work's time on the CPC (the benchmark with nothing drawn), base 0's fill, the packs' packed size, the Mode 0 art's size | The Spectrum's build is byte-identical; the measures decide 5.3 and 5.11 (packs in RAM or from the disc) | S |
 | 1 | Boot from the `.dsk`; firmware off; C1/C3; IM 2 and the six interrupts; the flip with test patterns; the key scan; `AyWrite`; a tune | In MAME the demo's logic runs (`GameFrames` counts), keys start a game, the tune is in the AY log at 1 MHz pitches; WinAPE shows the flip on types 0-4 | M |
 | 2 | The road: line pairs every frame, bands, kerbs, centre line, hills, the fork, tunnel walls, the portal and gantry | Screenshots of all 15 stages; the benchmark. **Decision:** the road's cost against 16-18 ms; if far over, the skip of unchanged pairs or colour cycling on straights | L |
-| 3 | Scenery, traffic and the car: `cpc_art.py`, the masked drawer, the crest clip, crashes | Every theme's objects in screenshots; the benchmark: the 3-TV-frame lock in most frames | L |
-| 4 | The sky, the panorama, the shadow and its conversion, the HUD, the message line, the starting lights, pause, the font | The HUD reads right at every stage. **Decision:** Mode 0 HUD or a Mode 1 band | M |
+| 3 | Scenery, traffic and the car: the masked drawer, the crest clip, crashes, with the placeholder art (5.6) | Every theme's objects in screenshots; the benchmark: the 3-TV-frame lock in most frames | L |
+| A | The CPC's art, alongside phases 2-6: `cpc_illustration.py`, `cpc_art.py`, `docs/cpc_artwork.md`; one theme (the coast, stage 1: its scenery, traffic, the car, sky and backdrop, palette) first, for the owner's approval, then the other themes, the signs, the tunnels' mouths and the gantry, the loading screen, the title and the goal postcards | Each theme approved from screenshots in MAME; the placeholders gone; the theme packs within their caches | XL |
+| 4 | The sky, the panorama, the shadow and its conversion, the HUD, the message line, the starting lights, pause, the font | The HUD reads right at every stage, in Mode 0 | M |
 | 5 | Stage loads from the banks, checkpoints, palettes per theme and stage, the front end (title, high scores, options and keys, goal and route screens) | A whole game plays through in MAME, front end included; `make test-cpc` passes | M |
-| 6 | The loading screen, the disc's boot files, `release/` (the `.dsk`, a README); the `.cdt` if wanted | Boots from the release `.dsk` in MAME and WinAPE | S |
+| 6 | The loading screen, the disc's boot files, `release/` (the `.dsk`, a README) | Boots from the release `.dsk` in MAME and WinAPE | S |
 | 7 | Speed, WinAPE across the CRTC types, a real 6128 if one is available | The benchmark recorded; plays through on real hardware | M |
 
 The road (phase 2) is the heart of the port and the biggest risk: build it
@@ -501,16 +510,14 @@ measurements come first of all: they decide the memory map's fallbacks.
 | Half width loses detail (a centre-line dash is 2 Spectrum pixels wide at least, the kerb's steps are coarser) | Judged in phase 2's screenshots. Mode 0 at 160 wide is the fallback, at the cost of scaling every x by 5/8 |
 | The heavy frames (big objects near the car) miss the lock though the average fits | Measured in phase 3 from the slowest frames; late frames made up (5.2); then the objects' drawer tuned first |
 | Interrupts late or lost while the fills have them off | Verified in phase 1 in MAME and WinAPE; fills split into shorter stretches if needed |
-| The flip, or a Mode 1 HUD split, on some CRTC types | WinAPE on types 0-4 in phases 1 and 4 (Wonder Boy's flip and split already hold on 0 and 3) |
-| The colour art is a large job | It reuses the Einstein's colour masters; the scenery's sizes and shifts stay `make_scenery.py`'s |
+| The flip on some CRTC types | WinAPE on types 0-4 in phase 1 (Wonder Boy's flip already holds on 0 and 3); no mode split to test, the HUD being Mode 0 |
+| The new art is the largest single job | Its own phase (A), beside the code, which builds on placeholders; one theme first, for approval, before the rest; the sizes and shifts stay `make_scenery.py`'s; each theme pack's size checked against its cache as it is made |
 | Wonder Boy's code is z80asm, Speed Run's sjasmplus | Copied file by file with their tests' behaviour as the check |
 
-## 10. Decisions for the owner
+## 10. Decisions (the owner, 24 November 2026)
 
-1. **The 6128 and disc only**, or the tape (`.cdt`) too? The plan: disc,
-   tape last if wanted.
-2. **128 x 192 Mode 0** (recommended) or 160 x 200?
-3. **The HUD:** Mode 0 with the doubled-pixel font (recommended to start),
-   or a Mode 1 band (decided in phase 4)?
-4. **Colour art** from the Einstein's masters (recommended), or a CPC art
-   pass of its own?
+1. **Media:** the 6128 and disc only; no tape (5.11).
+2. **The screen:** Mode 0 at 128 x 192 (5.2).
+3. **The HUD:** Mode 0, with the doubled-pixel font; no Mode 1 band (5.7).
+4. **The art:** new art for the CPC, not converted from the Einstein's
+   (5.6, phase A).
