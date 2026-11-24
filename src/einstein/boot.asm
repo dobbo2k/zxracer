@@ -28,9 +28,14 @@ EinBoot:
 ; Channel 3 (MOS's clock) is stopped.
 ELongWait:      db 0            ; (the CTC on its 16 ms wait)
 EFirstPoll:     db 0            ; (this poll: the first after that wait)
+EGrid:          db 0            ; (the TV frame the last sent was due at)
         IFNDEF EIN_MIN_FRAMES   ; (-D: the benchmark measures the work unlocked)
-EIN_MIN_FRAMES  EQU 4           ; a frame sent at most every 4 TV frames: a
+EIN_MIN_FRAMES  EQU 4           ; frames sent on a grid of 4 TV frames: a
         ENDIF                   ; steady 12.5 fps (the Spectrum: MIN_FRAMES)
+EIN_MIN_GAP     EQU 3           ; but after a late one, up to EIN_DEBT TV
+        IFNDEF EIN_DEBT         ; frames are made up, one a frame sent: at
+EIN_DEBT        EQU 4           ; least 3 apart (-DEIN_DEBT=0: always 4)
+        ENDIF
 
 EinCtcInit:
         xor a
@@ -101,13 +106,28 @@ EinIsr:
         ld a, (FlipPending)
         or a
         jr z, .snd
-        ld a, (hl)
+        ld a, (hl)              ; at least EIN_MIN_GAP since the last sent
         ld hl, LastFlip
+        sub (hl)
+        cp EIN_MIN_GAP
+        jr c, .snd
+        ld a, (FrameCount)      ; and at or past the grid's next tick
+        ld hl, EGrid
         sub (hl)
         cp EIN_MIN_FRAMES
         jr c, .snd
+        ld a, (hl)              ; the grid on a step, owing at most EIN_DEBT
+        add a, EIN_MIN_FRAMES   ; TV frames (a late frame's: the next ones
+        ld (hl), a              ; come a TV frame sooner till it's made up)
         ld a, (FrameCount)
+        sub (hl)
+        cp EIN_DEBT + 1
+        jr c, .owed
+        ld a, (FrameCount)
+        sub EIN_DEBT
         ld (hl), a
+.owed:  ld a, (FrameCount)
+        ld (LastFlip), a
         call EinUpload
         xor a
         ld (FlipPending), a

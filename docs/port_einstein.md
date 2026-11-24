@@ -261,9 +261,11 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 ## 6. Speed
 
-A frame is sent at most every 4 TV frames (`EIN_MIN_FRAMES` in
+A frame is sent every 4 TV frames (`EIN_MIN_FRAMES` in
 `src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
-frame takes longer. In the attract demo with normal timing (`wait16
+frame takes longer. Since 24 November 2026 a late frame's TV frames are made
+up, up to 4 of them: the frames after it come 3 TV frames apart, one TV
+frame made up each, till the grid of 4 is kept again (`EIN_DEBT`; below). In the attract demo with normal timing (`wait16
 GameFrames 20`, then `fliphist 1300`), 243 intervals take 4 TV refreshes,
 54 take 5 and 9 take 6. The average is 11.81 fps, and the longest gap is
 120 ms. The harness's `fliphist N`
@@ -346,6 +348,27 @@ plan for drawing them the Einstein's own way is in
 [einstein_objects_plan.md](einstein_objects_plan.md). A prototype of hardware
 sprites for them took normal play from 11.96 to 12.12 fps but made small objects
 one colour (black palms), so it was dropped; the results are in its section 5.
+
+**Late frames made up** (24 November 2026). A frame that came a TV frame
+late used to push every later one back by a TV frame. Now the frames are due
+on a grid of 4 TV frames, and after a late one the next come 3 apart till
+they are back on it, owing at most `EIN_DEBT` TV frames (a few bytes in the
+interrupt, `EGrid`). The game moves by the time passed, so it plays the same;
+the pictures are the same, a few of them sooner. Measured in the attract
+demo (`fliphist 1300`, intervals of 3 / 4 / 5 / 6 / 7 TV frames):
+
+| `EIN_DEBT` | Intervals | fps | Fixed-step benchmark, locked |
+|---|---|---|---|
+| 0 (as before) | 0 / 261 / 43 / 5 / 1 | 11.96 | 1,279 |
+| 1 | 13 / 249 / 46 / 5 / 0 | 12.08 | 1,271 |
+| **4 (the default)** | **35 / 231 / 45 / 7 / 0** | **12.27** | **1,253** |
+| 8 | 50 / 210 / 55 / 5 / 0 | 12.36 | |
+
+More debt is faster on average but less even. The block kerbs
+(`-DEIN_BLOCKS`), measured at the same time, gave 0 / 317 / 5 / 0 / 0
+(12.45 fps), with the speed cut's look (below) and slots too few for
+some objects. Unlocked (`-DEIN_MIN_FRAMES=3`) the benchmark is unchanged
+(1,177).
 
 **Einstein upload and kerb optimisations in the release.** Albert's
 normal-timing attract demo was sampled for 1,300 TV refreshes after

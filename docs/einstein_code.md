@@ -146,15 +146,18 @@ Everything before `WaitFlip` runs while the previous frame is still being sent.
 The VDP's frame interrupt is not wired to the Z80. CTC channel 2 interrupts every 1 ms
 (timer, /16, 250) and the handler reads the VDP's status. When the frame flag is set (at
 the start of the vertical blank), it counts a TV frame (`FrameCount`). If a frame is
-pending and at least `EIN_MIN_FRAMES` (4) TV frames have passed since the last was sent,
-it calls `EinUpload`. Then it plays the sound (`SoundTick`). After seeing a frame it sets
+pending, it calls `EinUpload` when the frame is due: frames go on a grid of
+`EIN_MIN_FRAMES` (4) TV frames (`EGrid`, the tick the last was due at), and a late one
+puts the grid's next ticks no more than `EIN_DEBT` (4) TV frames behind; while it is
+behind, frames go 3 TV frames apart (`EIN_MIN_GAP`), one TV frame made up each.
+`LastFlip` stays the TV frame the last was sent in (the stage's jingle waits for it). Then it plays the sound (`SoundTick`). After seeing a frame it sets
 the CTC to a 16 ms wait (/256, 250) and goes back to 1 ms polls after that, so the flag is
 seen at most 1 ms late. A frame seen at the very first poll after the wait may be late by
 an unknown time (`EFirstPoll`): its upload is all paced. A frame that begins while the
 interrupt is still busy is counted at its end, with its sound (the `.over` loop;
 `EinMirror` checks too, through `EinLateFrame`).
 
-A game frame takes at least 4 TV frames here. `Elapsed` goes up to 8 (`player.asm`) so the
+A game frame takes 4 TV frames here, or 3 while one late is made up. `Elapsed` goes up to 8 (`player.asm`) so the
 clock and the car keep real time.
 
 ### Sending a frame (`flip.asm` `EinUpload`)
@@ -526,6 +529,7 @@ Assembly options (`-D`):
 |---|---|
 | `FIXED_ELAPSED=1` | Every update counts 3 TV frames: the same game at any speed (the benchmark) |
 | `EIN_MIN_FRAMES=3` | The 12.5 fps lock off, to measure the work alone |
+| `EIN_DEBT=n` | The TV frames late a frame may be made up by (4; 0: never, every frame at least 4 apart) |
 | `EIN_BLOCKS` | The block kerbs: ready-made edges, the outer edge on a cell's edge (12.45 fps in the attract demo, against 11.7) |
 | `EIN_KERB2` | The exact kerbs in 2-line steps, not 4 (11.1 fps) |
 | `EIN_SLOPE=n` | With `EIN_BLOCKS`: the near rows' kerbs drawn exactly where they slope more than n pixels (4: the look before the speed cut) |
