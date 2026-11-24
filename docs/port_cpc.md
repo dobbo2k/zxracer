@@ -4,12 +4,13 @@ A plan, not yet started. The first draft (21 November 2026) was reviewed on
 22 November 2026 against three things that did not exist when it was
 written: the Einstein port (`docs/port_einstein.md`), which showed how the
 shared code really ports; the Wonder Boy project's two CPC ports
-(`C:\ZX Spectrum\Wonderboy`: `docs/cpc-guide.md`, `cpc-port-plan.md`,
-`cpc6128-port-plan.md`), which settle most of the CPC hardware questions and
-supply tested code and tools; and Speed Run's own code and measurements
-(`PLAN.md` 2.1 and 3.6). Section 3 lists what changed. Facts still marked
-*(verify)* must be checked in MAME and WinAPE before the work that depends
-on them.
+(`C:\ZX Spectrum\Wonderboy`: `docs/cpc-guide.md`, `docs/cpc-port-plan.md`,
+`docs/cpc6128-port-plan.md`), which settle most of the CPC hardware
+questions and supply tested code and tools; and Speed Run's own code and
+measurements (`PLAN.md` 2.1 and 3.6). It was checked again on 24 November
+2026 against the Einstein's later speed work and profile. Section 3 lists
+what changed both times. Facts still marked *(verify)* must be checked in
+MAME and WinAPE before the work that depends on them.
 
 ## 1. Target
 
@@ -25,8 +26,10 @@ on them.
   gave. The Spectrum locks a game frame to 3 TV frames (16.7 fps,
   `MIN_FRAMES`), and its heaviest quarter of frames (hills, forks and
   traffic together) take 4 (`PLAN.md` 3.6: 15.6 fps over a whole game). The
-  CPC aims for the same lock. The estimate in section 6 says it will be
-  marginal: expect 12.5-16.7 fps, as the Einstein's 11.5-12.
+  CPC aims for the same lock, with late frames made up as the Einstein's
+  are (5.2). The estimate in section 6 says it will be marginal: expect
+  12.5-16.7 fps. The Einstein, at a lock of 4 TV frames, reaches 12.35 fps
+  in normal play (`docs/port_einstein.md` section 6).
 - **Build:** `make cpc` gives `build/cpc/speedrun.dsk`. The Spectrum build
   stays byte-identical to `release/` at every step.
 
@@ -35,7 +38,7 @@ on them.
 | From | What | Use here |
 |---|---|---|
 | Spectrum | the game: `player`, `track`, `hills`, `fork` (its pass-1 part), `traffic`, `game`, `extend`, `respawn`, `tunnel` logic, `scenery`'s projection, the music sequencer, `stages.yaml` and the stage tools | Assembled unchanged from the same `src/main.asm` (section 4) |
-| Einstein port | the `-DEINSTEIN` pattern (one `main.asm`, about 20 switches); `KEY_IN` and `FRAME_WAIT` macros; `AYN`/`AYD` periods; Spectrum-format screen B as a shadow that platform code converts; `make_einstein.py`'s gen/dat/patch data build; the fixed-step benchmark (`FIXED_ELAPSED`); the native colour artwork masters (`tools/einstein_illustration.py`, `einstein_art.py`) | The same mechanisms with `-DCPC` |
+| Einstein port | the `-DEINSTEIN` pattern (one `main.asm`; about 70 switches in 24 shared files by now, section 4); `KEY_IN` and `FRAME_WAIT` macros; `AYN`/`AYD` periods; Spectrum-format screen B as a shadow that platform code converts; `make_einstein.py`'s gen/dat/patch data build; the fixed-step benchmark (`FIXED_ELAPSED`); the frame grid that makes up late frames (`EGrid`, `EIN_DEBT`); its exact speed-ups of the shared projection (`ApplyCurve`, the hill mapping's loop); the native colour artwork masters (`tools/einstein_illustration.py`, `einstein_art.py`) | The same mechanisms with `-DCPC` |
 | Wonder Boy CPC | `hardware.inc` (ports, Gate Array commands, RAM configurations); `screen.asm` (interrupts, CRTC, the flip); `input.asm` (`read_key_row`); `sound.asm` (`ay_write` through the PPI, the register shadow); `sprites.asm` (masks by pen 0 through a table); `fdc.asm` and `disk_loader.asm` (the uPD765 reader, the AMSDOS boot); `tools/cpc/make_dsk.py`, `make_cdt.py`; `tools/cpc_harness.py` with `tools/mame/cpc_harness.lua`; `tools/winape_run.py`; `tools/cpc_profile.py` | Copied into this repository and adapted, as `make_einstein_disk.py` was. Wonder Boy assembles with z80asm, so the sources need sjasmplus syntax |
 
 ## 3. Review of the first draft
@@ -97,6 +100,26 @@ on them.
     interrupts' positions (2 lines after VSYNC begins, then every 52) and
     the start address's latching (section 5.2).
 
+Checked again on 24 November 2026:
+
+13. **The Einstein's switches** have grown to about 70, and are of three
+    kinds, which the `NATIVE_GFX` step must keep apart: some mean "not the
+    Spectrum's screen", some are exact speed-ups the CPC can share, and
+    some fit only the Einstein's drawing (section 4).
+14. **The shared work is measured:** the Einstein's profile puts the game's
+    logic, the road's projection and hills and the objects' projection at
+    about 79K T a game frame, not the 105K first guessed (section 6).
+15. **The residents are smaller:** the crew's close-ups are gone from the
+    game, leaving 635 bytes free in bank 5 (section 5.3).
+16. **Late frames made up:** the Einstein's frame grid (a frame that comes
+    late lets the next come a TV frame sooner, up to 4 TV frames) gained
+    about 0.3 fps there for a few bytes, and suits the CPC too (5.2).
+17. **The heavy frames set the rate:** on the Einstein the frames with big
+    objects near the car (16% of them) are the ones that miss the lock.
+    The CPC's estimate must hold for those, not only on average (section 6).
+18. **The unlocked benchmark** can't be built with `-DMIN_FRAMES=1` as
+    written: `MIN_FRAMES` in `defs.asm` has no `IFNDEF` guard (section 7).
+
 ## 4. The build: `-DCPC`
 
 `src/main.asm` with `-DCPC` and `src/cpc/` for the platform code, as the
@@ -115,14 +138,21 @@ CPC needs at each:
 | `lampdraw.asm`, `tunnelb2.asm`, `holes.asm`, `pause.asm` | screen B only (screen A's memory holds buffers) | the same |
 | `scenery.asm` | the object's type in the draw command; the car's overlap test out | the same |
 | `player.asm` | `Elapsed` up to 8 | the same, if frames take 5 or more |
+| `road.asm` pass 1, `hills.asm` `HillStore`, `defs.asm` | `EIN_NOLANE`: no centre line, so pass 1 and the hill mapping leave it out (its registers do other work) | not if the CPC draws the centre line (5.4); then the Spectrum's pass 1 |
+| `road.asm` `RoadBands` | outside tunnels, the bands of lines 0 and 4 of each row only (all the Einstein's road reads) | not this: the CPC draws every line pair's band |
+| `track.asm` `ApplyCurve`, `hills.asm` `HillMap` | exact speed-ups: the same results, quicker | the same |
 | `stage.asm`, `stageov.asm`, `pics.asm` | packs and pictures read from the disc | packs unpacked from banks 4-6 (section 5.11) |
 | `frontend.asm` | screen A shown as a bitmap | section 5.9 |
 
-Most of these switches mean "not the Spectrum's screen". Before the CPC
-work starts, give that a name of its own: `defs.asm` defines `NATIVE_GFX`
-when `EINSTEIN` or `CPC` is defined, and the shared files test it. The
-Spectrum's bytes don't change; check with `make build/speedrun.tap` and
-`cmp` against `release/`.
+The switches are of three kinds. Most mean "not the Spectrum's screen".
+Before the CPC work starts, give that a name of its own: `defs.asm`
+defines `NATIVE_GFX` when `EINSTEIN` or `CPC` is defined, and the shared
+files test it. The exact speed-ups (`ApplyCurve`, `HillMap`) get a name of
+their own too, for both ports. The rest stay `EINSTEIN`: `EIN_NOLANE`, the
+bands of lines 0 and 4, `EinShape`. A blanket rename of `EINSTEIN` to
+`NATIVE_GFX` would give the CPC a road without its other line pairs'
+bands. The Spectrum's bytes don't change; check with `make
+build/speedrun.tap` and `cmp` against `release/`.
 
 The generated files come from `tools/make_cpc.py` in the Einstein's three
 steps (`gen` before the stage packs are assembled, `dat` after, `patch`
@@ -176,12 +206,18 @@ after the game), into `build/cpc`, last on the include path.
   itself, after `WaitFlip` and before it draws.
 - **Blanking** (the Spectrum's blanked screen B during a stage load): all
   16 pens black, 32 Gate Array writes.
+- **The frame lock:** a frame is shown at the VSYNC interrupt once
+  `MIN_FRAMES` (3) TV frames are due, on a grid as the Einstein's (`EGrid`
+  in `src/einstein/boot.asm`): after a late frame the next may come a TV
+  frame sooner, but never less than 2 apart, till the grid is kept again,
+  owing at most a few TV frames. `LastFlip` stays the real flip (the
+  stage's jingle waits for it).
 
 ### 5.3 Memory (CPC 6128)
 
 | CPU address in play (C1 or C3) | Contents |
 |---|---|
-| `$0000-$3FFF` base 0 | what the Spectrum keeps resident in bank 5 at `$5B00-$7FFF` (9.25K: scenery and car data, font, the music player, the stage loader's ways in, the track cache), assembled here under `-DCPC`; the CPC code: the interrupt, road and sprite drawers, cell conversion, keys, disc; page-aligned tables (pen-0 masks, mixed-pen bytes, 1-bit-to-Mode-0) |
+| `$0000-$3FFF` base 0 | what the Spectrum keeps resident in bank 5 at `$5B00-$7FFF` (8.0K to `$7B24`: scenery and car data, font, the music player, the stage loader's ways in, the tunnels' mouths; then 635 bytes free and the 640-byte track cache), assembled here under `-DCPC`; the CPC code: the interrupt, road and sprite drawers, cell conversion, keys, disc; page-aligned tables (pen-0 masks, mixed-pen bytes, 1-bit-to-Mode-0) |
 | `$4000-$7FFF` the hidden screen | base 1 (A) or base 3 (B). The stage overlay runs here as on the Spectrum (`StageOv` at `$4000`, the other screen shown and blanked). Each screen's 4K of gaps holds that screen's own state (what it shows: lines' spans, the sky cells objects covered). The overlay (about 1.9K) runs past the first gap at `$4600`; the display reset sets the gaps afresh after it |
 | `$8000-$BFFF` base 2 | the Spectrum's bank 2 as it is: code, tables, chains, IM2 table, stack |
 | `$C000-$FFFF` bank 7 | `$C000-$DAFF`: the Spectrum's screen B as a shadow (5.7); `$DB00-$FFFF`: the theme cache (Mode 0 sprites, panorama, palette) or the front end, at `THEME_CACHE` as on the Spectrum |
@@ -195,8 +231,8 @@ Rules:
   `$C000`. The Spectrum has the same problem, its pack banks taking bank
   7's place at `$C000`, and its loader bounces theme packs through the
   track cache: the CPC keeps that, with the track cache in base 0.
-- **Base 0 is the budget to watch:** 16K for the Spectrum's 9.25K of
-  residents (some of them graphics, whose Mode 0 size differs) and the CPC
+- **Base 0 is the budget to watch:** 16K for the Spectrum's 8.7K of
+  residents and track cache (some of them graphics, whose Mode 0 size differs) and the CPC
   code (estimate 6-8K). The fallback is the gaps in base 2 (`holes.asm`)
   and bank 7 below the theme cache. Measure in phase 0.
 - **Sizes of the Mode 0 art:** a Spectrum sprite stores 2 bits a pixel
@@ -237,6 +273,10 @@ line. A CPC has no attributes: every pixel carries its colour. The plan:
   write its return address into the picture.
 - **Cost:** 96 lines x 32 `PUSH`es x 4 us = 12.3 ms, plus about 40-60 us of
   set-up a line: 16-18 ms a game frame *(measure in phase 2)*.
+- **The centre line:** the Einstein leaves it out, for speed
+  (`EIN_NOLANE`). In a full redraw it is a run or two more a line pair, so
+  the CPC keeps it unless phase 2's measure says otherwise; without it the
+  CPC could share the Einstein's pass 1 and `HillStore` (section 4).
 - **Colour cycling** stays a later experiment for straight, flat road
   only, if the pens allow (3.7).
 
@@ -301,8 +341,8 @@ A starting budget, each theme and stage setting the colours (a
 
 - **Periods:** `AYN`/`AYD` = 564/1000 (1,000,000 / 1,773,400) in
   `defs.asm`, as the Einstein's 1128/1000; the tune's notes from their own
-  table (the Einstein's `music_notes.asm`, generated for 1 MHz); the
-  engine's step 28 a rev (50 x 0.564); the crash's thud as `EinCoarse`
+  table (`music_notes.asm`, made as the Einstein's is for its 2 MHz AY, for
+  1 MHz); the engine's step 28 a rev (50 x 0.564); the crash's thud as `EinCoarse`
   does it for 2 MHz. Periods get smaller, so high notes lose a little
   precision (a C7 is period 30 at 1 MHz).
 - **`AyWrite`:** the PPI sequence (register on port A, port C select,
@@ -368,19 +408,30 @@ A game frame at the 3-TV-frame lock has 59.9 ms on the CPC (Spectrum:
 
 | Work | Spectrum | CPC (estimate) |
 |---|---|---|
-| Shared: logic, pass 1, hills, the sprites' projection | about 105K T | 30-33 ms |
+| Shared: logic, pass 1, hills, the sprites' projection | about 105K T (the first guess); the Einstein's profile: about 79K T | 24-28 ms |
 | Interrupts: sound, key scan | about 9K T | 3 ms |
 | The road, 96 lines | 48K T (rows and lines) | 16-18 ms |
 | Scenery and traffic | 16K T | 6-12 ms (twice the bytes, each masked) |
 | The car | 7K T | 2-3 ms |
 | HUD and sky cells, the panorama | 10K T | 1-3 ms |
-| **Total** | about 205-260K T | **58-72 ms** |
+| **Total** | about 205-260K T | **52-66 ms** |
 
 So the light frames should keep the 16.7 lock and the heavy ones take 4 TV
-frames, as on the Spectrum, if these estimates hold. The shared work is
-the biggest share, and the Einstein left it alone so that the Spectrum's
-build stays the same. Phase 0 measures it on the CPC before anything is
+frames, as on the Spectrum, if these estimates hold. The shared figure is
+the Einstein's profile of 300 fixed-step game frames (24 November 2026:
+the road's projection and hills 57K T, the game's logic and sound 14K, the
+objects' projection about 8K), at the CPC's 3.3 MHz in practice. The shared
+work is the biggest share; the Einstein changed it only where the results
+are exactly the same. Phase 0 measures it on the CPC before anything is
 drawn.
+
+The averages hide the frames that set the rate. On the Einstein the frames
+with big objects near the car, 16% of them, take 5 to 7 TV frames where
+the rest take 4. On the CPC the cost of an object grows with its bytes
+(each masked), so the scenery and traffic row can reach twice its average
+in those frames: phase 3 measures the slowest frames (the frame histogram
+and the costliest routines of the frames that miss the lock), not only the
+average.
 
 ## 7. Tools and tests
 
@@ -409,7 +460,15 @@ drawn.
   - the Spectrum's build still byte-identical.
 - **The benchmark:** the Einstein's, with `-DFIXED_ELAPSED=1`: 300 game
   frames of the attract demo, in TV frames, locked and unlocked
-  (`-DMIN_FRAMES=1`). Each phase records it.
+  (`-DMIN_FRAMES=1`: that needs an `IFNDEF MIN_FRAMES` guard in `defs.asm`,
+  the Spectrum's bytes the same, or a `CPC_MIN_FRAMES` as the Einstein's
+  `EIN_MIN_FRAMES`). Each phase records it.
+- **Pictures that don't depend on speed:** the Einstein's checks slow the
+  lock (8 TV frames, nothing made up), because its sky over a tunnel's
+  mouth is sent over several TV frames and a faster build was pictured
+  part way through it. The CPC flips whole screens, so a picture taken as
+  a game frame is drawn should always show the one before in full: check
+  that in phase 1, and slow the lock for the rendercheck if not.
 - **Profiling:** MAME's debugger trace counted by label
   (`tools/cpc_profile.py`). MAME gives no T-state profile like zxsim's or
   Albert's; the trace's PC counts serve.
@@ -440,6 +499,7 @@ measurements come first of all: they decide the memory map's fallbacks.
 | Base 0 too small for the residents and the CPC code | Phase 0's measure; then base 2's holes and bank 7 below the theme cache |
 | The packs don't fit banks 4-6 packed | Stages from the disc at each checkpoint (the Einstein's way, Wonder Boy's `fdc.asm`) |
 | Half width loses detail (a centre-line dash is 2 Spectrum pixels wide at least, the kerb's steps are coarser) | Judged in phase 2's screenshots. Mode 0 at 160 wide is the fallback, at the cost of scaling every x by 5/8 |
+| The heavy frames (big objects near the car) miss the lock though the average fits | Measured in phase 3 from the slowest frames; late frames made up (5.2); then the objects' drawer tuned first |
 | Interrupts late or lost while the fills have them off | Verified in phase 1 in MAME and WinAPE; fills split into shorter stretches if needed |
 | The flip, or a Mode 1 HUD split, on some CRTC types | WinAPE on types 0-4 in phases 1 and 4 (Wonder Boy's flip and split already hold on 0 and 3) |
 | The colour art is a large job | It reuses the Einstein's colour masters; the scenery's sizes and shifts stay `make_scenery.py`'s |
