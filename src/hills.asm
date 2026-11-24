@@ -199,12 +199,16 @@ HillMap:
         ld (hl), $FF
         inc l
         ld (hl), $FF
+        IFDEF EIN_NOLANE        ; (no centre line)
+        inc l
+        ELSE
         ld h, high LXPage
         ld (hl), $FF
         dec l
         ld (hl), $FF
         inc l
         inc l
+        ENDIF
         djnz .e
         ret
 
@@ -290,10 +294,14 @@ HillStore:
         inc l
         ld (hl), a
         res 7, l
+        IFDEF EIN_NOLANE        ; (no centre line)
+        dec l
+        ELSE
         ld h, high LXPage
         ld (hl), c
         dec l
         ld (hl), c
+        ENDIF
 .hf:    jr .nf                  ; (patched: 0 with a fork in view)
         call ForkPair
 .nf:    inc l

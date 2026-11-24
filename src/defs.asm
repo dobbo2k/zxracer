@@ -16,6 +16,11 @@ AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the gam
         IFNDEF FIXED_ELAPSED
 FIXED_ELAPSED   EQU 0           ; 1 = (testing) every update counts 3 TV frames and nothing
         ENDIF                   ; drawn depends on the timing: identical runs at any speed
+        IFDEF EINSTEIN          ; the Einstein draws no centre line (but with -DEIN_DASH):
+        IFNDEF EIN_DASH         ; pass 1 and the hill mapping leave it out (LaneX
+        DEFINE EIN_NOLANE       ; stays $FF), src/road.asm, src/hills.asm
+        ENDIF
+        ENDIF
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
 TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)

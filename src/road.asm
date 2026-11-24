@@ -219,6 +219,32 @@ RoadPass1:
 .nx:    cp $FF                  ; a curve boundary or zone line (NextEvent)
         jp z, .event
 .go:    ; ---- odd line: edges and centre line from cx = total
+        IFDEF EIN_NOLANE        ; (the Einstein, no centre line: cx in BC')
+        push hl
+        exx
+        pop bc                  ; BC' = cx
+        ld h, high CXPage       ; road centre on this line, for the scenery
+        set 7, l
+        ld (hl), b
+        res 7, l
+        ld (hl), c
+        ld a, l
+.fl:    cp 0                    ; past the split? (P1ForkLim, patched)
+        jp c, .fork
+        ld h, high X1Page
+        ld a, b
+        or a
+        jr nz, .slow            ; cx outside 0..255
+        ld a, c
+        sub (hl)                ; cx - X1
+        jr c, .slow
+        ld d, a                 ; D' = first road pixel
+        ld a, c
+        dec a
+        add a, (hl)             ; cx + X1 - 1
+        jr c, .slow
+        ld e, a                 ; E' = last road pixel
+        ELSE
         ld a, l
         ld ixl, a
         ld a, h
@@ -254,6 +280,7 @@ RoadPass1:
         jr nc, .lane
         ld a, $FF
 .lane:  ld c, a                 ; C' = centre line x
+        ENDIF
 .store: jp .flat                ; (HillStore when hills are in view)
 .flat:  ; this line and the one above it
         ld h, high DEPage
@@ -265,10 +292,14 @@ RoadPass1:
         inc l
         ld (hl), e
         res 7, l
+        IFDEF EIN_NOLANE
+        dec l
+        ELSE
         ld h, high LXPage
         ld (hl), c
         dec l
         ld (hl), c
+        ENDIF
 .ff:    jr .ffs                 ; (patched: 0 with a fork in view)
         call ForkPair
 .ffs:   inc l
@@ -295,6 +326,21 @@ RoadPass1:
         jp p, .cx
         ret
 
+        IFDEF EIN_NOLANE
+.fork:  push bc                 ; (ForkLine takes cx in IX)
+        pop ix
+        jp ForkLine
+.slow:  ; BC' = cx (16-bit), HL' = X1Page + line
+        ld a, (hl)
+        push hl
+        ld h, b
+        ld l, c
+        ld c, a
+        ld b, 0
+        call Span               ; (src/fork.asm) D', E' on the screen, or $FF, 0
+        pop hl
+        jp .store
+        ELSE
 .slow:  ; IX = cx (16-bit), C' = X1, L' = line
         ld h, high LWPage
         ld b, (hl)              ; B' = LW (255: none)
@@ -343,6 +389,7 @@ RoadPass1:
         ld c, a
         pop hl
         jp .store
+        ENDIF
 
 .event: ; the curvature changes on this line: P += 3 (k' - k)
         push hl
