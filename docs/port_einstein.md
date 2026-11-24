@@ -341,7 +341,9 @@ count down (about 0.5K T a frame, for a change to the shared `NextEvent`);
 the empty silhouette cells (`EinSprMask`): 21 cells a game frame are read
 back from screen B, 7 of them empty, at about 530 T each - about 3.7K T in
 all, and knowing a cell empty without reading it costs most of that in time,
-or more memory than there is.
+or more memory than there is. What is left is mostly traffic and scenery: a
+plan for drawing them the Einstein's own way is in
+[einstein_objects_plan.md](einstein_objects_plan.md).
 
 **Einstein upload and kerb optimisations in the release.** Albert's
 normal-timing attract demo was sampled for 1,300 TV refreshes after
