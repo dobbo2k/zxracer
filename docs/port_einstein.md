@@ -304,6 +304,9 @@ measures the work alone. Taken so:
 | the kerbs exact, 4-line steps, unlocked | 1,239 (4.13) |
 | open-road band calculation and cached hill mapping, locked at 4 | 1,301 (4.34, 11.53 fps) |
 | release with batched road uploads and compact kerbs, locked at 4 | 1,292 (4.31, 11.61 fps) |
+| the same, unlocked | 1,200 (4.00) |
+| the road's projection the Einstein's way, locked at 4 | 1,279 (4.26, 11.73 fps) |
+| the road's projection the Einstein's way, unlocked | 1,176 (3.92) |
 
 With normal game timing, `wait16 GameFrames 20` then `fliphist 1300` in Albert
 gave 253/41/12/1 intervals of 4/5/6/7 TV refreshes before the change and
@@ -317,6 +320,28 @@ of 4/5/6/7 refreshes (11.97 fps). On the 300 fixed-step updates, Albert attribut
 1,204 T-states per TV refresh to `EinPanoCell` before the change and 684 after.
 The panorama names and both silhouette planes matched the Spider-only build on
 all 320 sampled updates, including 136 with objects across the horizon.
+
+**The road's projection the Einstein's way** (23 November 2026). The
+shared pass 1 and hill mapping had been left as the Spectrum's. Three
+pieces now have Einstein versions (`IFDEF`: the Spectrum's build is byte
+for byte the same), each checked against the pictures of the build before
+at every 10th game frame of the fixed-step demo (all identical):
+
+| Change | Locked | Unlocked |
+|---|---|---|
+| before | 1,292 | 1,200 |
+| pass 1, `HillStore` and the hill mapping's ground without the centre line, which the Einstein never draws (`EIN_NOLANE`: `LaneX` stays $FF); the road's centre to the other register set by the stack, not IX; the slow path `Span`'s | 1,283 | 1,186 |
+| the hill mapping's loop with `ProjClip + j` in HL' and the free pairs in C' (not IY, IXL), one test each for the events; `HillStore`'s depth line in C' | 1,280 | 1,178 |
+| `ApplyCurve`: `<< (zone - 2)` where the zone is 2 or more (exactly the same), not `<< zone` then `>> 2` | 1,279 | 1,176 |
+
+In normal timing (`wait16 GameFrames 20`, `fliphist 1300`) the frames came
+238 / 59 / 8 / 0 at 4 / 5 / 6 / 7 TV frames before (11.78 fps) and 261 / 43 /
+5 / 1 after (11.96 fps). Measured and not done: pass 1's event test as a
+count down (about 0.5K T a frame, for a change to the shared `NextEvent`);
+the empty silhouette cells (`EinSprMask`): 21 cells a game frame are read
+back from screen B, 7 of them empty, at about 530 T each - about 3.7K T in
+all, and knowing a cell empty without reading it costs most of that in time,
+or more memory than there is.
 
 **Einstein upload and kerb optimisations in the release.** Albert's
 normal-timing attract demo was sampled for 1,300 TV refreshes after

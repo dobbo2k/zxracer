@@ -209,6 +209,27 @@ ApplyCurve:
         push hl
         push bc
         push de
+        IFDEF EINSTEIN          ; (A = CurC) the zone's 2 or more: << (zone - 2),
+        ld l, a                 ; exactly the same, with fewer shifts
+        rlca
+        sbc a, a
+        ld h, a
+        ld a, (CurK)
+        sub 2
+        jr c, .near
+        jr z, .shifted
+        ld b, a
+.sh:    add hl, hl
+        djnz .sh
+        jr .shifted
+.near:  inc a                   ; (zone 0: >> 2, zone 1: >> 1)
+        jr z, .r1
+        sra h
+        rr l
+.r1:    sra h
+        rr l
+.shifted:                       ; HL = k (8.8)
+        ELSE
         ld a, (CurC)
         ld l, a
         rlca
@@ -225,6 +246,7 @@ ApplyCurve:
         rr l
         sra h
         rr l                    ; HL = k (8.8)
+        ENDIF
         ld a, h
         rlca
         sbc a, a                ; A:H:L = k

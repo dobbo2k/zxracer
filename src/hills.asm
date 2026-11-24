@@ -113,6 +113,95 @@ HillMap:
         ld hl, 0
         ld d, h
         ld e, l
+        IFDEF EINSTEIN
+        ; (the Einstein's loop: the same, quicker - ProjClip + j in HL' and
+        ; the pairs still free in C' rather than IY and IXL, the line last
+        ; in view in E', both events looked for with one test each)
+        ld a, (HillTopJ)
+        dec a
+        exx
+        ld e, a                 ; E': the line last in view, less 1
+        ld a, iyl
+        ld l, a
+        ld h, high ProjClip     ; HL' = ProjClip + j
+        ld a, ixl
+        ld c, a                 ; C' = pairs still free
+        ld a, l
+.lp:                            ; (the alternate set, A = L')
+.nb:    cp $FF
+        jr z, .eb
+.nz:    cp $FF
+        jr z, .ez
+.go:    exx
+        ex de, hl
+        add hl, bc              ; speed += hill
+        ex de, hl
+        or a
+        adc hl, de              ; offset += speed
+        jp pe, .sat
+.ok:    ; s = j - round(offset)
+        ld a, l
+        add a, $80              ; carry: round up
+        ld a, h
+        exx
+        ld b, a                 ; B' = the offset's whole part (carry kept)
+        ld a, l
+        bit 7, b
+        jr nz, .down
+        sbc a, b                ; rising: maybe above the top
+        sub low ProjClip
+        jp p, .s
+        xor a
+        jr .s
+.down:  sbc a, b                ; falling away: below (< 224)
+        sub low ProjClip
+        cp 128
+        jr c, .s
+        ld a, 127
+.s:     ld (hl), a
+        dec l
+        srl a                   ; screen pair
+        cp c
+        jr nc, .hidden          ; behind the road in front
+        ld b, a
+        cpl
+        add a, c
+        inc a                   ; pairs it covers: up to the road in front
+        or $80
+        ld (hl), a
+        ld c, b
+        ld e, l                 ; (j - 1: in view)
+        dec l
+        ld a, l
+        cp low ProjClip
+        jp nc, .lp
+        jr .lpEnd
+.hidden:
+        ld a, c
+        add a, a
+        ld (hl), a              ; its scenery is cut off at the road in front
+        dec l
+        ld a, l
+        cp low ProjClip
+        jp nc, .lp
+        jr .lpEnd
+.eb:    ld iyl, a               ; (.bound compares the next one's line with IYL)
+        exx
+        call .bound
+        exx
+        ld a, l
+        jr .nz
+.ez:    exx
+        call .zone
+        exx
+        jr .go
+.lpEnd: ld a, e
+        inc a
+        ld (HillTopJ), a        ; (low ProjClip + j)
+        ld a, c
+        ld ixl, a
+        exx
+        ELSE
 .lp:    ld a, iyl
 .nb:    cp $FF
         call z, .bound
@@ -165,6 +254,7 @@ HillMap:
         ld iyl, a
         cp low ProjClip
         jp nc, .lp
+        ENDIF
 
         ; screen pairs above the furthest road: ground without road
         ld a, (HillTopJ)
@@ -267,6 +357,22 @@ HillMap:
 ; j, D, E = road edges, C = centre line x: copy them onto the screen pairs
 ; the line covers. Ends at RoadPass1.stored, L kept.
 HillStore:
+        IFDEF EIN_NOLANE        ; (C' free: the depth line kept there)
+        ld c, l
+        ld a, l
+        add a, low ProjClip
+        ld l, a
+        ld h, high ProjClip
+        ld a, (hl)              ; screen line
+        dec l
+        ld b, (hl)
+        bit 7, b
+        jr z, .j                ; hidden
+        res 7, b                ; pairs
+        and $FE
+        ld l, a                 ; first screen line
+        ld a, c
+        ELSE
         ld a, l
         ld (.j + 1), a
         add a, low ProjClip
@@ -281,6 +387,7 @@ HillStore:
         and $FE
         ld l, a                 ; first screen line
         ld a, (.j + 1)
+        ENDIF
 .pp:    ld h, high DEPage
         ld (hl), d
         inc l
@@ -307,7 +414,11 @@ HillStore:
 .nf:    inc l
         inc l
         djnz .pp
+        IFDEF EIN_NOLANE
+.j:     ld l, c
+        ELSE
 .j:     ld l, 0
+        ENDIF
         jp RoadPass1.stored
 
 ; Hills out of view: one screen line per depth line again.

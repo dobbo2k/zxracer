@@ -485,7 +485,9 @@ game-over screens run unchanged and draw into screen A.
 | `defs.asm` | No border profiling; `AYN`/`AYD`; `FRAME_WAIT` is `EinHalt`; `KEY_IN` is `EinSpecIn` |
 | `interrupt.asm` | `InitInterrupts` is `EinCtcInit`; `Isr` is `EinIsr` |
 | `scenery.asm` | `DrawObject` records the type; `RunCommand` without the car check, clipped by `.clipY` |
-| `road.asm` | No pass 2 (`DrawRoad`, `DrawRoadRow`); `RoadPrepare` sets `EinShape` |
+| `road.asm` | No pass 2 (`DrawRoad`, `DrawRoadRow`); `RoadPrepare` sets `EinShape`; pass 1 without the centre line (`EIN_NOLANE`, `src/defs.asm`), the road's centre in BC', its slow path `Span`'s |
+| `hills.asm` | The hill mapping's loop with `ProjClip + j` in HL' and the free pairs in C'; `HillStore` and the ground without the centre line, the depth line in C' |
+| `track.asm` | `ApplyCurve`: `<< (zone - 2)` from zone 2 on |
 | `horizon.asm`, `fork.asm`, `tyres.asm`, `car.asm` | Their drawing left out (`IFNDEF EINSTEIN`) |
 | `tunnelaside.asm` | In bank 2 (on the Spectrum in bank 5, beside `tunnel.asm`): no room in bank 5 here |
 | `hud.asm`, `extend.asm`, `lampdraw.asm` | The cells they write noted to be sent; screen B only |
