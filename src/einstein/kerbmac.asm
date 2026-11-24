@@ -16,7 +16,7 @@ KSTEP           EQU 2
 KALL            EQU (1 << KPAIRS) - 1   ; (every group over road)
 
 ; Group k (its line C; C on KSTEP): L, D, E, R into EKP; B the least L, IXL
-; the most D, IXH the least E, IYL the most R.
+; the most D, IXH the least E, IYL the most R (group 0 sets them).
         MACRO KLOAD k
         ld l, c
         ld h, high DEPage
@@ -31,42 +31,59 @@ KALL            EQU (1 << KPAIRS) - 1   ; (every group over road)
         ld h, high RoadRW
         ld a, d
         ld (EKP + 4 + k), a
+        IF k == 0
+        ld ixl, a
+        ELSE
         cp ixl
         jr c, $ + 4
         ld ixl, a
+        ENDIF
         sub (hl)                ; L = D - RW (at least 0)
         jr nc, $ + 3
         xor a
         ld (EKP + k), a
+        IF k == 0
+        ld b, a
+        ELSE
         cp b
         jr nc, $ + 3
         ld b, a
+        ENDIF
         ld a, e
         ld (EKP + 8 + k), a
+        IF k == 0
+        ld ixh, a
+        ELSE
         cp ixh
         jr nc, $ + 4
         ld ixh, a
+        ENDIF
         add a, (hl)             ; R = E + RW (at most 255)
         jr nc, $ + 4
         ld a, 255
         ld (EKP + 12 + k), a
+        IF k == 0
+        ld iyl, a
+        ELSE
         cp iyl
         jr c, $ + 4
         ld iyl, a
+        ENDIF
         DUP KSTEP
         inc c
         EDUP
         ENDM
 
 ; Store the group's byte. Four-line kerbs keep it compact until commit.
-; B gets a bit (set: over road), D the AND of the bytes, E the OR.
+; B gets a bit (set: over road); in 2-line steps D the AND of the bytes, E
+; the OR (4-line steps: EinKerbCell works them out from EKPattern).
         MACRO KPUT k
         IFDEF EIN_KERB4
         ld (EKPattern + k), a
+        rl b
         ELSE
         ld (EPat + 2 * k), a
         ld (EPat + 2 * k + 1), a
-        ENDIF
         rl b
         ld l, a
         and d
@@ -74,6 +91,7 @@ KALL            EQU (1 << KPAIRS) - 1   ; (every group over road)
         ld a, l
         or e
         ld e, a
+        ENDIF
         ENDM
 
 ; The left run: road from D (kerb left of it, and grass as kerb), or no
@@ -117,4 +135,12 @@ KALL            EQU (1 << KPAIRS) - 1   ; (every group over road)
         cpl
         or a
         KPUT k
+        ENDM
+
+; A = a pixel -> A = its cell
+        MACRO KCELL
+        rrca
+        rrca
+        rrca
+        and 31
         ENDM

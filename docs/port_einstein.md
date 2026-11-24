@@ -370,6 +370,35 @@ More debt is faster on average but less even. The block kerbs
 some objects. Unlocked (`-DEIN_MIN_FRAMES=3`) the benchmark is unchanged
 (1,177).
 
+**The kerbs and the projection tuned** (24 November 2026). Each step was
+checked against the build before at every 5th game frame from 25 to 300 of
+five runs (the attract demo, a tunnel's way in and out, stage 1's fork,
+stages 7 and 12): all 280 pictures identical. For these pictures the
+frame lock is slowed to 8 TV frames with nothing made up, so that each
+frame is sent whole at the same point in both builds: at the normal speed
+the sky over a tunnel's mouth is sent over several TV frames, and a faster
+build can be pictured part way through it.
+
+| Change | Locked | Unlocked |
+|---|---|---|
+| before | 1,253 | 1,177 |
+| a kerb cell: the AND and OR of its 2 bytes worked out once, not per group; the kerb loops keep the cell's name's address in DE (`EinKerbName0`) | 1,251 | 1,172 |
+| a row's colour set copied, and the kerb's colour bytes (`EKCG`, `EKCR`) worked out, only when it is not the last row's (`ERowSetNow`) | 1,248 | 1,168 |
+| group 0's edges set the row's extremes outright (`KLOAD`); the 4 pixel-to-cell calls inline (`KCELL`) | 1,241 | 1,161 |
+| `RoadBands` outside tunnels: the bands of lines 0 and 4 of a row only, all the open road reads (`IFDEF EINSTEIN`) | 1,241 | 1,156 |
+| `EinCommitKerb` takes its slot itself (`EinAllocSlot` unrolled) | 1,239 | 1,154 |
+
+In normal timing (`fliphist 1300`) the frames came 33 / 241 / 43 / 3 at
+3 / 4 / 5 / 6 TV frames: 12.35 fps, against 12.27. Tried and dropped: a row
+drawn again for its bands storing its shape at once, so as not to be drawn
+again next frame (1,183 unlocked: the comparing cost more than the rows it
+saved). Measured and not done: pass 1 for lines 0 and 4 of each row only.
+On the flat that would save about 4K T a frame, but hills are in view in
+every game frame of the tunnel, stage 7 and stage 12 runs (stage 1's fork:
+30% of them), where a depth line can show on any screen line; and the rows
+drawn the exact, generic way (tunnels, forks, and an open row whose line
+groups don't all have road) need every line pair.
+
 **Einstein upload and kerb optimisations in the release.** Albert's
 normal-timing attract demo was sampled for 1,300 TV refreshes after
 `wait16 GameFrames 20`. The fixed-step benchmark times the same 300 game
@@ -623,10 +652,10 @@ the rows' signatures) are in screen A's memory, above the stage overlay
 ($4800-$5AFF): the game code never writes screen A here (`Ceiling` and
 `TimeWarn` skip it). The Spider now reads its pattern and colour sources directly
 from resident art. The normal build (the exact kerbs, in 4-line steps) has
-288 bytes free before the bank 2 tables, 268 below $4000, 128 at the end
+80 bytes free before the bank 2 tables, 140 below $4000, 128 at the end
 of the Einstein's buffers (after `EObjectLower`), 25 before the bank 5
-track cache and 324 at the end of screen A. `-DEIN_KERB2` leaves 92 in
-bank 2; `-DEIN_BLOCKS` 1,104 (and 76 below $4000), with `-DEIN_DASH` 256,
+track cache and 324 at the end of screen A (24 November 2026).
+`-DEIN_KERB2` no longer fits in bank 2; `-DEIN_BLOCKS` 1,104 (and 76 below $4000), with `-DEIN_DASH` 256,
 with `-DEIN_SLOPE=4` 759. Two combinations no longer fit: the look before
 the speed cut (`-DEIN_BLOCKS -DEIN_DASH -DEIN_SLOPE=4`: bank 2, since the
 objects' colours took 144 bytes of it), and the centre line with the exact

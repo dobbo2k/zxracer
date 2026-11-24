@@ -448,6 +448,9 @@ RoadBands:
         ld a, (TunJN)
         or a
         jr nz, .tunnel
+        IFDEF EINSTEIN          ; (the Einstein's open road reads the bands of
+        ld b, ROAD_LINES / 4    ; lines 0 and 4 of a row alone: src/einstein/
+        ENDIF                   ; roadgfx.asm; a tunnel's mouth all of them)
         ld a, (P1Hill)
         or a
         jr nz, .hills
@@ -457,10 +460,18 @@ RoadBands:
         add a, c
         and STRIPE_BIT
         ld (de), a
+        IFDEF EINSTEIN
+        ld a, l
+        add a, 4
+        ld l, a
+        add a, low Band - low ZLo
+        ld e, a
+        ELSE
         inc l
         inc l
         inc e
         inc e
+        ENDIF
         djnz .flat
         ret
 
@@ -475,6 +486,10 @@ RoadBands:
         ld h, high SrcLine
         inc l
         inc l
+        IFDEF EINSTEIN
+        inc l
+        inc l
+        ENDIF
         djnz .hills
         ret
 

@@ -1103,12 +1103,17 @@ EinRowRanges:
 
 ; The row's colours from its band (as src/road.asm RowAttrs): ECG grass,
 ; ECK kerb, ECR road (TMS colours), EKC a kerb cell's colour byte (the road
-; over the kerb), ELC a centre-line cell's (white over the road)
+; over the kerb), ELC a centre-line cell's (white over the road); with the
+; exact kerbs EKCG and EKCR too. As they are if the set is the last row's.
 EinRowColours:
         ld a, (ERBand)          ; its set: tunnel (bit 7), dark (bit 6)
         rlca
         rlca
         and 3
+        ld hl, ERowSetNow
+        cp (hl)
+        ret z
+        ld (hl), a
         ld l, a
         add a, a
         add a, a
@@ -1122,10 +1127,26 @@ EinRowColours:
         ld de, EAG
         ld bc, 7
         ldir
+        IFDEF EIN_KERB
+        ld a, (ECK)             ; kerb over grass, kerb over road (the exact
+        add a, a                ; kerbs' slots: src/einstein/kerbrow.asm)
+        add a, a
+        add a, a
+        add a, a
+        ld c, a
+        ld a, (ECG)
+        or c
+        ld (EKCG), a
+        ld a, (ECR)
+        or c
+        ld (EKCR), a
+        ENDIF
         ret
 
 ; A frame's 4 colour sets (ERowSets: open / tunnel, light / dark bands)
 EinColourSets:
+        ld a, $FF               ; (EAG ... ELC to be copied again)
+        ld (ERowSetNow), a
         ld de, ERowSets
         xor a
 .set:   push af
@@ -1623,9 +1644,33 @@ EinAllocSlot:
         IFDEF EIN_KERB4
 EKPattern: ds 2                 ; top and bottom four scanlines
 EinCommitKerb:
-        call EinAllocSlot
-        ret c
-        push hl
+        ld c, a                 ; (EinAllocSlot, unrolled here: the kerb
+        ld hl, ESlotN           ; cells' commits are many)
+        ld a, (ESlotTop)
+        sub (hl)
+        jr z, .full
+        ld a, (EDown)
+        or a
+        jr nz, .down
+        ld b, (hl)
+        inc (hl)
+        jr .address
+.down:  ld hl, ESlotTop
+        dec (hl)
+        ld b, (hl)
+.address:
+        ld a, b
+        add a, a
+        add a, a
+        add a, b
+        add a, a
+        add a, b                ; x 11
+        ld hl, (ESlotPtr)
+        add a, l
+        ld l, a
+        jr nc, .h
+        inc h
+.h:     push hl
         ld de, (EKPattern)
         ld a, e
         DUP 4
@@ -1652,6 +1697,9 @@ EinCommitKerb:
         inc hl
         EDUP
         jp EinCommitSlot.newColours
+.full:  ld a, $FF               ; (the row's slots all used)
+        ret
+        ASSERT SLOT_SIZE == 11
         ENDIF
 
 ; EPat holds all eight lines for scenery, portals and the generic road.
@@ -1795,6 +1843,7 @@ ERC:            db 0
 ERD:            db 0
 ERBand:         db 0
 ERowSets:       ds 4 * 7        ; EAG ... ELC for each band (EinColourSets)
+ERowSetNow:     db $FF          ; the set in EAG ... ELC (EinRowColours)
 EAG:            db 0            ; attributes: grass, kerb
 EAK:            db 0
 ECG:            db 0            ; colours (TMS): grass, kerb, road

@@ -280,9 +280,11 @@ writes the car's names over the road's (`EinCarNames`).
 - `EKC`: a kerb cell's colour byte (road over kerb);
 - `ELC`: a centre-line cell's.
 
-A row's set comes from the band of its middle line (`ERBand`). In rows 16-23 the open
-road's grass becomes the verge textures (`EinGroundName`). `EinGroundPaper` maps those
-back to a paper colour.
+A row's set comes from the band of its middle line (`ERBand`). `EinRowColours` copies it
+into `EAG` ... `ELC`, and with the exact kerbs works out `EKCG` and `EKCR` (kerb over
+grass, kerb over road) too, only when the set is not the one there already
+(`ERowSetNow`, reset by `EinColourSets`). In rows 16-23 the open road's grass becomes the
+verge textures (`EinGroundName`). `EinGroundPaper` maps those back to a paper colour.
 
 ### Slots
 
@@ -531,7 +533,7 @@ Assembly options (`-D`):
 | `EIN_MIN_FRAMES=3` | The 12.5 fps lock off, to measure the work alone |
 | `EIN_DEBT=n` | The TV frames late a frame may be made up by (4; 0: never, every frame at least 4 apart) |
 | `EIN_BLOCKS` | The block kerbs: ready-made edges, the outer edge on a cell's edge (12.45 fps in the attract demo, against 11.7) |
-| `EIN_KERB2` | The exact kerbs in 2-line steps, not 4 (11.1 fps) |
+| `EIN_KERB2` | The exact kerbs in 2-line steps, not 4 (11.1 fps; no longer fits: bank 2 overflows) |
 | `EIN_SLOPE=n` | With `EIN_BLOCKS`: the near rows' kerbs drawn exactly where they slope more than n pixels (4: the look before the speed cut) |
 | `EIN_DASH` | With `EIN_BLOCKS`: the centre line's sprites (none by default) |
 | `EIN_KERB`, `EIN_KERB4` | (set by `platform.asm` unless `EIN_BLOCKS`; `EIN_KERB4` unless `EIN_KERB2`): the exact kerbs, in 4-line steps; slots of 11 bytes, 11 a row in rows 12-15, the ready-made rows' code left out |
