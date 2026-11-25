@@ -44,11 +44,17 @@ A stage's 16 pens and its border travel in its art pack: unpacked at
 ## Done so far (25 November 2026)
 
 - **The coast:** palm, bush, lifeguard tower, parasol; its palette (sand in
-  pastel and bright yellow, a grey road, a bright cyan sky).
+  pastel and bright yellow, a grey road, a bright cyan sky). Approved by
+  the owner (25 November 2026).
+- **The other four themes:** the desert's saguaro, rocks, windpump and
+  tumbleweed (orange and yellow sand); the alpine pass's fir, rocks in
+  blue-grey, chalet and snowman (ice-blue ground, the tunnels' walls in
+  bright blue and blue); the valley's oak, bush, windmill and hay bales
+  (greens); the boulevard's street lamp, bush, hoarding and palms (purple
+  and mauve ground). Each stage keeps its own sky, panorama, ground and
+  HUD colours (its Spectrum palette's, over its theme's CPC palette).
 - **Every theme:** the bend signs, the fork's and the tunnel's boards; the
   traffic (a yellow hatchback, a white van, a lorry); the Spider's seven
   poses.
-- **Still the placeholders:** the other themes' scenery (the Spectrum's
-  silhouettes in black) and their palettes (from the Spectrum's colours);
-  the sky and the panorama (the Spectrum's, converted); the title, the goal
+- **Still the placeholders:** the sky and the panorama (the Spectrum's, converted); the title, the goal
   postcards and the loading screen (the Spectrum's pictures).

@@ -88,7 +88,7 @@ def stage_art(theme, stage):
     horizon = make_stages.round_art.panorama(style, seed, stage.get("vista"))
     clouds = make_stages.round_art.sky(style, seed)
     assert len(horizon.tobytes()) == 512 and len(clouds.tobytes()) == 640
-    pens = cpc_illustration.stage_pens(stage["theme"], palette)
+    pens = cpc_illustration.stage_pens(stage["theme"], palette, stage.get("palette"))
     return bytes(palette[key] for key in make_stages.PALETTE_KEYS) + make_stages.make_screens.lz(
         horizon.tobytes() + clouds.tobytes() + pens)
 

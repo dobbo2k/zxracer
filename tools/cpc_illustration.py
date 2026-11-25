@@ -13,6 +13,9 @@ Pens the same in every stage: 0 road (grey), 1 black, 2 bright white, 3
 bright red, 12 bright yellow. Each theme's own: 4, 5 the ground, 6 the sky,
 7, 8 the panorama, 9, 10, 13, 14, 15 its scenery, 11 the HUD's panel.
 """
+import math
+import random
+
 from PIL import Image, ImageDraw
 
 TRANSPARENT = 255
@@ -43,7 +46,25 @@ THEMES = {
     "coast": {GROUND_L: PYELLOW_C, GROUND_D: BYELLOW_C, SKY: BCYAN_C, PANO_INK: BBLUE_C,
               PANO_PAPER: PCYAN_C, S1: GREEN_C, S2: BGREEN_C, HUD: BLUE_C, S3: ORANGE_C,
               S4: RED_C, S5: PBLUE_C},
+    "desert": {GROUND_L: BYELLOW_C, GROUND_D: ORANGE_C, SKY: SKYBLUE_C, PANO_INK: RED_C,
+               PANO_PAPER: PBLUE_C, S1: GREEN_C, S2: LIME_C, HUD: RED_C, S3: YELLOW_C,
+               S4: RED_C, S5: PINK_C},
+    "alpine": {GROUND_L: PCYAN_C, GROUND_D: PBLUE_C, SKY: BCYAN_C, PANO_INK: BLUE_C,
+               PANO_PAPER: PCYAN_C, S1: BBLUE_C, S2: BLUE_C, HUD: BBLUE_C, S3: GREEN_C,
+               S4: SEAGREEN_C, S5: RED_C},
+    "country": {GROUND_L: BGREEN_C, GROUND_D: GREEN_C, SKY: BCYAN_C, PANO_INK: GREEN_C,
+                PANO_PAPER: PCYAN_C, S1: LIME_C, S2: PGREEN_C, HUD: GREEN_C, S3: RED_C,
+                S4: YELLOW_C, S5: ORANGE_C},
+    "sunset": {GROUND_L: PURPLE_C, GROUND_D: MAUVE_C, SKY: BMAGENTA_C, PANO_INK: MAGENTA_C,
+               PANO_PAPER: PMAGENTA_C, S1: GREEN_C, S2: BGREEN_C, HUD: MAGENTA_C, S3: ORANGE_C,
+               S4: RED_C, S5: BCYAN_C},
 }
+# What each pen draws, per theme (the masters below)
+#   coast:   S1, S2 leaves; S3 trunk; S4 rings, a parasol's stripe; S5 the tower's window
+#   desert:  S1, S2 cactus; S3, S4 rock and tumbleweed; S5 a rock's light side
+#   alpine:  S1, S2 a tunnel's walls; S3, S4 pine; S5 the chalet's timber
+#   country: S1, S2 leaves; S3 trunk, the mill's sails' frame; S4 hay; S5 the mill's cap
+#   sunset:  S1, S2 leaves; S3 trunk; S4 rings; S5 the billboard's lettering
 
 
 def pens(theme):
@@ -57,13 +78,30 @@ SPEC_FW = (BLACK_C, BLUE_C, RED_C, MAGENTA_C, GREEN_C, CYAN_C, YELLOW_C, GREY_C,
            BLACK_C, BBLUE_C, BRED_C, BMAGENTA_C, BGREEN_C, BCYAN_C, BYELLOW_C, BWHITE_C)
 
 
-def stage_pens(theme_name, palette):
+def stage_pens(theme_name, palette, stage_palette=None):
     """A stage's 16 pens and the border as the Gate Array's colours (17
     bytes, src/cpc/reset.asm CpcPalette): its theme's CPC palette if it has
-    one, else (until its art, phase A) made from the stage's Spectrum
-    palette (attributes: sky, pano, hud, grass_l, grass_d)."""
+    one (with the stage's own sky, panorama, ground and HUD colours from its
+    Spectrum palette, STAGE_PALETTE: each return to a region looks new),
+    else made from the stage's Spectrum palette (attributes: sky, pano, hud,
+    grass_l, grass_d)."""
     if theme_name in THEMES:
-        fw = pens(theme_name)
+        table = {**FIXED, **THEMES[theme_name]}
+        def paper(a): return SPEC_FW[((a >> 3) & 7) + (8 if a & 0x40 else 0)]
+        def ink(a): return SPEC_FW[(a & 7) + (8 if a & 0x40 else 0)]
+        own = stage_palette or {}           # the stage's own colours over its theme's
+        if "sky" in own:
+            table[SKY] = paper(own["sky"])
+        if "pano" in own:
+            table[PANO_INK], table[PANO_PAPER] = ink(own["pano"]), paper(own["pano"])
+            if table[PANO_INK] == table[PANO_PAPER]:
+                table[PANO_INK] = THEMES[theme_name][PANO_INK]
+        for key, pen in (("grass_l", GROUND_L), ("grass_d", GROUND_D)):
+            if key in own and paper(own[key]) not in (BWHITE_C, BRED_C, GREY_C):
+                table[pen] = paper(own[key])
+        if "hud" in own:
+            table[HUD] = paper(own["hud"])
+        fw = [table[k] for k in range(16)]
     else:
         def paper(a): return SPEC_FW[((a >> 3) & 7) + (8 if a & 0x40 else 0)]
         def ink(a): return SPEC_FW[(a & 7) + (8 if a & 0x40 else 0)]
@@ -217,6 +255,184 @@ def tunnel_sign():
     return im
 
 
+# ---------------------------------------------------------------- the desert
+def cactus():
+    """A saguaro: a ribbed column, two arms turned up."""
+    im, d = canvas(48, 164)
+    d.rounded_rectangle((18, 10, 30, 163), 6, S1)
+    d.rounded_rectangle((4, 60, 16, 70), 4, S1)
+    d.rounded_rectangle((4, 34, 12, 70), 4, S1)
+    d.rounded_rectangle((32, 76, 44, 86), 4, S1)
+    d.rounded_rectangle((36, 48, 44, 86), 4, S1)
+    for x in (21, 26):
+        d.line((x, 14, x, 160), S2)
+    d.line((7, 38, 7, 66), S2)
+    d.line((40, 52, 40, 82), S2)
+    return outline(im)
+
+
+def rock(light=S5, dark=S4):
+    """A heap of boulders, lit from above left."""
+    im, d = canvas(48, 60)
+    for x0, y0, x1, y1 in ((2, 22, 30, 59), (20, 12, 46, 59), (12, 34, 38, 59)):
+        d.ellipse((x0, y0, x1, y1), dark)
+    for x0, y0, x1, y1 in ((5, 25, 20, 40), (24, 15, 38, 30), (15, 37, 26, 46)):
+        d.ellipse((x0, y0, x1, y1), light)
+    return outline(im)
+
+
+def windpump():
+    """A windpump: a tapering lattice tower, its wheel of vanes, its tail."""
+    im, d = canvas(48, 192)
+    d.line((14, 191, 22, 52), BLACK, 2)
+    d.line((34, 191, 26, 52), BLACK, 2)
+    for y in range(70, 191, 24):
+        d.line((15, y, 33, y + 20), BLACK)
+        d.line((33, y, 15, y + 20), BLACK)
+    cx, cy = 24, 36
+    for k in range(12):
+        a = 2 * math.pi * k / 12
+        d.line((cx, cy, cx + 13 * math.cos(a), cy + 26 * math.sin(a)), WHITE, 2)
+    d.ellipse((cx - 3, cy - 6, cx + 3, cy + 6), RED)
+    d.polygon([(cx + 4, cy - 2), (46, cy - 8), (46, cy + 4), (cx + 4, cy + 2)], RED)
+    return outline(im)
+
+
+def tumbleweed():
+    """A ball of dry, tangled twigs."""
+    im, d = canvas(40, 54)
+    r = random.Random(7)
+    d.ellipse((4, 6, 36, 52), S3)
+    for _ in range(26):
+        a, b = r.uniform(0, 6.28), r.uniform(0, 6.28)
+        d.line((20 + 14 * math.cos(a), 29 + 21 * math.sin(a),
+                20 + 14 * math.cos(b), 29 + 21 * math.sin(b)), S4)
+    return outline(im)
+
+
+# ---------------------------------------------------------------- the alpine
+def pine():
+    """A fir: tiers of dark needles, snow along each tier's top."""
+    im, d = canvas(48, 192)
+    d.rectangle((21, 160, 27, 191), S5)
+    for w, y in ((22, 150), (19, 124), (16, 98), (12, 72), (8, 46)):
+        top = y - 38
+        d.polygon([(24 - w, y), (24, top), (24 + w, y)], S3)
+        d.polygon([(24 - w, y), (24 - w + 4, y - 4), (24, top), (24, top + 6)], S4)
+        d.line((24 - w + 2, y - 2, 24 - 2, top + 8), WHITE)
+    d.polygon([(21, 10), (24, 2), (27, 10)], WHITE)
+    return outline(im)
+
+
+def chalet():
+    """A chalet: a timber front, a broad roof deep in snow, a balcony."""
+    im, d = canvas(64, 150)
+    d.rectangle((8, 70, 56, 149), S5)
+    for y in range(76, 149, 8):
+        d.line((8, y, 56, y), RED)
+    d.polygon([(0, 74), (32, 24), (64, 74)], RED)
+    d.polygon([(2, 70), (32, 26), (62, 70), (56, 66), (32, 32), (8, 66)], WHITE)
+    for x in (16, 40):
+        d.rectangle((x, 90, x + 8, 106), BLACK)
+        d.rectangle((x + 1, 91, x + 7, 105), YELLOW)
+        d.line((x + 4, 90, x + 4, 106), BLACK)
+    d.rectangle((26, 120, 38, 149), BLACK)
+    d.line((8, 112, 56, 112), WHITE, 2)
+    for x in range(10, 56, 4):
+        d.line((x, 112, x, 118), WHITE)
+    return outline(im)
+
+
+def snowman():
+    """A snowman: two balls, a hat, a carrot nose, a scarf."""
+    im, d = canvas(40, 90)
+    d.ellipse((4, 44, 36, 89), WHITE)
+    d.ellipse((10, 18, 30, 50), WHITE)
+    d.rectangle((12, 40, 28, 46), RED)
+    d.rectangle((24, 46, 28, 56), RED)
+    d.rectangle((12, 12, 28, 18), BLACK)
+    d.rectangle((15, 0, 25, 13), BLACK)
+    d.point((17, 28), BLACK)
+    d.point((23, 28), BLACK)
+    d.polygon([(20, 32), (28, 34), (20, 36)], RED)
+    for y in (58, 68, 78):
+        d.point((20, y), BLACK)
+    return outline(im)
+
+
+# ---------------------------------------------------------------- the country
+def tree():
+    """A broad oak: a thick trunk, a round crown lit on its left."""
+    im, d = canvas(56, 184)
+    d.polygon([(24, 183), (25, 100), (31, 100), (32, 183)], S3)
+    d.line((27, 120, 14, 96), S3, 3)
+    d.line((29, 116, 42, 92), S3, 3)
+    for x0, y0, x1, y1 in ((2, 40, 34, 110), (20, 20, 54, 96), (8, 6, 44, 70), (26, 60, 55, 116)):
+        d.ellipse((x0, y0, x1, y1), S1)
+    for x0, y0, x1, y1 in ((8, 14, 26, 46), (6, 50, 20, 82), (24, 26, 36, 46)):
+        d.ellipse((x0, y0, x1, y1), S2)
+    return outline(im)
+
+
+def windmill():
+    """A tower mill: white walls, a cap, four sails across it."""
+    im, d = canvas(56, 176)
+    d.polygon([(14, 175), (20, 70), (36, 70), (42, 175)], WHITE)
+    d.rectangle((24, 150, 32, 175), BLACK)
+    d.rectangle((25, 104, 31, 114), BLACK)
+    d.pieslice((16, 54, 40, 86), 180, 360, S5)
+    cx, cy = 28, 70
+    for dx, dy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+        tip = (cx + 24 * dx, cy + 50 * dy)
+        d.line((cx, cy, tip[0], tip[1]), S3, 2)
+        side = (cx + 24 * dx + 6 * dy, cy + 50 * dy - 10 * dx)
+        mid = (cx + 6 * dx + 6 * dy, cy + 12 * dy - 10 * dx)
+        d.polygon([mid, side, tip, (cx + 6 * dx, cy + 12 * dy)], WHITE)
+        for t in (0.4, 0.6, 0.8):
+            a = (cx + 24 * dx * t, cy + 50 * dy * t)
+            b = (a[0] + 6 * dy, a[1] - 10 * dx)
+            d.line((a, b), S3)
+    d.ellipse((cx - 3, cy - 5, cx + 3, cy + 5), BLACK)
+    return outline(im)
+
+
+def haybales():
+    """Round bales of hay, two side by side and one on top."""
+    im, d = canvas(56, 60)
+    for x0, y0 in ((2, 24), (28, 24), (15, 2)):
+        d.ellipse((x0, y0, x0 + 26, y0 + 34), S4)
+        d.ellipse((x0 + 5, y0 + 7, x0 + 21, y0 + 27), YELLOW)
+        d.arc((x0 + 9, y0 + 12, x0 + 17, y0 + 22), 0, 360, S4)
+    return outline(im)
+
+
+# ---------------------------------------------------------------- the sunset
+def lamp():
+    """A street lamp: a tall pole, its arm and a glowing head."""
+    im, d = canvas(32, 192)
+    d.rectangle((8, 30, 11, 191), BLACK)
+    d.rectangle((5, 176, 14, 191), BLACK)
+    d.line((10, 30, 26, 22), BLACK, 3)
+    d.rectangle((20, 22, 30, 28), BLACK)
+    d.rectangle((21, 28, 29, 34), YELLOW)
+    d.rectangle((23, 34, 27, 36), WHITE)
+    return im
+
+
+def billboard():
+    """A hoarding on two legs: a bright poster, its lettering, a border."""
+    im, d = canvas(64, 144)
+    for x in (12, 50):
+        d.rectangle((x, 70, x + 3, 143), BLACK)
+    d.rectangle((0, 8, 63, 74), WHITE)
+    d.rectangle((3, 12, 60, 70), S5)
+    d.ellipse((6, 18, 26, 64), YELLOW)
+    for k, y in enumerate((22, 36, 50)):
+        d.rectangle((30, y, 58 - 6 * k, y + 8), WHITE)
+    d.rectangle((0, 8, 63, 74), None, BLACK)
+    return im
+
+
 # ---------------------------------------------------------------- traffic
 # Seen from behind (the camera follows the player): body, rear window,
 # lamps, tyres. Fixed pens only: they drive through every theme.
@@ -327,6 +543,10 @@ def preview(im, theme, scale=4):
 
 
 MASTERS = {"palm": palm, "bush": bush, "tower": tower, "parasol": parasol,
+           "cactus": cactus, "rock": rock, "windpump": windpump, "tumbleweed": tumbleweed,
+           "pine": pine, "chalet": chalet, "snowman": snowman,
+           "tree": tree, "windmill": windmill, "haybales": haybales,
+           "lamp": lamp, "billboard": billboard, "citypalm": palm,
            "sign_r": lambda: sign(1), "sign_l": lambda: sign(-1), "fork": fork_sign,
            "sign_tunnel": tunnel_sign, "traffic": traffic_car, "van": van, "truck": truck}
 
@@ -336,6 +556,14 @@ def cpc_masters(theme_name):
     ("cpc", image) (tools/cpc_art.py emit_type): the coast's so far."""
     out = {t: ("cpc", MASTERS[t]()) for t in ("traffic", "van", "truck", "sign_r", "sign_l", "fork",
                                               "sign_tunnel")}
-    if theme_name == "coast":
-        out.update({t: ("cpc", MASTERS[t]()) for t in ("palm", "bush", "tower", "parasol")})
+    own = {"coast": ("palm", "bush", "tower", "parasol"),
+           "desert": ("cactus", "rock", "windpump", "tumbleweed"),
+           "alpine": ("pine", "rock", "chalet", "snowman"),
+           "country": ("tree", "bush", "windmill", "haybales"),
+           "sunset": ("lamp", "bush", "billboard", "citypalm")}.get(theme_name, ())
+    for t in own:
+        if theme_name == "alpine" and t == "rock":
+            out[t] = ("cpc", rock(light=PANO_PAPER, dark=S2))   # (grey-blue stone)
+        else:
+            out[t] = ("cpc", MASTERS[t]())
     return out
