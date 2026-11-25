@@ -51,7 +51,8 @@ import zpack                                # noqa: E402
 from cpc import make_dsk                    # noqa: E402
 
 AY_CLOCK = 1000000                          # the CPC's AY: 1 MHz
-TRACK_CACHE = make_stages.TRACK_CACHE - 0x4000      # bank 5's part, $4000 lower
+TRACK_CACHE = make_stages.TRACK_CACHE - 0x4000      # bank 5's part's end, $4000 lower
+SCN_DATA = 0x1500                           # its start (src/defs.asm: after the CPC's code)
 SECTOR = 512
 DAT_SECTOR = 4                              # SPEED.DAT first on the disc, after the directory
 LOADER_AT = 0x1000                          # SPEED.BIN (src/cpc/loader.asm: it moves to $C000)
@@ -95,7 +96,7 @@ def gen(cfg, outdir):
     open(os.path.join(outdir, "cpc_car.asm"), "w").write("\n".join(cpc_art.car_frames()) + "\n")
     open(os.path.join(outdir, "font_data.asm"), "w").write("\n".join(cpc_art.font_asm()) + "\n")
     out = head + ["; the resident sprites the theme packs name (src/main.asm: at SCN_DATA)",
-                  "        ORG $1B00", '        INCLUDE "cpc_objects.asm"']
+                  f"        ORG ${SCN_DATA:04X}", '        INCLUDE "cpc_objects.asm"']
     for label, lines, size, cache in packs:
         if label.startswith("art_"):
             open(os.path.join(outdir, label + ".bin"), "wb").write(db_bytes(lines))

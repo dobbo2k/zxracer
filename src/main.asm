@@ -316,6 +316,7 @@ CmdListB        EQU $10000 - THEME_TOP
         ELSE
         IFDEF CPC
         INCLUDE "cpc_objects.asm"       ; (build/cpc: the resident objects in Mode 0)
+        ASSERT Scn_traffic == SCN_DATA  ; (tools/make_cpc.py assembles the packs so)
         ELSE
         INCLUDE "resident_data.asm"
         ENDIF

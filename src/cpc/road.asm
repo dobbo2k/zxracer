@@ -163,16 +163,35 @@ CpcRoad:
         rrca                    ; its row's fork (RowFork: both roads on it)
         rrca
         rrca
+        ld c, a
         add a, low RowFork
         ld l, a
         ld h, high RowFork
         ld a, (hl)
         ld (.fk + 1), a
-        IFDEF ROAD_QUADS
+        ld a, c                 ; the far rows: 4 lines a step
+        cp ROAD_QUAD_ROWS
+        sbc a, a
+        and 1
+        ld (CQuad), a
+        jr z, .pairs
+        ld hl, CPl3         ; (the program's second line on to the third)
+        ld (CIy2 + 2), hl
+        ld hl, 0                ; (CFill: its two lines more)
+        ld (CFill.q1), hl
+        ld (CFill.q2), hl
+        ld a, 4
         ld b, 2                 ; (two 4-line groups a row)
-        ELSE
+        jr .q
+.pairs: ld hl, CPdone
+        ld (CIy2 + 2), hl
+        ld hl, CFILL_Q1         ; (CFill: the jumps past them)
+        ld (CFill.q1), hl
+        ld hl, CFILL_Q2
+        ld (CFill.q2), hl
+        ld a, 2
         ld b, 4
-        ENDIF
+.q:     ld (.step + 1), a
 .pair:  push bc
         call CPrep
 .fk:    ld b, 0
@@ -183,18 +202,21 @@ CpcRoad:
         jr .next
 .fork:  call CForkPair
 .next:  ld hl, CI
-        inc (hl)
-        inc (hl)
-        IFDEF ROAD_QUADS
-        inc (hl)
-        inc (hl)
-        ENDIF
+.step:  ld a, 0                 ; (2 lines on, or 4)
+        add a, (hl)
+        ld (hl), a
         pop bc
         djnz .pair
         ld a, (CI)
         cp ROAD_LINES
         jr c, .row
         ret
+CQuad:          db 0            ; this row's steps are 4 lines (ROAD_QUAD_ROWS)
+        IFNDEF ROAD_QUAD_ROWS   ; the road's first rows set up a step of 4
+ROAD_QUAD_ROWS  EQU 6           ; lines at a time (the far half: the road narrow
+        ENDIF                   ; there), the rest line pairs (-D: 0-12)
+CFILL_Q1        EQU $18 | ((CFill.n1 - CFill.q1 - 2) << 8)  ; (jr .n1)
+CFILL_Q2        EQU $18 | ((CFill.n2 - CFill.q2 - 2) << 8)
 
 ; The pair (CI: its first line, pass 1's index, even): its lines' ends
 ; patched into the program's runs, its band's class (IXH x 32, CDark) and
@@ -205,12 +227,10 @@ CPrep:  ld a, (CI)
         ld (CEnd1 + 2), a
         add a, 2
         ld (CEnd2 + 2), a
-        IFDEF ROAD_QUADS        ; (and the next pair's: 4 lines)
-        add a, 2
+        add a, 2                ; (and the next pair's: 4 lines)
         ld (CEnd3 + 2), a
         add a, 2
         ld (CEnd4 + 2), a
-        ENDIF
         ld h, high Band
         set 7, l
         ld a, (hl)              ; its band's class (x 32)
@@ -421,23 +441,21 @@ CPair:  ld a, (CI)
         ld (CSave), sp
         di
 CEnd1:  ld sp, (CPairEnds)      ; (its low byte patched: the pair's)
-        ld iy, .l2
+        ld iy, CPl2
         jp CRun
-.l2:
+CPl2:
 CEnd2:  ld sp, (CPairEnds + 2)
-        IFDEF ROAD_QUADS
-        ld iy, .l3
+CIy2:   ld iy, CPdone           ; (CPl3 for a step of 4 lines)
         jp CRun
-.l3:
+CPl3:
 CEnd3:  ld sp, (CPairEnds + 4)
-        ld iy, .l4
+        ld iy, CPl4
         jp CRun
-.l4:
+CPl4:
 CEnd4:  ld sp, (CPairEnds + 6)
-        ENDIF
-        ld iy, .done
+        ld iy, CPdone
         jp CRun
-.done:  ld sp, (CSave)
+CPdone: ld sp, (CSave)
         ei
         ; ---- an outer edge in its inner edge's word: its pixels put right
         ld a, (CFixR)
@@ -521,10 +539,12 @@ CGrassFill:
         ld e, (hl)
         inc l
         ld d, (hl)
-        IFDEF ROAD_QUADS
         inc l
         ex de, hl
         ld sp, hl
+        ld a, (CQuad)           ; (a step of 4 lines: two more)
+        or a
+        jr z, .last
         ld iy, .l3
         jp CRun
 .l3:    ex de, hl
@@ -540,10 +560,9 @@ CGrassFill:
         ld e, (hl)
         inc l
         ld d, (hl)
-        ENDIF
         ex de, hl
         ld sp, hl
-        ld iy, .done
+.last:  ld iy, .done
         jp CRun
 .done:  ld sp, (CSave)
         ei
@@ -662,15 +681,13 @@ CFill:  ld a, (CEnd1 + 2)       ; (the pair's first line: its end - 64)
         ld (hl), c
         set 3, h
         ld (hl), c
-        IFDEF ROAD_QUADS
+.q1:    jr .n1                  ; (nop, nop: a step of 4 lines)
         set 4, h
         ld (hl), c
         res 3, h
         ld (hl), c
         res 4, h
-        ELSE
-        res 3, h
-        ENDIF
+.n1:    res 3, h
         inc e
         inc e
         jr .px
@@ -695,14 +712,12 @@ CFill:  ld a, (CEnd1 + 2)       ; (the pair's first line: its end - 64)
         ld (hl), a
         set 3, h
         ld (hl), a
-        IFDEF ROAD_QUADS
+.q2:    jr .n2                  ; (nop, nop: a step of 4 lines)
         set 4, h
         ld (hl), a
         res 3, h
         ld (hl), a
         res 4, h
-        ELSE
-        res 3, h
-        ENDIF
+.n2:    res 3, h
         inc e
         jr .px

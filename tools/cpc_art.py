@@ -119,6 +119,32 @@ CAR_PENS = {0: 1, 1: 10, 2: 3, 3: 3, 4: 5, 5: 15, 6: 14, 7: 15}
 CAR_W, CAR_H = 64, 32                       # (the Spectrum's: assets/gfx/car.png)
 
 
+def line_runs(row):
+    """A sprite's line as runs (src/cpc/sprites.asm CpcCar): the bytes to
+    skip, then runs, each its length (bit 7 set: masked by pen 0, some of
+    its pixels transparent; else every pixel drawn) and its bytes; 0 ends
+    it. All transparent: 0, 0."""
+    lit = [i for i, b in enumerate(row) if b]
+    if not lit:
+        return [0, 0]
+    out = [lit[0]]
+    i = lit[0]
+    while i <= lit[-1]:
+        masked = not opaque(row[i])
+        j = i
+        while j <= lit[-1] and (not opaque(row[j])) == masked and j - i < 127:
+            j += 1
+        out += [(j - i) | (0x80 if masked else 0)] + row[i:j]
+        i = j
+    return out + [0]
+
+
+def opaque(b):
+    """No pixel of the byte is pen 0."""
+    left, right = pens(b)
+    return left != 0 and right != 0
+
+
 def car_frames(png="assets/gfx/car.png", split=24):
     """The Spider's 7 poses (the Spectrum's car.png, 64 x 32 each), Mode 0:
     16 bytes by 32 lines; outside its outline on each line transparent (pen
@@ -135,7 +161,7 @@ def car_frames(png="assets/gfx/car.png", split=24):
         if key not in parts:
             parts[key] = name
             data.append(f"{name}:")
-            data.extend("        db " + ", ".join(f"${b:02X}" for b in r) for r in rows)
+            data.extend("        db " + ", ".join(f"${b:02X}" for b in line_runs(r)) for r in rows)
         return parts[key]
 
     for k in range(frames):

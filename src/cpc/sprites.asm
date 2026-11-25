@@ -294,23 +294,39 @@ CpcCar:
         ld l, a
         ld (.bot + 1), hl
         ld hl, SCR + CAR_ROW * SCR_ROW + CAR_COL * 2
-        ld b, high CMaskTab
         ld ixh, CARTOP_M0
+; Lines of runs (tools/cpc_art.py line_runs): DE -> them, HL = the first
+; line's left end in the hidden screen, IXH = how many
 .ln:    push hl
-        ld ixl, CARW_M0
-.px:    ld a, (de)
+        ld a, (de)              ; the bytes to skip
+        inc de
+        add a, l
+        ld l, a
+.run:   ld a, (de)
         inc de
         or a
-        jr z, .t
+        jr z, .eol
+        jp m, .masked
+        ex de, hl               ; every pixel drawn: copied
+        call LdiN
+        ex de, hl
+        jr .run
+.masked:
+        and $7F
+        ld ixl, a
+        ld b, high CMaskTab
+.px:    ld a, (de)
+        inc de
         ld c, a
         ld a, (bc)
         and (hl)
         or c
         ld (hl), a
-.t:     inc l
+        inc l
         dec ixl
         jr nz, .px
-        pop hl
+        jr .run
+.eol:   pop hl
         ld a, h                 ; the next line
         add a, high SCR_LINE
         ld h, a
@@ -343,3 +359,19 @@ bv      DEFL 0
         db ((1 - (((bv >> 7) | (bv >> 5) | (bv >> 3) | (bv >> 1)) & 1)) * $AA) | ((1 - (((bv >> 6) | (bv >> 4) | (bv >> 2) | bv) & 1)) * $55)
 bv      DEFL bv + 1
         EDUP
+
+; A = n (0-64): n bytes from (HL) to (DE), both on past them (an unrolled
+; LDI chain: 4 us a byte, LDIR's 6). BC spent.
+LdiN:   or a
+        ret z
+        add a, a
+        neg
+        add a, low LdiEnd
+        ld (.j + 1), a
+.j:     jp LdiEnd               ; (its low byte patched: LdiEnd - 2n)
+LdiChain:
+        DUP 64
+        ldi
+        EDUP
+LdiEnd: ret
+        ASSERT high LdiChain == high LdiEnd

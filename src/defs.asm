@@ -41,7 +41,7 @@ TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)
 PANO_LDI_END    EQU $BA00       ; unrolled 32-LDI chain for the panorama
 XOR_END         EQU $BB00       ; unrolled XOR chain ends here (with JP (IY))
         IFDEF CPC
-SCN_DATA        EQU $1B00       ; (the CPC: bank 5's part $4000 lower, in base 0)
+SCN_DATA        EQU $1500       ; (the CPC: bank 5's part, in base 0 after its own code: tools/make_cpc.py SCN_DATA)
         ELSE
 SCN_DATA        EQU $5B00       ; scenery sprites: spare RAM in bank 5 (always paged)
         ENDIF
