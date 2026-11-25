@@ -288,6 +288,10 @@ CPair:  ld a, (CI)
 .x1:    srl a
         ld e, a
         srl d                   ; x2 = D / 2
+        ld a, e                 ; (x1, x4 kept: the fixes, a tunnel's lamps)
+        ld (CXs), a
+        ld a, h
+        ld (CXs + 3), a
         ; ---- the road's words: w2 < w3 (else the slow way)
         ld a, d
         srl a
@@ -473,7 +477,7 @@ CPdone: ld sp, (CSave)
         call CFill
 .fl:    ld a, (CFixL)
         or a
-        jr z, CLane
+        jr z, CLamps
         xor a
         ld (CFixL), a
         ld a, (CXs)             ; [x1's word's start, x1) grass
@@ -481,6 +485,31 @@ CPdone: ld sp, (CSave)
         and $FC
         ld e, a
         ld a, (CG)
+        ld c, a
+        call CFill
+        ; ---- in a tunnel, its light bands: lamps on the walls beside the
+        ; kerbs (a cell's width, as the Spectrum's)
+CLamps: ld a, (CDark)
+        cp $40                  ; (class 2: a tunnel's, light)
+        jr nz, CLane
+        ld a, (TunInside)
+        or a
+        jr z, CLane
+        ld a, (CXs)             ; [x1 - 4, x1)
+        ld d, a
+        sub 4
+        jr c, .r
+        ld e, a
+        ld a, (PenByte + PEN_LAMP)
+        ld c, a
+        call CFill
+.r:     ld a, (CXs + 3)         ; [x4, x4 + 4)
+        ld e, a
+        add a, 4
+        cp 129
+        jr nc, CLane
+        ld d, a
+        ld a, (PenByte + PEN_LAMP)
         ld c, a
         call CFill
         ; ---- the centre line (light bands only)
