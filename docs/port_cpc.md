@@ -671,3 +671,26 @@ measurements come first of all: they decide the memory map's fallbacks.
   at the pose's next line when the pose changes. Pixel for pixel the same.
 - **The benchmark:** 3.69 TV frames a game frame, 13.54 fps (was 4.01,
   12.47).
+
+### The tunnels' mouths and ways out (25 November 2026)
+
+With a tunnel's mouth or its way out in view a game frame took 6.6-10 TV
+frames (4 elsewhere): the portal's cells were found by scanning every
+attribute of rows 3-23 each frame, and each changed cell converted on its
+own. Now:
+
+- `CpcPortal` looks only when `GateWas` says the shared code painted
+  something, this frame or the last; rows 3-11 only those it painted
+  (`RowAttrHL` and `PaintRaceSky` note them under `IFDEF CPC`:
+  `CSkyPainted`), rows 10 on only above `PtRow`.
+- `DrawPortal` runs before the road; the road leaves out the rows the
+  portal covers edge to edge (`CpcPortalRows`, `CRowFull`).
+- The portal's cells and the sky's one-colour cells (ink as paper: the
+  face, the arch, the dark) drawn a run at a time, with `PUSH` from three
+  cells on (`CpcSolidRun`, `CGroupSolid`); a converted cell with no ink
+  pixels drawn as its paper (`CCellSolid`).
+
+The approach now takes 5 TV frames a game frame (6 just before the mouth),
+inside 3.5. The yellow row under the HUD and the missing message line on
+the first two frames inside, and the way out's blocky opening, are the
+Spectrum's too (the shared code's).

@@ -351,6 +351,12 @@ SkyRowAttr:
 
 ; HL = first attribute of sky row 3, either screen.
 PaintRaceSky:
+        IFDEF CPC
+        ld a, 3                 ; (every sky row painted: src/cpc/reset.asm)
+        ld (CSkyMin), a
+        ld a, ROAD_ROW0 - 1
+        ld (CSkyMax), a
+        ENDIF
         ld c, 3
 .row:   call SkyRowAttr
         ld b, 32

@@ -75,9 +75,10 @@ MainLoop:
         call UpdatePlayer
         call RoadPrepare
         call WaitFlip           ; (the last frame shown: the hidden screen at $4000)
-        call CpcDraw            ; the road and the panorama (src/cpc)
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
-        call CpcPortal          ; (its cells: src/cpc/draw.asm)
+        call CpcPortalRows      ; (the road's rows it covers: left out)
+        call CpcDraw            ; the road and the panorama (src/cpc)
+        call CpcPortal          ; (its cells over them: src/cpc/reset.asm)
         call DrawSprites        ; traffic and scenery projected: the command list
         call DrawHud            ; (into screen B: the cells it writes are noted)
         call CpcCells           ; the noted cells into the hidden screen

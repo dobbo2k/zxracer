@@ -189,48 +189,6 @@ CDirtyHid:
         ld hl, CDirtyB
         ret
 
-; The hidden screen's noted cells converted into it, their bits cleared
-CpcCells:
-        call CDirtyHid
-        ld b, 0                 ; the row
-.row:   ld c, 0                 ; the column
-.oct:   ld a, (hl)
-        or a
-        jr z, .skip
-        ld (hl), 0
-        push hl
-        ld e, a                 ; its 8 cells' bits, from the left
-.bit:   sla e
-        jr nc, .nb
-        push bc
-        push de
-        call CpcCell
-        pop de
-        pop bc
-.nb:    inc c
-        ld a, c
-        and 7
-        jr nz, .bit
-        pop hl
-        jr .n8
-.skip:  ld a, c
-        add a, 8
-        ld c, a
-.n8:    inc hl
-        ld a, c
-        cp 32
-        jr c, .oct
-        inc b
-        ld a, (TunInside)       ; (the panorama's rows: in a tunnel only, its
-        or a                    ; ceiling; else the panorama, drawn as it is)
-        ld a, PANO_ROW0
-        jr z, .lim
-        ld a, CELL_ROWS
-.lim:   cp b
-        jr z, .done
-        jr nc, .row
-.done:  ret
-
 ; B = row, C = column: the shadow's cell into the hidden screen. All spent.
 CpcCell:
         ld a, b                 ; its attribute: $D800 + row x 32 + column
@@ -309,6 +267,8 @@ CpcCell:
         ld a, h
         or $40
         ld b, a                 ; BC = its first byte
+        call CCellSolid         ; (one colour: drawn so, src/cpc/reset.asm)
+        ret z
         ld h, high CHalf1
         DUP 8
         ld a, (de)              ; 8 Spectrum pixels: 4 Mode 0 pixels
@@ -366,3 +326,6 @@ CRowVal:        ds 8, $FF
 ; (src/sound.asm AyWrite) the AY's registers as last written ($FF: not yet)
 CAyShadow:      ds 16, $FF
         ASSERT high CAyShadow == high (CAyShadow + 15)
+; (src/cpc/reset.asm CpcPortalRows) per road row: the portal covers it
+CRowFull:       ds ROAD_ROWS, 0
+        ASSERT high CRowFull == high (CRowFull + ROAD_ROWS - 1)

@@ -192,6 +192,9 @@ Chequer:
 ; (DrawPortal's helpers and row patterns, src/tunnel.asm)
 ; A = row -> HL = its first attribute on the screen being drawn (A kept)
 RowAttrHL:
+        IFDEF CPC
+        call CSkyPainted        ; (the sky rows painted: src/cpc/reset.asm)
+        ENDIF
         ld l, a
         ld h, 0
         add hl, hl

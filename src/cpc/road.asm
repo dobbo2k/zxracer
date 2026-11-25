@@ -28,6 +28,7 @@
 ; ---------------------------------------------------------------------------
 
 ; Pens (docs/port_cpc.md 5.5)
+ROAD_ROWS       EQU ROAD_LINES / 8   ; (12: rows 12-23)
 PEN_ROAD        EQU 0
 PEN_BLACK       EQU 1
 PEN_KERB_L      EQU 2
@@ -164,6 +165,13 @@ CpcRoad:
         rrca
         rrca
         ld c, a
+        add a, low CRowFull     ; (a row the portal covers: not drawn,
+        ld l, a                 ; src/cpc/reset.asm CpcPortalRows)
+        ld h, high CRowFull
+        ld a, (hl)
+        or a
+        jr nz, .covered
+        ld a, c
         add a, low RowFork
         ld l, a
         ld h, high RowFork
@@ -208,6 +216,12 @@ CpcRoad:
         pop bc
         djnz .pair
         ld a, (CI)
+        cp ROAD_LINES
+        jr c, .row
+        ret
+.covered:
+        ld a, (CI)
+        add a, 8
         cp ROAD_LINES
         jr c, .row
         ret

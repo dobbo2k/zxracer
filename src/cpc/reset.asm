@@ -202,38 +202,157 @@ CpcHorizon:
 ; the display reset left them) is the portal's: drawn solid in its paper's
 ; pen over the road (or the panorama, which is then drawn afresh), and its
 ; attribute put back for the next frame's painting.
+        ALIGN 32
 CSkyAttr:       ds (ROAD_ROW0 - 3) * 32, 0     ; rows 3-11's attributes as last seen
 CPortalAny:     db 0
+CPortalWas:     db 0            ; GateWas as CpcPortal last saw it
+CRowAny:        db 0            ; CRowFull has a row set
+CSkyMin:        db 3            ; the sky rows painted since CpcPortal looked
+CSkyMax:        db ROAD_ROW0 - 1    ; (RowAttrHL, PaintRaceSky: CSkyPainted)
+
+; (src/tunnelb2.asm RowAttrHL) A = a row the shared code paints: noted.
+; Everything kept.
+CSkyPainted:
+        push hl
+        ld hl, CSkyMin
+        cp (hl)
+        jr nc, .mx
+        ld (hl), a
+.mx:    inc hl
+        cp (hl)
+        jr c, .x
+        ld (hl), a
+.x:     pop hl
+        ret
+
+; (Before the road) the road's rows the portal's cells cover from edge to
+; edge (no cell with its row's own attribute: DrawPortal just painted
+; them), CRowFull: the road leaves them out (src/cpc/road.asm CpcRoad)
+CpcPortalRows:
+        ld a, (CRowAny)         ; (none, unless found)
+        or a
+        jr z, .none
+        xor a
+        ld (CRowAny), a
+        ld hl, CRowFull
+        ld b, ROAD_ROWS
+.clr:   ld (hl), a
+        inc hl
+        djnz .clr
+.none:  ld a, (GateWas)         ; (as CpcPortal: nothing painted, nothing to do)
+        ld hl, CPortalWas
+        or (hl)
+        ret z
+        ld a, (PtRow)           ; the rows the portal paints: above PtRow
+        sub ROAD_ROW0
+        ret c
+        ret z
+        cp ROAD_ROWS + 1
+        jr c, .n
+        ld a, ROAD_ROWS
+.n:     ld b, a
+        ld de, CRowFull
+        ld hl, $D800 + ROAD_ROW0 * 32
+.row:   push bc
+        push hl
+        ld a, (PalGrassL)       ; any cell its own?
+        ld bc, 32
+        cpir
+        jr z, .next
+        ld a, 1
+        ld (de), a
+        ld (CRowAny), a
+.next:  pop hl
+        ld bc, 32
+        add hl, bc
+        pop bc
+        inc de
+        djnz .row
+        ret
 
 CpcPortal:
-        ld hl, (TunEnd)         ; a tunnel or the gantry on this stage?
-        ld a, h
-        or l
-        jr nz, .scan
-        ld hl, (GateZ)
-        ld a, h
-        and l
-        inc a
+        ld a, (GateWas)         ; nothing painted (DrawPortal: a portal, or
+        ld hl, CPortalWas       ; the sky put back after one) this frame nor
+        ld c, (hl)              ; the last: nothing to see to
+        ld (hl), a
+        or c
         ret z
-.scan:  ld hl, $D800 + 3 * 32   ; ---- rows 3-11: changed attributes
-        ld de, CSkyAttr
-        ld bc, 3 * 256          ; B: row, C: column
-.sk:    ld a, (de)
+.scan:  ld a, (CSkyMin)          ; ---- rows 3-11 the shared code painted
+        ld b, a                 ; (CSkyPainted): changed attributes
+        ld a, (CSkyMax)
+        inc a
+        ld (.skEnd + 1), a
+        ld a, $FF
+        ld (CSkyMin), a
+        xor a
+        ld (CSkyMax), a
+        ld a, b
+        cp 3
+        jr nc, .s3
+        ld b, 3
+.s3:    ld a, (.skEnd + 1)
+        cp ROAD_ROW0 + 1
+        jr c, .s4
+        ld a, ROAD_ROW0
+        ld (.skEnd + 1), a
+.s4:    ld a, b
+        ld hl, .skEnd + 1
         cp (hl)
-        jr z, .skn
-        ld a, (hl)
-        ld (de), a
-        call CpcMarkRC
-.skn:   inc hl
-        inc de
+        jr nc, .skDone
+        rrca                    ; HL = row B's attributes, DE = CSkyAttr's
+        rrca
+        rrca
+        ld l, a
+        and 3
+        or high $D800
+        ld h, a
+        ld a, l
+        and $E0
+        ld l, a
+        push hl
+        ld a, b
+        sub 3
+        ld l, a
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld de, CSkyAttr
+        add hl, de
+        ex de, hl
+        pop hl
+        ld c, 0                 ; B: row, C: column
+.sk:    REPT 4
+        ld a, (de)
+        cp (hl)
+        call nz, .new
+        inc e
+        inc l
         inc c
+        ENDR
         bit 5, c
         jr z, .sk
-        ld c, 0
+        ld a, l                 ; (a row: 32 bytes, 32-aligned)
+        or a
+        jr nz, .sh
+        inc h
+.sh:    ld a, e
+        or a
+        jr nz, .sd
+        inc d
+.sd:    ld c, 0
         inc b
         ld a, b
-        cp ROAD_ROW0
+.skEnd: cp ROAD_ROW0            ; (patched: past the last row painted)
         jr c, .sk
+.skDone:
+        ld a, (PtRow)           ; ---- rows 10 on: those the portal paints
+        cp ROAD_ROW0            ; (above PtRow: src/tunnel.asm DrawPortal)
+        jr nc, .pr
+        ld a, ROAD_ROW0
+.pr:    ld (.last + 1), a
         ; ---- rows 10-23: the portal's cells
         ld hl, $D800 + PANO_ROW0 * 32
         ld b, PANO_ROW0
@@ -246,18 +365,45 @@ CpcPortal:
         ld c, 0
 .c:     ld a, (hl)
         cp e
-        jr z, .cn
-        ld (hl), e              ; (put back)
-        push hl
+        jr nz, .run
+.cn:    inc hl
+        inc c
+.cc:    bit 5, c
+        jr z, .c
+        inc b
+        ld a, b
+.last:  cp 24                   ; (patched: the rows the portal paints)
+        jr c, .r
+        ret
+.new:   ld a, (hl)              ; (a changed attribute: kept, its cell noted)
+        ld (de), a
+        jp CpcMarkRC
+.run:   ld d, a                 ; a run of the portal's cells, one attribute:
+        ld a, c                 ; each put back, then drawn at once
+        ld (.first + 1), a
+.rn:    ld (hl), e
+        inc hl
+        inc c
+        bit 5, c
+        jr nz, .re
+        ld a, (hl)
+        cp d
+        jr z, .rn
+.re:    push hl
         push bc
         push de
-        call CpcSolid
+        ld a, c
+.first: ld c, 0                 ; (patched: its first column)
+        sub c
+        ld ixl, a               ; IXL = its cells
+        ld a, d
+        call CpcSolidRun
         pop de
         pop bc
         pop hl
         ld a, b                 ; over the panorama: drawn afresh next time
         cp ROAD_ROW0
-        jr nc, .cn
+        jr nc, .cc
         push hl
         ld hl, CPanoA
         ld a, (CpcHidden)
@@ -265,19 +411,263 @@ CpcPortal:
         ld l, a
         ld (hl), $FF
         pop hl
-.cn:    inc hl
-        inc c
-        bit 5, c
-        jr z, .c
+        jr .cc
+
+; A = an attribute, B = row, C = column, IXL = cells (1-32): they solid in
+; its paper's pen in the hidden screen. All spent.
+CpcSolidRun:
+        call CpcSolidAt         ; E = the pen's byte, HL = the first byte
+        ld a, ixl
+        cp 3                    ; (3 cells or more: pushed, a word in 4 us)
+        jr c, .stores
+        ld c, a                 ; the chain's entry: a push a word (a cell's
+        ld a, low CPushEnd      ; two bytes in a line)
+        sub c
+        ld (.go + 1), a
+        ld a, high CPushEnd
+        sbc a, 0
+        ld (.go + 2), a
+        ld a, c                 ; HL = the first line's end
+        add a, a
+        add a, l
+        ld l, a
+        jr nc, .e
+        inc h
+.e:     ld d, e
+        ld (CPushSp), sp
+        ld iy, .back
+        ld b, 8
+.pl:    di                      ; (the stack in the screen meanwhile)
+        ld sp, hl
+.go:    jp CPushEnd             ; (patched)
+.back:  ld sp, (CPushSp)
+        ei
+        ld a, h
+        add a, high SCR_LINE
+        ld h, a
+        djnz .pl
+        ret
+.stores:
+        ld a, ixl
+        add a, a
+        add a, a                ; (4 bytes of code a cell)
+        ld c, a
+        ld a, low CStoreEnd
+        sub c
+        ld (.sgo + 1), a
+        ld a, high CStoreEnd
+        sbc a, 0
+        ld (.sgo + 2), a
+        ld b, 8
+.l:     push hl
+.sgo:   call CStoreEnd          ; (patched: 2 bytes a cell in a line)
+        pop hl
+        ld a, h
+        add a, high SCR_LINE
+        ld h, a
+        djnz .l
+        ret
+CStores:
+        DUP 64
+        ld (hl), e
+        inc l
+        EDUP
+CStoreEnd:
+        ret
+CPushes:
+        DUP 32
+        push de
+        EDUP
+CPushEnd:
+        jp (iy)
+CPushSp:        dw 0
+
+; The hidden screen's noted cells converted into it, their bits cleared
+; (src/cpc/cells.asm: the cells and their bits)
+CpcCells:
+        call CDirtyHid
+        ld b, 0                 ; the row
+.row:   ld c, 0                 ; the column
+.oct:   ld a, (hl)
+        or a
+        jr z, .skip
+        inc a                   ; (all 8: one colour, all the same? drawn at
+        jr nz, .one             ; once, CGroupSolid)
+        push hl
+        push bc
+        call CGroupSolid
+        pop bc
+        pop hl
+        jr nz, .one
+        ld d, a                 ; (A = the groups of 8 drawn)
+.clr:   ld (hl), 0
+        dec d
+        jr z, .skip
+        inc hl
+        ld a, c
+        add a, 8
+        ld c, a
+        jr .clr
+.one:   ld a, (hl)
+        ld (hl), 0
+        push hl
+        ld e, a                 ; its 8 cells' bits, from the left
+.bit:   sla e
+        jr nc, .nb
+        push bc
+        push de
+        call CpcCell
+        pop de
+        pop bc
+.nb:    inc c
+        ld a, c
+        and 7
+        jr nz, .bit
+        pop hl
+        jr .n8
+.skip:  ld a, c
+        add a, 8
+        ld c, a
+.n8:    inc hl
+        ld a, c
+        cp 32
+        jr c, .oct
         inc b
-        ld a, b
-        cp 24
-        jr c, .r
+        ld a, (TunInside)       ; (the panorama's rows: in a tunnel only, its
+        or a                    ; ceiling; else the panorama, drawn as it is)
+        ld a, PANO_ROW0
+        jr z, .lim
+        ld a, CELL_ROWS
+.lim:   cp b
+        jr z, .done
+        jr nc, .row
+.done:  ret
+
+; B = row, C = column (a multiple of 8), HL = their bits (all set): its 8
+; cells one attribute, ink as paper? Then they drawn in it at once
+; (CpcSolidRun), and the next 8 too while all noted and the same: Z, A =
+; the groups of 8; else NZ
+CGroupSolid:
+        ld (CGBits), hl
+        ld a, b                 ; HL = the first's attribute: $D800 + row x 32
+        rrca                    ; + column
+        rrca
+        rrca
+        ld l, a
+        and 3
+        or high $D800
+        ld h, a
+        ld a, l
+        and $E0
+        or c
+        ld l, a
+        ld a, (hl)
+        ld e, a                 ; ink as paper?
+        rrca
+        rrca
+        rrca
+        xor e
+        and 7
+        ret nz
+        ld d, 7                 ; the other 7 the same?
+.same:  inc l
+        ld a, (hl)
+        cp e
+        ret nz
+        dec d
+        jr nz, .same
+        ld a, 1
+        ld (CGN), a
+.more:  ld a, l                 ; the next 8: in the row, all noted, the same?
+        inc a
+        and 31
+        jr z, .draw
+        push hl
+        ld hl, (CGBits)
+        inc hl
+        ld a, (hl)
+        ld (CGBits), hl
+        pop hl
+        inc a
+        jr nz, .draw
+        push hl
+        ld d, 8
+.s8:    inc l
+        ld a, (hl)
+        cp e
+        jr nz, .no
+        dec d
+        jr nz, .s8
+        pop af                  ; (HL on: its last)
+        ld a, (CGN)
+        inc a
+        ld (CGN), a
+        jr .more
+.no:    pop hl
+.draw:  ld a, (CGN)
+        add a, a
+        add a, a
+        add a, a
+        ld ixl, a
+        ld a, e
+        call CpcSolidRun
+        ld a, (CGN)
+        cp a                    ; (Z)
+        ret
+CGBits:         dw 0
+CGN:            db 0
+
+; (src/cpc/cells.asm CpcCell) IXL = paper's byte, IXH = paper ^ ink, DE =
+; the cell's bitmap, BC = its first byte: one colour (ink as paper, or no
+; ink pixels)? Then drawn in the paper's pen, Z; else NZ (BC, DE kept)
+CCellSolid:
+        ld a, ixh
+        or a
+        jr z, .solid
+        ld h, d
+        ld l, e
+        ld a, (hl)
+        REPT 7
+        inc h
+        or (hl)
+        ENDR
+        ret nz
+.solid: ld h, b
+        ld l, c
+        ld a, ixl
+        ld e, a
+        DUP 7
+        ld (hl), e
+        inc l
+        ld (hl), e
+        dec l
+        ld a, h
+        add a, high SCR_LINE
+        ld h, a
+        EDUP
+        ld (hl), e
+        inc l
+        ld (hl), e
+        xor a                   ; (Z)
         ret
 
 ; A = an attribute, B = row, C = column: the cell solid in its paper's pen
 ; in the hidden screen. All spent.
 CpcSolid:
+        call CpcSolidAt
+        ld b, 8
+.l:     ld (hl), e
+        inc l
+        ld (hl), e
+        dec l
+        ld a, h
+        add a, high SCR_LINE
+        ld h, a
+        djnz .l
+        ret
+; A = an attribute, B = row, C = column -> E = its paper's pen's byte, HL =
+; the cell's first byte in the hidden screen
+CpcSolidAt:
         rrca
         rrca
         rrca
@@ -304,15 +694,6 @@ CpcSolid:
         add a, a
         add a, l
         ld l, a
-        ld b, 8
-.l:     ld (hl), e
-        inc l
-        ld (hl), e
-        dec l
-        ld a, h
-        add a, high SCR_LINE
-        ld h, a
-        djnz .l
         ret
 
 ; ---- colours (SpecHw, CSpecPB: src/cpc/cells.asm)
