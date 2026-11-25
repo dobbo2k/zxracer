@@ -199,10 +199,11 @@ def dsk(cfg, outdir):
     files = [make_dsk.DiskFile("SPEED.DAT", open(os.path.join(outdir, "SPEED.DAT"), "rb").read()),
              make_dsk.DiskFile("SPEED.BIN", open(os.path.join(outdir, "speed.bin"), "rb").read(),
                                load=LOADER_AT, run=LOADER_AT)]
-    layout = make_dsk.write(Path(outdir) / "speedrun.dsk", files)
+    target = Path(os.environ.get("CPC_DSK") or Path(outdir) / "speedrun.dsk")
+    layout = make_dsk.write(target, files)
     assert layout["SPEED.DAT"][0] == DAT_SECTOR, layout
     used = sum(sectors(len(f.data) + (128 if f.load is not None else 0)) for f in files)
-    print(f"speedrun.dsk: {used} of {make_dsk.TRACKS * make_dsk.SECTORS - 4} sectors used")
+    print(f"{target.name}: {used} of {make_dsk.TRACKS * make_dsk.SECTORS - 4} sectors used")
 
 
 def main(step, src="assets/stages.yaml", outdir="build/cpc"):

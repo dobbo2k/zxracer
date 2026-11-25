@@ -571,3 +571,51 @@ measurements come first of all: they decide the memory map's fallbacks.
   and the HUD into the shadow take 29.6 ms a game frame, as section 6
   estimated (27-31 ms with the interrupts). About 30 ms a game frame are
   left for the CPC's drawing at the 3-TV-frame lock.
+
+### Phases 1-5 so far (25 November 2026)
+
+- **Phase 1:** the disc boots in MAME (`RUN"SPEED"`), the firmware off,
+  C1/C3, IM 2 and the six interrupts (the VSYNC one counted, or the sixth
+  since it if taken late), the frame grid, the key scan in the interrupt,
+  `AyWrite` through the PPI. SPACE starts a game; the AY log has the engine
+  at period 790 (1400 x 0.564) and the tune at 1 MHz periods, the mixer's
+  bit 6 never set. WinAPE across the CRTC types: still to do (phase 7).
+- **Phase 2, the road** (`src/cpc/road.asm`): every line pair redrawn each
+  game frame, a word at a time with PUSH: the four edges' "special" words
+  from a table (by the band's class, the edge, its pixel in the word), the
+  runs between them unrolled chains entered at their lengths, every step's
+  jump patched so a run can be left out (the road off the screen's edge, a
+  kerb inside one word). The far road in one word and a fork's two roads go
+  a slow way (grass through the program, then a byte at a time). Bands,
+  kerbs, the centre line, hills, forks, tunnels' walls; the portal and the
+  gantry from the shadow's attributes (`CpcPortal`: road rows' cells drawn
+  solid, the sky's changed cells converted). Not yet: a tunnel's lamps.
+  **Measured:** the road takes about 40 ms a game frame against section 6's
+  16-18: the PUSHes themselves 14.7 ms, the setting up of 48 pairs the
+  rest. `-DROAD_QUADS` sets up a pair of pairs at a time (4-line steps, as
+  the Einstein's kerbs): 29 ms.
+- **Phase 4** (`src/cpc/cells.asm`): the shadow's cells, marked by the
+  shared code's hooks, converted into each screen (a bit per cell and
+  screen); the panorama made Mode 0 at a display reset and scrolled a byte
+  at a time (in a tunnel its rows are the ceiling's cells); the font 3
+  pixels wide with each pixel doubled (`tools/cpc_art.py FONT`), the HUD's
+  top strip in it.
+- **Phase 3** (`src/cpc/sprites.asm`, `src/scenery.asm`'s CPC way): the
+  commands in Mode 0 columns, drawn far to near masked by pen 0, the sky's
+  cells and the panorama under them made again the next time that screen
+  is drawn; the car last. Placeholders: the Spectrum's silhouettes in one
+  pen, its car's poses.
+- **Phase 5:** stage loads and checkpoints through the overlay as on the
+  Spectrum, each pack read from the disc (`CpcLoad`); the palette per stage
+  from the Spectrum's attributes (placeholders: `CpcPalette`); the front end
+  (`src/cpc/front.asm`): it draws the Spectrum's screen A into base 1, base
+  3 is shown converted from it (a copy in bank 7, a share of cells compared
+  each frame wait), the pens the Spectrum's colours. `make test-cpc`
+  (`tests/cpc_check.py`): the demo, a game, the AY, 14 stages' screenshots.
+- **The benchmark** (`-DFIXED_ELAPSED=1`, game frames 20-320): with the
+  road, the HUD, the objects and the car, 4.52 TV frames a game frame
+  (11.1 fps); with `-DROAD_QUADS` 3.99 (12.5 fps). The car alone, masked a
+  byte at a time, is about 7 ms.
+- **Memory:** base 0's CPC code to $17F6 (of $1B00); its residents to
+  $3D25 (of $3DA0, the car's poses' tops and bottoms stored once); bank 2's
+  code to $98FA (of $A300).

@@ -67,6 +67,9 @@ MainLoop:
         ENDIF
         IFDEF CPC
 MainLoop:
+        ld a, (CStageReq)       ; (the tests: another stage asked for)
+        or a
+        call nz, CStageGo
         call CheckPause
         call ReadInput
         call UpdatePlayer
