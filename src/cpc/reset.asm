@@ -102,6 +102,23 @@ CpcHorizon:
 .a:     ld a, (hl)
         cp c
         ret z
+        IF FIXED_ELAPSED == 0   ; (one byte behind and the frame already late:
+        cp $FF                  ; not now, as the Spectrum's DrawHorizonIfTime;
+        jr z, .draw             ; none drawn: always)
+        sub c
+        inc a                   ; (the benchmark's runs always draw it)
+        and $3F
+        cp 3
+        jr nc, .draw
+        ld a, (FrameCount)
+        push hl
+        ld hl, LastFlip
+        sub (hl)
+        pop hl
+        cp MIN_FRAMES
+        ret nc
+.draw:  ld a, (hl)
+        ENDIF
         ld (hl), c
         inc a                   ; (none drawn: every line; else from the
         ld a, 0                 ; first not all paper)
