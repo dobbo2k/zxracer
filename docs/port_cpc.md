@@ -619,3 +619,25 @@ measurements come first of all: they decide the memory map's fallbacks.
 - **Memory:** base 0's CPC code to $17F6 (of $1B00); its residents to
   $3D25 (of $3DA0, the car's poses' tops and bottoms stored once); bank 2's
   code to $98FA (of $A300).
+
+### Speed, phase 6, phase A begun (25 November 2026)
+
+- **Speed:** the road's first `ROAD_QUAD_ROWS` rows (6, the far half) set up
+  a 4-line step at a time, the rest line pairs; the car's lines as runs
+  (opaque bytes copied, only the edges masked); an unrolled LDI chain for
+  the panorama and the car; the panorama's all-paper lines left alone when
+  it only scrolls. The benchmark: 3.98 TV frames a game frame, 12.55 fps
+  (from 4.52). The road is still the most of it (about 35 ms); the shared
+  work 30 ms.
+- **Phase 6:** the loader sets the game's CRTC and shows a loading screen
+  (until phase A's: the Spectrum's title, "FOR THE AMSTRAD CPC 6128").
+  `make release-cpc` copies the disc to `release/speedrun_cpc.dsk`: not run
+  yet, the art being unfinished.
+- **Phase A:** `docs/cpc_artwork.md`. The coast's scenery and palette, the
+  signs, the traffic and the Spider drawn for the CPC; the other themes
+  still the placeholders. Waiting for the owner's approval of the coast
+  before the rest.
+- **Still to do:** the other four themes' art; a native sky and panorama
+  (now the Spectrum's converted); the title, goal postcards and loading
+  screen; a tunnel's lamps; WinAPE on CRTC types 0-4 and a real 6128
+  (phase 7: WinAPE has no headless mode, its window must be in front).
