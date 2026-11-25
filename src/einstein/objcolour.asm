@@ -6,9 +6,93 @@
 ; Spectrum, and here at first, they took the cell's ink and changed colour
 ; as they crossed a kerb). Graphics II has two colours a line: the cell's
 ; other colour is lost under and around the object, so the one more of its
-; pixels show is kept.
+; pixels show is kept. An object in the colour of the ground under it takes
+; a shade of the same hue (EinShadeE), not black: the coast's green palms
+; on its green grass stayed green on one band and went black on the other.
 ; In bank 2's code: the platform code below $4000 is full.
 ; ---------------------------------------------------------------------------
+
+; E = a TMS colour -> E: another of its hue, as far from it in lightness as
+; the hue allows (Albert's palette: dark green 12 against light green 3, not
+; medium green 2, which is too near it). A, BC, HL kept; D spent.
+EinShadeE:
+        push hl
+        ld hl, EShade
+        ld d, 0
+        add hl, de
+        ld e, (hl)
+        pop hl
+        ret
+EShade: db 1, 14, 3, 12, 5, 4, 9, 4, 9, 6, 11, 10, 3, 9, 15, 14
+
+; A cell under a silhouette in rows 12-15 whose row has no slot left (the
+; middle third has 11 a row: a big palm's crown over the far road's kerbs
+; uses them up): one of the panorama's cell patterns (PANO_SPR on, in the
+; same third) that no silhouette covers this frame or covered the last,
+; sent with them (EPanoList), so the object is never left out (the road
+; showing through it). B = row, C = its colour byte, EPat its pixels,
+; ESprName its name.
+EinBorrowPano:
+        ld a, b
+        cp 16
+        ret nc                  ; (the bottom third: none to borrow)
+        ld a, (EPanoNext)       ; (the next to look at: one less, down to 0)
+.find:  sub 1
+        ret c                   ; none left
+        ld e, a                 ; E: the pattern (its cell: row 10 + E / 32)
+        and 7                   ; its cell's bit in EMaskU's rows 10-11
+        add a, low EBitTab
+        ld l, a
+        ld h, high EBitTab
+        ld d, (hl)
+        ld a, e
+        rrca
+        rrca
+        rrca
+        and 7
+        add a, low (EMaskU + PANO_ROW0 * MASK_ROW)
+        ld l, a
+        ld a, high (EMaskU + PANO_ROW0 * MASK_ROW)
+        adc a, 0
+        ld h, a
+        ld a, (hl)
+        and d
+        ld a, e
+        jr nz, .find            ; under a silhouette: the next down
+        ld (EPanoNext), a
+        ld l, a                 ; its pixels and colours, as EinPanoCell's
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        push hl
+        ld de, EPanoSpr
+        add hl, de
+        ex de, hl
+        ld hl, EPat
+        push bc
+        ld bc, 8
+        ldir
+        pop bc
+        pop hl
+        ld de, EPanoInkBuf
+        add hl, de
+        ld b, 8
+.ink:   ld (hl), c
+        inc hl
+        djnz .ink
+        ld hl, EPanoN           ; to be sent
+        ld e, (hl)
+        inc (hl)
+        ld d, 0
+        ld hl, EPanoList
+        add hl, de
+        ld a, (EPanoNext)
+        ld (hl), a
+        add a, PANO_SPR
+        ld hl, (ESprName)
+        ld (hl), a
+        ret
 
 ; A = the road cell's name (SLOT_FIRST or more), B = its row (12-23)
 ; -> A = the TMS colour (0-15) of most of its pixels. BC kept.

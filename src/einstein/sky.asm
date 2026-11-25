@@ -344,8 +344,30 @@ EinSendCell:
         jp EinFill
 
 ; B,C = screen cell. EMPat contains only moving ink (object or message).
-; Copy the original pair back exactly on each uncovered scanline.
+; Copy the original pair back exactly on each uncovered scanline. A covered
+; one: the object's ink (rows 4-9: EinSprCells notes it; row 3 black) over
+; the sky's paper, or a shade of it where they are the same colour.
 EinSkyCell:
+        ld e, 1
+        ld a, b
+        cp 4
+        jr c, .mat
+        call EinMaterialCell    ; (BC, DE kept)
+        ld e, (hl)
+.mat:   ld a, e
+        ld (.same + 1), a
+        rlca
+        rlca
+        rlca
+        rlca
+        ld (.ink4 + 1), a
+        call EinShadeE          ; (D spent)
+        ld a, e
+        rlca
+        rlca
+        rlca
+        rlca
+        ld (.shd4 + 1), a
         ld a, b
         sub 3
         ld h, a
@@ -372,11 +394,11 @@ EinSkyCell:
         ld c, a
         ld a, (ix)
         and 15
-        cp 1
-        jr nz, .dark
-        or $F0
+.same:  cp 0                    ; (patched: the object's ink)
+        jr z, .shd4
+.ink4:  or 0                    ; (patched: its ink, high nibble)
         jr .ink
-.dark:  or $10
+.shd4:  or 0                    ; (patched: its shade, high nibble)
 .ink:   ld (iy), a
         ld a, c
         jr .p

@@ -169,6 +169,14 @@ EinSprCells:
         ret z
         ld b, a
         inc hl
+        dec a                   ; last first: a cell two share takes the first's
+        add a, a                ; ink, as on the Spectrum (src/objink.asm):
+        add a, a                ; traffic, then the nearest scenery (the far
+        add a, a                ; palm's ink no longer on the near one's crown)
+        add a, l
+        ld l, a
+        jr nc, .cmd
+        inc h
 .cmd:   push bc
         ld a, (hl)              ; y top
         ld d, a
@@ -287,8 +295,8 @@ EinSprCells:
         jr nz, .mc
         call .flush
         pop de
-        ld a, b                 ; ---- the cells' ink (rows 10-23: rows above
-        cp PANO_ROW0            ; are the sky's own, src/einstein/sky.asm)
+        ld a, b                 ; ---- the cells' ink (rows 4-23: in the sky
+        cp 4                    ; for src/einstein/sky.asm EinSkyCell)
         jr c, .rowDone
         add a, a                ; the object's type's, by the third of its
         add a, a                ; height the row's middle line is in
@@ -328,6 +336,8 @@ EinSprCells:
         cp h
         jp nz, .row
 .done:  pop hl
+        ld de, -2 * CMD_SIZE    ; (the one before)
+        add hl, de
         pop bc
         dec b
         jp nz, .cmd
@@ -429,6 +439,8 @@ EinMaskRow:
 EinPanoCompose:
         xor a
         ld (EPanoN), a
+        ld a, 64                ; (all of PANO_SPR's to borrow from: EinBorrowPano)
+        ld (EPanoNext), a
         ld b, PANO_ROW0
 .r:     push bc
         call EinComposeStart
@@ -580,6 +592,14 @@ EinPanoCell:
         call EinSprMask
         ret z
         call EinMaterialCell
+        ld e, (hl)              ; (a line whose paper is its ink: a shade of it)
+        call EinShadeE
+        ld a, e
+        rlca
+        rlca
+        rlca
+        rlca
+        ld (.shd + 1), a
         ld a, (hl)
         exx                     ; B' = material ink, C' = ink repeated in both nibbles
         ld c, a
@@ -646,8 +666,8 @@ EinPanoCell:
         or b
         cp c
         jr nz, .ink
-        xor $F0
-        or $10
+        and 15
+.shd:   or 0                    ; (patched: the ink's shade)
         jr .ink
 .bare:
         ld a, (hl)
@@ -895,13 +915,8 @@ EinSprCell:
         call EinMaterialCell
         ld e, (hl)
         pop af
-        cp e
-        jr nz, .contrast
-        ld e, 1
-        cp e
-        jr nz, .contrast
-        ld e, 15
-.contrast:
+        cp e                    ; the ground's own colour: a shade of it
+        call z, EinShadeE       ; (green palms on green grass stay green)
         ld d, a
         ld a, e
         rlca
@@ -913,7 +928,7 @@ EinSprCell:
 .commit:
         call EinCommitSlot
         cp $FF
-        ret z
+        jp z, EinBorrowPano     ; (the row's slots all used: objcolour.asm)
         ld hl, (ESprName)
         ld (hl), a
         ret
@@ -926,7 +941,8 @@ ERoadInkT:      db 0
 EPanoCol:       db 0            ; the panorama's column at the left edge
 EPanoIdx:       db 0
 EPanoN:         db 0
-ENRows:         ds 3            ; the rows (a bit each) with any in EMaskN,
+EPanoNext:      db 0            ; (EinBorrowPano: the patterns below it to look at)
+ENRows:       ds 3            ; the rows (a bit each) with any in EMaskN,
 EURows:         ds 3            ; and in EMaskU (EinSprCells)
         ASSERT EURows == ENRows + 3
 ERowLo:         ds 12           ; per road row: its silhouettes' free slots

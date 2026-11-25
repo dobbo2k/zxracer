@@ -13,6 +13,10 @@
 ; 3 seventh, 4 minor seventh, 5 major seventh, 6 sus4, 7 power (5th, octave),
 ; 8 octave
 ArpTab:         db 4, 7,  3, 7,  4, 10,  3, 10,  4, 11,  5, 7,  7, 12,  12, 12
+        IFDEF ZX_OBJINK
+OBJ_PART        DEFL 4
+        INCLUDE "objinkb2.asm"  ; (objects' inks: OCount)
+        ENDIF
         ASSERT $ <= ScrLo + 256
         ORG ScrHi + $C4
         ASSERT ScrHi_end <= ScrHi + $C4
@@ -64,6 +68,12 @@ JingleGo:
         ASSERT $ <= LWPage + 256
         ORG ZPage + $60
         ASSERT ZLo_end <= ZPage + $60
+        IFDEF ZX_OBJINK         ; (src/objink.asm: a cell's object and ground
+OS:             ds 8            ; pixels, and the bits in a nibble)
+OG:             ds 8
+NibBits:        db 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
+        ASSERT (OS & 15) == 0 && OG == OS + 8 && NibBits == OS + 16
+        ENDIF
         ASSERT $ <= ZPage + $80
         ORG ZPage + $E0
         ASSERT LaneW_end <= ZPage + $E0
@@ -89,18 +99,49 @@ TunWidthE:
         ASSERT $ <= DEPage + $80
         ORG DEPage + $E0
         ASSERT RoadE_end <= DEPage + $E0
+        IFDEF ZX_OBJINK         ; (src/objink.asm) per buffer: a count, then
+ClaimA:         db 0            ; the cells to put back
+                ds 2 * CLAIMS
+        ENDIF
         ASSERT $ <= DEPage + 256
         ORG LXPage + $60
         ASSERT LaneX_end <= LXPage + $60
+        IFDEF ZX_OBJINK
+ClaimB:         db 0
+                ds 2 * CLAIMS
+        ENDIF
         ASSERT $ <= LXPage + $80
         ORG LXPage + $E0
         ASSERT ForkT1_end <= LXPage + $E0
+        IFDEF ZX_OBJINK         ; (src/objink.asm's working)
+OInk:           db 0            ; the object's ink
+ORow:           db 0            ; the row
+OSky:           db 0            ; its own attribute (the sky's, the backdrop's)
+OFork:          db 0            ; a fork's row (no kerb cells)
+OList:          dw 0            ; the back buffer's claim list
+OAttrAt:        dw 0            ; the cell: its attribute's address,
+OAttr:          db 0            ; its attribute
+OSrcOk:         db 0            ; OSrcRow's done for the row:
+OSrc:           dw 0
+OSrcC:          db 0
+OSrcN:          db 0            ; (just after OSrcC: src/objink.asm)
+OPixHi:         db 0
+        ASSERT OSrcN == OSrcC + 1
+        ENDIF
         ASSERT $ <= LXPage + 256
         ORG ObjPage + $60
         ASSERT ObjScale_end <= ObjPage + $60
+        IFDEF ZX_OBJINK
+OBJ_PART        DEFL 1
+        INCLUDE "objinkb2.asm"  ; (objects' inks: OListHL)
+        ENDIF
         ASSERT $ <= ObjPage + $80
         ORG ObjPage + $E0
         ASSERT SizeForLine_end <= ObjPage + $E0
+        IFDEF ZX_OBJINK
+OBJ_PART        DEFL 2
+        INCLUDE "objinkb2.asm"  ; (objects' inks: OInkOn)
+        ENDIF
         ASSERT $ <= ObjPage + 256
         ORG ZHiPage + $60
         ASSERT ZHi_end <= ZHiPage + $60
@@ -108,6 +149,10 @@ TunWidthE:
 ; a nibble's 4 pixels, each doubled
 DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
         ASSERT high DblNib == high (DblNib + 15)
+        IFDEF ZX_OBJINK
+OBJ_PART        DEFL 3
+        INCLUDE "objinkb2.asm"  ; (objects' inks: putting their cells back)
+        ENDIF
         ASSERT $ <= ZHiPage + 256
         ORG MaskPage + $20
         ASSERT LMaskIncl_end <= MaskPage + $20

@@ -107,7 +107,7 @@ MainLoop:
         BORDER 3                ; magenta: sprites
         call DrawSprites
         IFDEF ZX_OBJINK
-        call THEME_CACHE + 28   ; their inks (src/objink.asm, in the theme pack)
+        call ObjInk             ; their inks, in front of the road and backdrop
         ENDIF
         call DrawCar
         BORDER 5                ; cyan: HUD
@@ -345,6 +345,9 @@ CmdListB        EQU $10000 - THEME_TOP
         ENDIF
         IFDEF CPC
         INCLUDE "cpc/resident.asm"  ; (the CPC's code that is not time-critical)
+        ENDIF
+        IFDEF ZX_OBJINK         ; (the Spectrum's: NATIVE_GFX never has it)
+        INCLUDE "objink.asm"    ; objects in their own inks, in front of the road
         ENDIF
 PrevHillInputs: ds 2 + 3 * MAX_BOUNDS + 1
 ScnEnd:

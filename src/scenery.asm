@@ -131,7 +131,11 @@ EraseSprites:
         add hl, bc
         pop bc
         djnz .lp
+        IFDEF ZX_OBJINK         ; (the Spectrum's: NATIVE_GFX never has it)
+        jp ClaimRestore         ; (the cells ObjInk drew over: src/objink.asm)
+        ELSE
         ret
+        ENDIF
 
 ; Project visible objects, XOR them onto the back buffer and record the
 ; commands in this buffer's list: traffic first, then scenery.

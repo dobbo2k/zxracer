@@ -323,9 +323,12 @@ the car's cells and a tunnel's ceiling rows: `EinSprCell` and `EinPanoCell` do s
   frame's. `MASK_ROW` is 4 bytes a row; bit k of byte j is column 8j + k.
 - **Row bits:** `ENRows` and `EURows` hold a bit for each row that has any, so only those
   rows are copied, cleared and mirrored.
-- **Inks:** for rows 10-23, each covered cell's ink goes into `EObjectUpper` or
+- **Inks:** for rows 4-23, each covered cell's ink goes into `EObjectUpper` or
   `EObjectLower` (`EinMaterialCell`). It comes from the object's type and the third of
-  its height the row is in (`EObjectInks`: 3 a type).
+  its height the row is in (`EObjectInks`: 3 a type). The list is walked last command
+  first, so a cell two objects share takes the first's ink, as on the Spectrum
+  (traffic, then the nearest scenery; the far palm's ink had been on the near one's
+  crown).
 - **Sky rows:** covered cells in rows 0-9 are noted for mirroring.
 
 **Compositing.** A row with silhouettes is copied from `BaseNames` to `NameBuf`
@@ -333,18 +336,25 @@ the car's cells and a tunnel's ceiling rows: `EinSprCell` and `EinPanoCell` do s
 
 - **Rows 10-11** (`EinPanoCompose`, `EinPanoCell`): the panorama's pixels, except on lines
   with silhouette pixels. Those take the silhouette's pixels and the object's ink over the
-  panorama's paper, or a contrast if they're the same. The result goes into a pattern of
+  panorama's paper, or a shade of that ink if they're the same (`EinShadeE`). The result goes into a pattern of
   its own (`PANO_SPR` + index). `EinPanoSend` groups adjacent tile indices and sends
   each run's pixels and colours through `EinWrite`. A run contains up to eight tiles,
   so each transfer is at most 64 bytes and gets its own vertical-blank timing check.
 - **Rows 12-23** (`EinRoadCompose`, `EinSprCell`): the road's name under the cell decides.
-  - A solid cell becomes the silhouette in the object's ink over the cell's paper, with
-    black or white if the ink and paper are the same.
-  - A ready-made kerb edge is XORed with the silhouette, in its own colour.
-  - A slot's pattern is XORed with the silhouette, in its colour.
-  
-  Each result takes one of the row's slots. The car's cells are skipped (its names go
-  over).
+  - A solid cell becomes the silhouette in the object's ink over the cell's paper.
+  - A cell of two colours (a ready-made kerb edge, a slot) becomes the silhouette in the
+    object's ink over the colour most of its pixels show (`EinCellGround`,
+    `objcolour.asm`), so objects keep their colours across kerbs.
+  - Where the ink is the ground's colour it takes a shade of the same hue (`EinShadeE`,
+    `EShade`: the coast's palms on its dark green band were drawn black, and flicked
+    between green and black as the bands passed).
+
+  Each result takes one of the row's slots. When the row has none left (rows 12-15
+  have 11: a big palm's crown over the far road's kerbs used them up, and its cells
+  were left out, the road showing through), `EinBorrowPano` takes one of the
+  panorama's covered-cell patterns (`PANO_SPR` on, the same third) that no
+  silhouette covers this frame or covered the last, and sends it with them
+  (`EPanoList`). The car's cells are skipped (its names go over).
 
 ## 9. The sky, the HUD and the panorama
 
@@ -362,8 +372,9 @@ Each note sets a bit in `EMirrorBits`, so a cell is sent once however often it's
 - **Row 0:** fixed colours for the labels.
 - **Rows 3-9:** with the sky's own attribute, outside a tunnel and away from an active
   message, `EinSkyCell` composites screen B's moving ink over the native sky
-  (`ESkyPixels`, `ESkyInks`). Each uncovered line gets the art's own pixels and colours
-  back.
+  (`ESkyPixels`, `ESkyInks`): an object's lines in its own ink (rows 4-9, from
+  `EObjectUpper`; row 3 black), or a shade of it over a sky of the same colour. Each
+  uncovered line gets the art's own pixels and colours back.
 - **Everything else** (rows 1-2, a tunnel, a lamp, the message): the cell's attribute
   ink over paper, with FLASH swapped when `EFlashOn` says so.
 

@@ -48,10 +48,11 @@ SMALL2_SHARE = 0.4                  # of the small scenery: the theme's second s
 RESIDENT_TYPES = ["traffic", "van", "truck"]          # in bank 5
 # Objects in their own inks on the Spectrum (the Makefile's ZX_OBJINK, 1 by
 # default; with -DZX_OBJINK). Each theme pack gets a byte per object type after
-# its tune (Inks, in TYPE_IDS order; a theme's "inks:" in stages.yaml can change
-# them) and src/objink.asm, at THEME_CACHE + 28. ZX_OBJINK=0: neither.
+# its header (Inks, at THEME_CACHE + 17, in TYPE_IDS order; a theme's "inks:" in
+# stages.yaml can change them), for src/objink.asm (resident), and two of its
+# routines, src/objinkpack.asm, at THEME_CACHE + 28. ZX_OBJINK=0: neither.
 OBJINK = os.environ.get("ZX_OBJINK", "1") == "1"
-OBJINK_BYTES = 184                  # the routine's room (asserted)
+OBJPACK_BYTES = 180                 # src/objinkpack.asm's room (asserted)
 OBJ_INKS = {"traffic": 5, "van": 7, "truck": 6,                     # cyan, white, yellow
             "sign_r": 2, "sign_l": 2, "fork": 2, "sign_tunnel": 2,  # red
             "tree": 2, "citypalm": 2,                               # trees: red, for brown
@@ -288,9 +289,10 @@ def theme_pack(name, theme, masters=None):
                "van", "truck", theme["types"][2], theme["types"][3], "sign_tunnel"]
         inks = {**OBJ_INKS, **theme.get("inks", {})}
         out += ["Inks:   db " + ", ".join(str(inks.get(n, 255)) for n in ids),
-                '        INCLUDE "../src/objink.asm"',
-                "        ASSERT ObjInk == @THEME_CACHE + 28",
-                f"        ASSERT $ - ObjInk <= {OBJINK_BYTES}"]
+                "        ASSERT Inks == @THEME_CACHE + 17",
+                '        INCLUDE "../src/objinkpack.asm"',
+                "        ASSERT ObjPack == @THEME_CACHE + 28",
+                f"        ASSERT $ - ObjPack <= {OBJPACK_BYTES}"]
     out += ["TypeDir:",
             "        dw @Scn_traffic"]
     assert len(theme["types"]) == 4, "a theme has four scenery types (ids 4, 5, 8, 9)"
@@ -304,7 +306,7 @@ def theme_pack(name, theme, masters=None):
         im.convert("L").point(lambda v: 0 if v else 255).save(f"assets/gfx/horizon_{name[6:]}.png")
     size = 6 + 9 + 2 + make_music.tune_bytes(name[6:]) + 2 * (len(types) + 3) + len(theme["name"]) + 1
     if objink:
-        size += 11 + OBJINK_BYTES
+        size += 11 + OBJPACK_BYTES
     for t in types:
         master = masters.get(t) if masters is not None else None
         consts, dirl, data = scn.emit_type(t, master=master, previews=masters is None)

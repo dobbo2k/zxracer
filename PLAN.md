@@ -152,22 +152,46 @@ and all moving objects are drawn as masked monochrome bitmaps that inherit it:
   (the nearest to brown: dark red in dark bands); the coast's palms, pines, bushes
   and cacti green; the towers, windmills, billboards and windpumps blue; signs,
   rocks and chalets red; the snowman white. An ink the same as the paper is drawn
-  black (white on black): the snowman on white snow, a bush on green grass. Kerb cells keep their ink (their
-  road pixels would take it too), a centre-line dash in a coloured cell takes it,
-  and the BRIGHT bit stays the band's. The row's band in the buffer's state page is
-  then made $FF, so `DrawRoadRow` writes the row's attributes afresh when the
-  buffer is next drawn. Bank 2 had room only for the 7 bytes that store each
-  command's object type and call the routine, so the routine (184 bytes) and a
-  colour per type (11 bytes, `OBJ_INKS` in `tools/make_stages.py`, or a theme's
-  `inks:`) are in every theme pack, at `THEME_CACHE + 17` and `+ 28`: the alpine
-  pack, the fullest, keeps 11 bytes of the theme cache. Measured (22 November
-  2026): `make profile` 209.8K to 217.7K T a game frame (the colouring about 4K,
-  the rows' attributes written again about 4K), game frames taking 4 TV frames
-  130 to 201 in 890, 15.05 to 14.82 fps; the FIXED_ELAPSED autopilot over 12,000
-  TV frames 14.94 to 14.45 fps. `make test` passes either way. The colours are
-  `OBJ_INKS` in `tools/make_stages.py` (a theme's `inks:` in `stages.yaml` can
-  change them); the BRIGHT bit is the band's, so a colour is bright in a light band
-  and dark in a dark one.
+  black (white on black): the snowman on white snow, a bush on green grass. A
+  centre-line dash in a coloured cell takes the ink, and the BRIGHT bit stays the
+  band's. The row's band in the buffer's state page is then made $FF, so
+  `DrawRoadRow` writes the row's attributes afresh when the buffer is next drawn.
+  The first command's ink wins a cell two share (traffic, then the nearest
+  scenery). Measured (22 November 2026, plain cells only): `make profile` 209.8K
+  to 217.7K T a game frame (the colouring about 4K, the rows' attributes written
+  again about 4K), game frames taking 4 TV frames 130 to 201 in 890, 15.05 to
+  14.82 fps; the FIXED_ELAPSED autopilot over 12,000 TV frames 14.94 to 14.45
+  fps. `make test` passes either way. The colours are `OBJ_INKS` in
+  `tools/make_stages.py` (a theme's `inks:` in `stages.yaml` can change them);
+  the BRIGHT bit is the band's, so a colour is bright in a light band and dark in
+  a dark one.
+- **Objects in front of the kerbs and the backdrop** *(as built, 25 November
+  2026)*. Until then an object over a kerb cell or the backdrop kept that cell's
+  colours: black over the kerbs, the mountains' ink in rows 10-11, the clouds' in
+  the sky; and being XORed, where it crossed the kerb's road pixels or the
+  mountains they showed through it (the road "in front of" a palm). Now
+  `ObjInk` also takes a kerb cell (`PalKerbL`, `PalKerbD`, not in a fork's row),
+  a backdrop cell (rows 10-11) and a sky cell (rows 6-9, below the message line),
+  outside tunnels, where the object has pixels. If the ground has none of its own
+  there (the cell's pixels are the object's XOR alone) the ink is enough. If it
+  has, the cell's pixels become the object's alone, in its ink, over whichever
+  of the ground's two colours covers more of the cell (a car at the road's edge
+  stays on the road's black, a palm by the kerb on the kerb's colour); in the
+  sky the clouds are left as they were. Each such cell goes on the buffer's claim
+  list (15 cells, 2 bytes each: its attribute's address, with flags), and is put
+  back when the buffer is next drawn, after `EraseSprites` (`ClaimRestore`): its
+  attribute (a kerb's from the palette, the sky's and backdrop's `SkyRowAttr`);
+  a backdrop cell's pixels copied from the panorama at the scroll that buffer
+  shows; a kerb cell's lines drawn again by the road, their edges in the state
+  page made $FE, $00 (D > E: pass 1 makes only $FF, $00). The code: `ObjInk` and
+  `OClaim` resident in bank 5 (`src/objink.asm`), `ClaimRestore`, `OCell` (the
+  cell's object and ground pixels), `OCount`, `OInkOn`, `OListHL` and the data in
+  the table pages' holes (`src/objinkb2.asm`, `src/holes.asm`), `OSrcRow` and
+  `OPanoCell` in every theme pack at `THEME_CACHE + 28` (`src/objinkpack.asm`,
+  180 bytes, where the whole routine was; the inks stay at `+ 17`). Measured
+  (FIXED_ELAPSED autopilot, 12,000 TV frames): 14.71 fps before, 13.95 after
+  (about 4 cells a game frame, about 3K T each); kerbs alone (`OBJ_ROW0` 12)
+  14.30. `make test` passes.
 
 ---
 
