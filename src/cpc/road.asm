@@ -39,8 +39,8 @@ PEN_PANO_F      EQU 7
 PEN_PANO_N      EQU 8
 PEN_WALL_L      EQU 9
 PEN_WALL_D      EQU 10
-PEN_LANE        EQU 13
-PEN_LAMP        EQU 14
+PEN_LANE        EQU 2           ; (bright white, as the light kerb)
+PEN_LAMP        EQU 12          ; (bright yellow)
 
 ; A pen in both pixels of a byte: its bits 0-3 in bits 7 and 6, 3 and 2,
 ; 5 and 4, 1 and 0 (the left pixel's the odd bits: two pens' bytes as one,

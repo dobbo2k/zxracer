@@ -334,38 +334,24 @@ CpcHw:  add a, low SpecHw
         ld a, (hl)
         ret
 
-; The pens from the stage's palette (the Spectrum's attributes, Palette:
-; src/vars.asm), until the CPC's own (docs/port_cpc.md phase A); and each
-; Spectrum colour's pen (CSpecPB)
+; The pens: the stage's (its art pack: 16 pens and the border as the Gate
+; Array's colours, after the panorama and the clouds: tools/make_cpc.py
+; stage_art); and each Spectrum colour's pen (CSpecPB)
 CpcPalette:
-        ld ix, CPalSrc
-        ld e, 0                 ; the pen
-.pen:   ld l, (ix + 0)          ; its attribute's address (0: a colour)
-        ld h, (ix + 1)
-        ld a, h
-        or l
-        ld a, (ix + 2)          ; 0: its paper, 1: its ink; or the colour
-        jr z, .set
-        or a
-        ld a, (hl)
-        jr nz, .ink
-        call CpcPaper
-        jr .set
-.ink:   call CpcInk
-.set:   ld bc, GA_PORT
-        out (c), e
-        ld b, 0
-        ld c, e
-        ld hl, CPens
-        add hl, bc
-        ld (hl), a
+        ld hl, ART_BITMAP + 512 + 640
+        ld de, CPens
         ld bc, GA_PORT
+        xor a
+.pen:   out (c), a              ; (the pen)
+        push af
+        ld a, (hl)
+        ld (de), a
         or GA_COLOUR
         out (c), a
-        ld bc, 3
-        add ix, bc
-        inc e
-        ld a, e
+        pop af
+        inc hl
+        inc de
+        inc a
         cp 17
         jr c, .pen
         ; ---- each Spectrum colour's pen: the first in CPenOrder with its
@@ -407,44 +393,6 @@ CpcPalette:
         cp 16
         jr c, .col
         ret
-
-; Per pen (and the border, 16): the attribute it takes its colour from, and
-; 0 for its paper or 1 its ink; or 0 and the hardware colour
-CPalSrc:
-        dw PalRoad
-        db 0                    ; 0 road: the road's paper
-        dw 0
-        db $14                  ; 1 black
-        dw PalKerbL
-        db 0                    ; 2 the light kerb
-        dw PalKerbD
-        db 0                    ; 3 the dark kerb
-        dw PalGrassL
-        db 0                    ; 4 light grass
-        dw PalGrassD
-        db 0                    ; 5 dark grass
-        dw PalSky
-        db 0                    ; 6 sky
-        dw PalPano
-        db 1                    ; 7 the panorama: its ink
-        dw PalPano
-        db 0                    ; 8 its paper
-        dw TunWall
-        db 0                    ; 9 a tunnel's light wall
-        dw TunWall + 1
-        db 0                    ; 10 its dark wall
-        dw PalHud
-        db 1                    ; 11 the HUD's ink
-        dw PalTime
-        db 1                    ; 12 the timer's ink
-        dw PalRoad
-        db 1                    ; 13 the centre line: the road's ink
-        dw 0
-        db $0A                  ; 14 bright yellow: a tunnel's lamps and arch
-        dw 0
-        db $0B                  ; 15 bright white
-        dw 0
-        db $14                  ; the border: black
 
 ; Both screens cleared (A: the byte)
 CpcClearBoth:

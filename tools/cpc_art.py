@@ -71,6 +71,7 @@ def emit_type(name, label=None, *, master=None, previews=True, pen=PLACEHOLDER_P
     -> (consts, directory, data) lists of assembler lines."""
     fn, factor, shifts = scn.TYPES[name]
     label = label or f"Scn_{name}"
+    colour = isinstance(master, tuple)              # the CPC's own: ("cpc", image)
     master = fn() if master is None else master
     consts, dirl, data = [], [f"{label}:"], []
     indices = scn.size_indices(name)
@@ -81,7 +82,10 @@ def emit_type(name, label=None, *, master=None, previews=True, pen=PLACEHOLDER_P
     for k in sorted(set(indices)):
         n = copies(shifts[k])
         h = max(2, round(scn.SIZES[k] * factor))
-        rows = halve(scn.scaled(master, h))
+        if colour:
+            rows = shrink(master[1], h)
+        else:
+            rows = [[pen if on else 0 for on in r] for r in halve(scn.scaled(master, h))]
         wpx = len(rows[0])
         wb = size_bytes(wpx, n)
         lab = f"{label}_{k}"
@@ -91,9 +95,8 @@ def emit_type(name, label=None, *, master=None, previews=True, pen=PLACEHOLDER_P
         for shift in range(n):
             for row in rows:
                 line = [0] * (2 * wb)
-                for x, on in enumerate(row):
-                    if on:
-                        line[x + shift] = pen
+                for x, p in enumerate(row):
+                    line[x + shift] = p
                 out = [byte(line[2 * i], line[2 * i + 1]) for i in range(wb)]
                 data.append("        db " + ", ".join(f"${v:02X}" for v in out))
     return consts, dirl, data
@@ -102,20 +105,20 @@ def emit_type(name, label=None, *, master=None, previews=True, pen=PLACEHOLDER_P
 def type_bytes(name, master=None):
     """Bytes emit_type gives a type (for the theme cache's size check)."""
     fn, factor, shifts = scn.TYPES[name]
+    colour = isinstance(master, tuple)
     master = fn() if master is None else master
     total = 0
     for k in set(scn.size_indices(name)):
         n = copies(shifts[k])
         h = max(2, round(scn.SIZES[k] * factor))
-        wpx = (scn.scaled(master, h).width + 1) // 2
+        if colour:
+            wpx = len(shrink(master[1], h)[0])
+        else:
+            wpx = (scn.scaled(master, h).width + 1) // 2
         total += size_bytes(wpx, n) * h * n
     return total + 8 * len(scn.SIZES)
 
 
-# The Spectrum's colours (index: BRIGHT x 8 + colour) as the placeholder
-# car's pens (docs/port_cpc.md 5.5: 1 black, 3 the dark kerb's red, 14
-# bright yellow, 15 bright white, 10 blue, 5 and 4 the grass's)
-CAR_PENS = {0: 1, 1: 10, 2: 3, 3: 3, 4: 5, 5: 15, 6: 14, 7: 15}
 CAR_W, CAR_H = 64, 32                       # (the Spectrum's: assets/gfx/car.png)
 
 
@@ -145,14 +148,11 @@ def opaque(b):
     return left != 0 and right != 0
 
 
-def car_frames(png="assets/gfx/car.png", split=24):
-    """The Spider's 7 poses (the Spectrum's car.png, 64 x 32 each), Mode 0:
-    16 bytes by 32 lines; outside its outline on each line transparent (pen
-    0), black inside it black. Each pose a top part (SPLIT lines) and a
-    bottom part, the same parts stored once. -> assembler lines."""
-    from PIL import Image
-    im = Image.open(png).convert("RGB")
-    frames = im.width // CAR_W
+def car_frames(spider, split=24):
+    """The Spider's 7 poses (tools/cpc_illustration.py spider: 32 Mode 0
+    pixels by 32 lines, the Spectrum's car block), as runs of bytes a line
+    (line_runs). Each pose a top part (SPLIT lines) and a bottom part, the
+    same parts stored once. -> assembler lines."""
     parts = {}                              # bytes -> label
     table, data = [], []
 
@@ -164,30 +164,15 @@ def car_frames(png="assets/gfx/car.png", split=24):
             data.extend("        db " + ", ".join(f"${b:02X}" for b in line_runs(r)) for r in rows)
         return parts[key]
 
-    for k in range(frames):
-        rows = []
-        for y in range(CAR_H):
-            pens = []
-            for x in range(0, CAR_W, 2):
-                rgb = [im.getpixel((k * CAR_W + x + d, y)) for d in (0, 1)]
-                lit = [c for c in rgb if c != (0, 0, 0)]
-                if not lit:
-                    pens.append(None)          # black: inside or out (below)
-                    continue
-                r, g, b = lit[0]
-                colour = (1 if b else 0) | (2 if r else 0) | (4 if g else 0)
-                pens.append(CAR_PENS[colour])
-            lit = [i for i, p in enumerate(pens) if p is not None]
-            row = [0] * len(pens)
-            if lit:
-                for i in range(lit[0], lit[-1] + 1):
-                    row[i] = pens[i] if pens[i] is not None else 1
-            rows.append([byte(row[2 * i], row[2 * i + 1]) for i in range(len(row) // 2)])
+    for k in range(7):
+        px = spider(k).load()
+        rows = [[byte(*[0 if px[2 * i + j, y] == 255 else px[2 * i + j, y] for j in (0, 1)])
+                 for i in range(CAR_W // 4)] for y in range(CAR_H)]
         top = part(rows[:split], f"CpcCarTop{k}")
         bot = part(rows[split:], f"CpcCarBot{k}")
         table.append(f"        dw {top}, {bot}")
-    return (["; Generated by tools/make_cpc.py - do not edit (a placeholder: the",
-             "; Spectrum's poses, docs/port_cpc.md 5.6)",
+    return (["; Generated by tools/make_cpc.py - do not edit (the Spider's poses:",
+             "; tools/cpc_illustration.py spider)",
              f"CARW_M0 EQU {CAR_W // 4}", f"CARH_M0 EQU {CAR_H}", f"CARTOP_M0 EQU {split}",
              "CpcCarFrames:                ; per pose: its top part, its bottom part"]
             + table + data)
@@ -308,3 +293,28 @@ def loading_screen():
     put_text(block, 16, 21, "FOR THE AMSTRAD CPC 6128", 13)
     put_text(block, 50, 23, "LOADING", 14)
     return bytes(block)
+
+
+def shrink(master, h):
+    """A CPC master (tools/cpc_illustration.py: pens, 255 transparent) at
+    height H, its width in proportion -> rows of pens (0: transparent). Each
+    pixel from its block of the master: transparent if most of it is, else
+    the pen most of the rest is."""
+    from collections import Counter
+    W, H = master.size
+    w = max(1, round(W * h / H))
+    px = master.load()
+    rows = []
+    for ty in range(h):
+        y0, y1 = ty * H // h, max(ty * H // h + 1, (ty + 1) * H // h)
+        row = []
+        for tx in range(w):
+            x0, x1 = tx * W // w, max(tx * W // w + 1, (tx + 1) * W // w)
+            seen = Counter(px[x, y] for y in range(y0, y1) for x in range(x0, x1))
+            clear = seen.pop(255, 0)
+            if not seen or clear > sum(seen.values()):
+                row.append(0)
+            else:
+                row.append(seen.most_common(1)[0][0])
+        rows.append(row)
+    return rows

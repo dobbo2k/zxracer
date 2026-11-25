@@ -58,18 +58,21 @@ def main(disk, sym, outdir):
         fail("the tune's channels were not written")
     for name in ("title", "demo", "game"):
         shutil.copy(folder / f"{name}.png", outdir / f"cpc_{name}.png")
-    # ---- every stage
-    cmds = list(h.boot()) + ["untilw GameFrames 20 6000"]
-    for st in range(NUM_STAGES - 1):        # (the last: its demo ends in the front end)
-        cmds += [f"poke8 CStageReq {st + 1}", "frames 200", f"peek8 s{st} Stage",
-                 f"peek16 g{st} GameFrames", "frames 60", f"peek16 h{st} GameFrames", f"shot stage_{st:02}"]
-    r = h.run(*cmds, disk=disk, sym=sym, folder=folder, timeout=2400)
-    for st in range(NUM_STAGES - 1):
-        if r[f"s{st}"] != str(st):
-            fail(f"stage {st} did not load (Stage {r[f's{st}']})")
-        if int(r[f"h{st}"]) <= int(r[f"g{st}"]):
-            fail(f"stage {st}: the game stopped")
-        shutil.copy(folder / f"stage_{st:02}.png", outdir / f"stage_{st:02}.png")
+    # ---- every stage (a boot each five: the demo goes back to the title in time)
+    for first in range(0, NUM_STAGES - 1, 5):
+        group = range(first, min(first + 5, NUM_STAGES - 1))
+        cmds = list(h.boot()) + ["untilw GameFrames 20 6000"]
+        for st in group:
+            cmds += [f"poke8 CStageReq {st + 1}", "frames 200", f"peek8 s{st} Stage",
+                     f"peek16 g{st} GameFrames", "frames 60", f"peek16 h{st} GameFrames",
+                     f"shot stage_{st:02}"]
+        r = h.run(*cmds, disk=disk, sym=sym, folder=folder, timeout=1200)
+        for st in group:
+            if r[f"s{st}"] != str(st):
+                fail(f"stage {st} did not load (Stage {r[f's{st}']})")
+            if int(r[f"h{st}"]) <= int(r[f"g{st}"]):
+                fail(f"stage {st}: the game stopped")
+            shutil.copy(folder / f"stage_{st:02}.png", outdir / f"stage_{st:02}.png")
     # ---- the Spectrum's tape
     tap, release = ROOT / "build" / "speedrun.tap", ROOT / "release" / "speedrun.tap"
     if tap.exists() and not filecmp.cmp(tap, release, shallow=False):
