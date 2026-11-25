@@ -4,17 +4,13 @@
 
         INCLUDE "road.asm"
         INCLUDE "cells.asm"
+        INCLUDE "sprites.asm"
 
 ; The road and the panorama into the hidden screen
 CpcDraw:
         call CpcRoad
         jp CpcHorizon
 
-; (After DrawPortal and DrawSprites) a tunnel's mouth or the gantry, the
-; objects from the command list, then the car
-CpcSprites:
-        call CpcPortal
-        ret
 
 ; The shared code's hooks (NATIVE_GFX, src/defs.asm); GfxMarkCell,
 ; GfxMarkBig, GfxLampCells: src/cpc/cells.asm

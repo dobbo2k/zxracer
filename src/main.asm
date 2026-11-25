@@ -74,10 +74,11 @@ MainLoop:
         call WaitFlip           ; (the last frame shown: the hidden screen at $4000)
         call CpcDraw            ; the road and the panorama (src/cpc)
         call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
+        call CpcPortal          ; (its cells: src/cpc/draw.asm)
         call DrawSprites        ; traffic and scenery projected: the command list
-        call CpcSprites         ; drawn from it, then the car (src/cpc)
         call DrawHud            ; (into screen B: the cells it writes are noted)
-        call CpcCells           ; and converted into the hidden screen
+        call CpcCells           ; the noted cells into the hidden screen
+        call CpcObjects         ; the objects from the list, then the car (src/cpc)
         call RequestFlip        ; shown from the next VSYNC due
         jr MainLoop
         ENDIF

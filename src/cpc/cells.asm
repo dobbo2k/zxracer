@@ -81,6 +81,37 @@ CBit:   db $80, $40, $20, $10, $08, $04, $02, $01
         ASSERT high CBit == high (CBit + 7)
         ASSERT high CDirtyA == high (CDirtyB + CELL_ROWS * 4 - 1)
 
+; B = row, C = column: the cell noted for the hidden screen alone (an
+; object over it: converted again next time). BC, DE kept.
+CpcMarkHid:
+        push de
+        ld a, c
+        and 7
+        add a, low CBit
+        ld l, a
+        ld h, high CBit
+        ld d, (hl)
+        ld a, b
+        add a, a
+        add a, a
+        ld e, a
+        ld a, c
+        rrca
+        rrca
+        rrca
+        and 3
+        add a, e
+        ld e, a
+        call CDirtyHid
+        ld a, l
+        add a, e
+        ld l, a
+        ld a, d
+        or (hl)
+        ld (hl), a
+        pop de
+        ret
+
 ; A big digit's four cells (HL: its top left in the shadow; kept)
 GfxMarkBig:
         push af
