@@ -641,3 +641,16 @@ measurements come first of all: they decide the memory map's fallbacks.
   (now the Spectrum's converted); the title, goal postcards and loading
   screen; a tunnel's lamps; WinAPE on CRTC types 0-4 and a real 6128
   (phase 7: WinAPE has no headless mode, its window must be in front).
+
+### Phase A's art done; the release (25 November 2026)
+
+- **Phase A:** the owner approved the coast and the far road's 4-line steps.
+  The other four themes' scenery and palettes, the title, the five goal
+  postcards and the loading screen drawn for the CPC (`docs/cpc_artwork.md`).
+  The sky's clouds and the panorama stay the Spectrum's 1-bit drawings in
+  the CPC's pens. A tunnel's lamps drawn.
+- **Phase 6:** `release/speedrun_cpc.dsk` (`make release-cpc`) and the
+  README's CPC lines; the disc boots in MAME. WinAPE across the CRTC types
+  and a real 6128 are still to do (phase 7).
+- **The benchmark:** 4.01 TV frames a game frame, 12.47 fps (the new art's
+  objects a little larger than the placeholders).

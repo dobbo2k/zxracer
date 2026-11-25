@@ -56,5 +56,14 @@ A stage's 16 pens and its border travel in its art pack: unpacked at
 - **Every theme:** the bend signs, the fork's and the tunnel's boards; the
   traffic (a yellow hatchback, a white van, a lorry); the Spider's seven
   poses.
-- **Still the placeholders:** the sky and the panorama (the Spectrum's, converted); the title, the goal
-  postcards and the loading screen (the Spectrum's pictures).
+- **The pictures** (`tools/cpc_pictures.py`): the title (the logo on its
+  fascia, the coast, the Spider), the five goal postcards (each region
+  under the GOAL! gantry) and the loading screen, in Mode 0 from the
+  masters. Each is a screen's 16K block, its inks at $600 and its text
+  panel's Spectrum cells in the other 2Ks' unshown parts: the front end
+  prints and blinks its text there as before (`src/cpc/front.asm
+  GfxPicture`); the title's labels in the CPC's font.
+- **Still the Spectrum's drawing, in the CPC's pens:** the stage's sky
+  (its clouds) and the panorama, 1 bit a pixel. A Mode 0 sky and panorama
+  of their own would need about 3.5K and 1K a stage, and a clean copy of
+  the sky to put back where objects cover it.
