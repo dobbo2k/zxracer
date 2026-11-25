@@ -253,3 +253,58 @@ def dash_header():
     for x in (0, 186):
         draw.line((x, 6, x + 4, 1), 1, width=2)
     return im.tobytes()
+
+
+SPEC_HW = (0x14, 0x04, 0x1C, 0x18, 0x16, 0x06, 0x1E, 0x00,      # the Spectrum's colours as
+           0x14, 0x15, 0x0C, 0x0D, 0x12, 0x13, 0x0A, 0x0B)      # the Gate Array's (src/cpc)
+
+
+def spectrum_screen(scr):
+    """A Spectrum screen (6912 bytes) as a CPC screen's 16K block: Mode 0,
+    pen k the Spectrum's colour k (BRIGHT x 8 + colour), each pair of
+    Spectrum pixels a Mode 0 pixel (ink if either is); line y at
+    (y & 7) x $800 + (y / 8) x 64. Its 17 inks (the pens' and the border's
+    hardware colours) in the first 2K's unshown part, at $600."""
+    out = bytearray(0x4000)
+    for y in range(192):
+        line = ((y & 0xC0) << 5) | ((y & 7) << 8) | ((y & 0x38) << 2)
+        for cx in range(32):
+            attr = scr[6144 + (y >> 3) * 32 + cx]
+            bright = 8 if attr & 0x40 else 0
+            ink, paper = (attr & 7) + bright, ((attr >> 3) & 7) + bright
+            bits = scr[line + cx]
+            px = [ink if bits & (0xC0 >> (2 * k)) else paper for k in range(4)]
+            at = (y & 7) * 0x800 + (y >> 3) * 64 + cx * 2
+            out[at] = byte(px[0], px[1])
+            out[at + 1] = byte(px[2], px[3])
+    out[0x600:0x611] = bytes(SPEC_HW) + bytes([0x14])
+    return bytes(out)
+
+
+def put_text(block, x, row, text, pen):
+    """CPC font text into a screen block (spectrum_screen's): Mode 0 pixel
+    x, character row ROW (its 8 lines), each glyph 4 pixels wide."""
+    for ch in text:
+        for y, r in enumerate(FONT.get(ch, "... ... ... ... ... ... ...").split()):
+            for c, p in enumerate(r + "."):
+                px = x + c
+                at = (y & 7) * 0x800 + row * 64 + px // 2
+                left, right = pens(block[at])
+                if p == "#":
+                    left, right = (pen, right) if px % 2 == 0 else (left, pen)
+                block[at] = byte(left, right)
+        x += 4
+
+
+def loading_screen():
+    """The loading screen until the CPC's own (phase A): the Spectrum's title
+    in its colours, its last three rows saying what it is for."""
+    import make_screens
+    block = bytearray(spectrum_screen(make_screens.title_screen(loading=True)))
+    for row in range(21, 24):
+        for y in range(8):
+            at = y * 0x800 + row * 64
+            block[at:at + 64] = bytes(64)
+    put_text(block, 16, 21, "FOR THE AMSTRAD CPC 6128", 13)
+    put_text(block, 50, 23, "LOADING", 14)
+    return bytes(block)

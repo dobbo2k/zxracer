@@ -45,7 +45,37 @@ Loader:
         jp p, .pen
         ld bc, PPI_CONTROL | $82
         out (c), c
+        ld hl, Crtc             ; the game's screen: 64 bytes a line, 24 rows
+        ld e, 0
+.crtc:  ld b, $BC
+        out (c), e
+        ld b, $BD
+        ld a, (hl)
+        out (c), a
+        inc hl
+        inc e
+        ld a, e
+        cp 14
+        jr c, .crtc
         call FdcStart
+        ld a, $C0               ; the loading screen: packed into base 0, then
+        ld hl, LOADING_SECTOR   ; into base 1 (C0) and shown, its inks with it
+        ld b, LOADING_SECTORS
+        call ReadBase0
+        ld hl, $0000
+        ld de, $4000
+        call Unpack
+        ld hl, $4600
+        ld bc, GA_PORT
+        xor a
+.ink:   out (c), a
+        ld e, (hl)
+        inc hl
+        set 6, e
+        out (c), e
+        inc a
+        cp 17
+        jr c, .ink
         ld a, $C4               ; base 0's part into bank 4
         ld hl, IMAGE_BASE0_SECTOR
         ld b, IMAGE_BASE0_SECTORS
@@ -67,15 +97,21 @@ Loader:
         call Unpack
         jp $0000                ; (jp CpcBoot)
 
+; HL = a logical sector, B = how many: read to $0000 on (C0)
+ReadBase0:
+        ld de, $0000
+        jr ReadAt
 ; A = a RAM configuration, HL = a logical sector, B = how many: read to
 ; $4000 on
-Read:   ld (.n + 1), a
+Read:   ld de, $4000
+ReadAt: ld (.to + 1), de
+        ld (.n + 1), a
         ld a, b
         ld (Count), a
 .n:     ld bc, GA_PORT          ; (C patched)
         out (c), c
         call FdcPlace
-        ld hl, $4000
+.to:    ld hl, $4000
 .sec:   call FdcReadSector
         jr nc, .sec             ; (till it reads)
         call FdcNext
@@ -85,6 +121,8 @@ Read:   ld (.n + 1), a
         jr nz, .sec
         ret
 Count:  db 0
+; R0-R13: the game's (src/cpc/boot.asm CpcCrtc), base 1 shown
+Crtc:   db 63, 32, 42, $8E, 38, 0, 24, 30, 0, 7, 0, 0, $10, 0
 
 ; A sector that will not read: the border red till one does
 FdcFailed:

@@ -203,8 +203,12 @@ CPC_SRC := $(wildcard src/cpc/*.asm)
 CPC_GEN := build/cpc/packs.asm build/cpc/cpc_objects.asm build/cpc/cpc_car.asm build/cpc/font_data.asm build/cpc/stagepacks.asm build/cpc/music_notes.asm
 CPC_DAT := build/cpc/stages.asm build/cpc/stageov_pack.asm build/cpc/screens_data.asm build/cpc/speed_raw.dat build/cpc/reserve.txt
 
-.PHONY: cpc test-cpc run-cpc
+.PHONY: cpc test-cpc run-cpc release-cpc
 cpc: build/cpc/speedrun.dsk
+
+release-cpc: build/cpc/speedrun.dsk
+	mkdir -p release
+	cp $< release/speedrun_cpc.dsk
 
 build/cpc:
 	mkdir -p build/cpc
@@ -233,7 +237,7 @@ build/cpc/speed.bin: src/cpc/loader.asm src/cpc/fdc.asm build/cpc/loader_defs.as
 build/cpc/speedrun.dsk: build/cpc/SPEED.DAT build/cpc/speed.bin tools/make_cpc.py tools/cpc/make_dsk.py
 	$(PYTHON) tools/make_cpc.py dsk assets/stages.yaml build/cpc
 
-test-cpc: build/cpc/speedrun.dsk
+test-cpc: build/cpc/speedrun.dsk build/speedrun.tap
 	$(PYTHON) tests/cpc_check.py build/cpc/speedrun.dsk build/cpc/speedrun.sym build/cpc
 
 # WinAPE (CPC_WINAPE in local.mk): the disc in drive A; RUN"SPEED"
