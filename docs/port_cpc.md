@@ -654,3 +654,19 @@ measurements come first of all: they decide the memory map's fallbacks.
   and a real 6128 are still to do (phase 7).
 - **The benchmark:** 4.01 TV frames a game frame, 12.47 fps (the new art's
   objects a little larger than the placeholders).
+
+### Speed: the keys, the AY and the car (25 November 2026)
+
+- **The keys:** each Spectrum half-row is made from the CPC's matrix once a
+  scan, by its own unrolled code (`src/cpc/keyrows.asm`, in bank 2), and
+  kept (`CRowVal`, `CRowOk`); a one-row read (the game's) goes straight to
+  its value.
+- **The AY:** `AyWrite` keeps the registers as last written (`CAyShadow`)
+  and skips a write that changes nothing (but the envelope's shape, which
+  restarts it): about one real write a frame in play.
+- **The car:** each of the Spider's lines compiled to straight code
+  (`tools/cpc_art.py car_code`: 118 lines for the 7 poses, about 3.8K, in
+  the room the runs had); each line ends in a jump that `CCarPatch` points
+  at the pose's next line when the pose changes. Pixel for pixel the same.
+- **The benchmark:** 3.69 TV frames a game frame, 13.54 fps (was 4.01,
+  12.47).

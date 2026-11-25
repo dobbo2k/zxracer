@@ -15,7 +15,23 @@ ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpda
 ; A = register, E = value
 AyWrite:
         IFDEF CPC               ; (A, E and the flags kept; BC used)
+        push af                 ; (a value it holds already: not written, but
+        cp 13                   ; the envelope's shape, which restarts it; a
+        jr z, .w                ; write through the PPI is about 30 us)
+        add a, low CAyShadow
+        ld c, a
+        ld b, high CAyShadow
+        ld a, (bc)
+        cp e
+        jr z, .same
+        ld a, e
+        ld (bc), a
+        pop af
         push af
+        jr .w
+.same:  pop af
+        ret
+.w:
         ld b, $F4               ; the AY's bus is the PPI's port A, its
         out (c), a              ; function port C's bits 6-7: the register
         ld bc, $F6C0            ; selected,

@@ -360,3 +360,9 @@ SpecHw: db $14, $04, $1C, $18, $16, $06, $1E, $00     ; black blue red magenta g
 ; colour it is: CpcPalette)
 CSpecPB:        ds 16, 0
         ASSERT high CSpecPB == high (CSpecPB + 15)
+; (src/cpc/keys.asm) the Spectrum's half-rows as last made
+CRowVal:        ds 8, $FF
+        ASSERT high (CRowVal - 1) == high (CRowVal + 7)
+; (src/sound.asm AyWrite) the AY's registers as last written ($FF: not yet)
+CAyShadow:      ds 16, $FF
+        ASSERT high CAyShadow == high (CAyShadow + 15)

@@ -10,7 +10,7 @@ each thing is. Phase A of the plan; the coast theme first, for approval.
 | File | What |
 |---|---|
 | `tools/cpc_illustration.py` | The masters, drawn in code: indexed images in Mode 0 pixels, each value a pen (255 transparent), at twice the largest size shown. The themes' palettes (`THEMES`), each stage's 17 colours (`stage_pens`) |
-| `tools/cpc_art.py` | The masters made the game's bytes: scaled to the Spectrum's ladder of sizes (`shrink`: each pixel the pen most of its block is), one copy or two a pixel apart (`emit_type`); the Spider's poses as runs (`car_frames`, `line_runs`); the font (`FONT`), the HUD's top strip (`dash_header`), the loading screen (`loading_screen`) |
+| `tools/cpc_art.py` | The masters made the game's bytes: scaled to the Spectrum's ladder of sizes (`shrink`: each pixel the pen most of its block is), one copy or two a pixel apart (`emit_type`); the Spider's poses compiled, a line of straight code each (`car_code`); the font (`FONT`), the HUD's top strip (`dash_header`), the loading screen (`loading_screen`) |
 | `tools/make_cpc.py` | Hands the masters to `make_stages` (each theme its own, the traffic resident); the stage's pens appended to its art pack |
 
 The sizes stay `make_scenery.py`'s (the projection and the clipping depend

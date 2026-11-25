@@ -125,7 +125,7 @@ def gen(cfg, outdir):
     open(os.path.join(outdir, "packs.asm"), "w").write("\n".join(head) + "\n")
     open(os.path.join(outdir, "cpc_objects.asm"), "w").write(make_stages.resident_data(masters))
     open(os.path.join(outdir, "cpc_car.asm"), "w").write(
-        "\n".join(cpc_art.car_frames(spider=cpc_illustration.spider)) + "\n")
+        "\n".join(cpc_art.car_code(spider=cpc_illustration.spider)) + "\n")
     open(os.path.join(outdir, "font_data.asm"), "w").write("\n".join(cpc_art.font_asm()) + "\n")
     out = head + ["; the resident sprites the theme packs name (src/main.asm: at SCN_DATA)",
                   f"        ORG ${SCN_DATA:04X}", '        INCLUDE "cpc_objects.asm"']

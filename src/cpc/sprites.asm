@@ -277,78 +277,62 @@ CpcCar:
         sbc a, a
         cpl
         ld (Squeal), a
-        ld a, c                 ; its top part and its bottom part
-        add a, a
-        add a, a
-        ld l, a
+        ld a, c                 ; a new pose: its lines' jumps
+        ld hl, CCarLast
+        cp (hl)
+        call nz, CCarPatch
+        ld bc, CAR_BC           ; (its commonest bytes, as the code expects)
+        ld de, CAR_DE
+CCarGo: jp CCarDone             ; (patched: the pose's first line)
+CCarDone:
+        ret
+
+; A = the pose (HL = CCarLast): each of its lines' jump to its next line
+; (build/cpc/cpc_car.asm: tools/cpc_art.py car_code)
+CCarPatch:
+        ld (hl), a
+        ld l, a                 ; HL = its lines' numbers
         ld h, 0
-        ld de, CpcCarFrames
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        add hl, hl
+        ld de, CCarPoses
         add hl, de
+        ld de, CCarGo + 1       ; the jump to point at the next line
+        ld b, CARH_M0
+.ln:    push bc
+        ld a, (hl)
+        inc hl
+        push hl
+        ld l, a                 ; its entry: its code, its jump's operand
+        ld h, 0
+        add hl, hl
+        add hl, hl
+        ld bc, CCarLines
+        add hl, bc
+        ld c, (hl)
+        inc hl
+        ld b, (hl)
+        inc hl
+        ex de, hl
+        ld (hl), c
+        inc hl
+        ld (hl), b
+        ex de, hl
         ld e, (hl)
         inc hl
         ld d, (hl)
+        pop hl
+        pop bc
+        djnz .ln
+        ex de, hl               ; the last line's: back
+        ld (hl), low CCarDone
         inc hl
-        ld a, (hl)
-        inc hl
-        ld h, (hl)
-        ld l, a
-        ld (.bot + 1), hl
-        ld hl, SCR + CAR_ROW * SCR_ROW + CAR_COL * 2
-        ld ixh, CARTOP_M0
-; Lines of runs (tools/cpc_art.py line_runs): DE -> them, HL = the first
-; line's left end in the hidden screen, IXH = how many
-.ln:    push hl
-        ld a, (de)              ; the bytes to skip
-        inc de
-        add a, l
-        ld l, a
-.run:   ld a, (de)
-        inc de
-        or a
-        jr z, .eol
-        jp m, .masked
-        ex de, hl               ; every pixel drawn: copied
-        call LdiN
-        ex de, hl
-        jr .run
-.masked:
-        and $7F
-        ld ixl, a
-        ld b, high CMaskTab
-.px:    ld a, (de)
-        inc de
-        ld c, a
-        ld a, (bc)
-        and (hl)
-        or c
-        ld (hl), a
-        inc l
-        dec ixl
-        jr nz, .px
-        jr .run
-.eol:   pop hl
-        ld a, h                 ; the next line
-        add a, high SCR_LINE
-        ld h, a
-        cp high (SCR + 8 * SCR_LINE)
-        jr c, .nr
-        sub high (8 * SCR_LINE)
-        ld h, a
-        ld a, l
-        add a, SCR_ROW
-        ld l, a
-        jr nc, .nr
-        inc h
-.nr:    dec ixh
-        jr nz, .ln
-        ld a, (.bot + 2)        ; then the bottom part (once)
-        or a
-        ret z
-.bot:   ld de, 0
-        xor a
-        ld (.bot + 2), a
-        ld ixh, CARH_M0 - CARTOP_M0
-        jr .ln
+        ld (hl), high CCarDone
+        ret
+CCarLast:       db $FF          ; the pose the jumps are set for
 
 ; Per sprite byte: the screen's pixels it leaves (its pen 0 pixels'), page-
 ; aligned

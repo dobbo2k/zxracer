@@ -3,6 +3,7 @@
 ; ---------------------------------------------------------------------------
         INCLUDE "front.asm"
         INCLUDE "reset.asm"
+        INCLUDE "keyrows.asm"
 
 ; (The tests, tests/cpc_check.py) A = 1 + a stage: the demo from its start
 CStageReq:      db 0

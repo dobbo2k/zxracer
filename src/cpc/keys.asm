@@ -33,49 +33,63 @@ CpcScan:
         out (c), c
         ld bc, PPI_C
         out (c), c
+        xor a                   ; (the Spectrum's rows made afresh)
+        ld (CRowOk), a
         ret
 
 ; A = the Spectrum's half-rows to read (as port $FE's high byte: a 0 bit
 ; each) -> A = their keys (bits 0-4, 0: pressed; bits 5-7 set), as the
-; Spectrum's IN would give. BC, DE, HL kept.
+; Spectrum's IN would give. Each half-row is made from the CPC's lines once
+; a scan (CRowVal, CRowOk: CpcScan clears it), by its own unrolled code
+; (src/cpc/keyrows.asm). One row (the game's reads): straight to its value.
+; BC, DE, HL kept.
 CpcSpecIn:
+        push bc
+        push hl
+        ld c, a
+        cpl
+        ld b, a                 ; B = the rows as 1 bits
+        dec a                   ; one row only? (B & (B - 1) = 0, B not 0)
+        and b
+        jr nz, .all
+        or b
+        jr z, .all
+        ld hl, CRowVal - 1      ; its value's byte
+.find:  inc l
+        rr c
+        jr c, .find
+        ld a, (CRowOk)
+        and b
+        jr z, .make
+        ld a, (hl)
+        pop hl
+        pop bc
+        ret
+.make:  call CRowMake
+        pop hl
+        pop bc
+        ret
+.all:   ld a, c                 ; (none or several rows: each)
+        pop hl
+        pop bc
         push bc
         push de
         push hl
         ld c, a                 ; the rows: a 0 bit each
         ld d, $FF               ; the answer (0 bits: pressed)
-        ld hl, CpcSpecMap
-        ld b, 8
-.row:   rr c
-        jr nc, .read
-        ld a, l                 ; (not read: past its 10 bytes)
-        add a, 10
-        ld l, a
-        jr nc, .next
-        inc h
-        jr .next
-.read:  ld e, 1                 ; the key's bit in the answer
-.key:   push bc
-        ld c, (hl)              ; its line
-        inc hl
-        ld a, (hl)              ; its mask
-        inc hl
-        push hl
-        ld hl, CpcKeys
-        ld b, 0
-        add hl, bc
-        and (hl)
-        pop hl
-        pop bc
-        jr nz, .up
-        ld a, e                 ; pressed
-        cpl
+        ld hl, CRowVal - 1
+        ld b, 1                 ; this row's bit
+.row:   inc l
+        rr c
+        jr c, .next
+        ld a, (CRowOk)
+        and b
+        ld a, (hl)
+        call z, CRowMake
         and d
         ld d, a
-.up:    sla e
-        bit 5, e
-        jr z, .key
-.next:  djnz .row
+.next:  sla b
+        jr nc, .row
         ld a, d
         or $E0
         pop hl
@@ -83,17 +97,36 @@ CpcSpecIn:
         pop bc
         ret
 
-; The Spectrum's keyboard on the CPC's: per half-row (from $FE's bit 0)
-; its five keys (from bit 0), each a line and a bit's mask
-CpcSpecMap:
-        db 2, $20, 8, $80, 7, $80, 7, $40, 6, $80     ; CAPS (SHIFT) Z X C V
-        db 8, $20, 7, $10, 7, $20, 6, $20, 6, $10     ; A S D F G
-        db 8, $08, 7, $08, 7, $04, 6, $04, 6, $08     ; Q W E R T
-        db 8, $01, 8, $02, 7, $02, 7, $01, 6, $02     ; 1 2 3 4 5
-        db 4, $01, 4, $02, 5, $01, 5, $02, 6, $01     ; 0 9 8 7 6
-        db 3, $08, 4, $04, 4, $08, 5, $04, 5, $08     ; P O I U Y
-        db 2, $04, 4, $10, 4, $20, 5, $20, 5, $10     ; ENTER (RETURN) L K J H
-        db 5, $80, 2, $80, 4, $40, 5, $40, 6, $40     ; SPACE SYMBOL (CONTROL) M N B
+; HL = the row's byte in CRowVal, B = its bit: the row made and kept -> A
+; (BC, DE, HL kept)
+CRowMake:
+        push bc
+        push de
+        push hl
+        ld a, l
+        sub low CRowVal
+        add a, a
+        add a, low CRowMakers
+        ld l, a
+        ld h, high CRowMakers
+        ld a, (hl)
+        inc l
+        ld h, (hl)
+        ld l, a
+        call .jp                ; A = the row's keys
+        pop hl
+        ld (hl), a
+        pop de
+        pop bc
+        push af
+        ld a, (CRowOk)
+        or b
+        ld (CRowOk), a
+        pop af
+        ret
+.jp:    jp (hl)
+
+CRowOk:         db 0            ; the rows made since the last scan (a bit each)
 
 ; The joystick (line 9: up 0, down 1, left 2, right 3, fire 4 and 5) as
 ; the Kempston's bits (1: pressed). C kept.
