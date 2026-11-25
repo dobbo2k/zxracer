@@ -104,9 +104,11 @@ def translate(commands, syms: dict[str, int]) -> tuple[list[str], list[str]]:
 
 
 def run(*commands: str, disk: Path = DISK, timeout: int = 600, debug: bool = False,
-        folder: Path = RUN, wav: Path | None = None, sym: Path = SYMBOLS) -> dict[str, str]:
+        folder: Path = RUN, wav: Path | None = None, sym: Path = SYMBOLS,
+        avi: Path | None = None) -> dict[str, str]:
     """debug: MAME's debugger on (for "debug" commands: traces); folder: the
-    run's own (commands, results, screenshots, MAME states)."""
+    run's own (commands, results, screenshots, MAME states); avi: the run
+    recorded, picture and sound (MAME's -aviwrite)."""
     syms = symbols(sym)
     folder.mkdir(parents=True, exist_ok=True)
     snaps = folder / "snaps"
@@ -120,8 +122,9 @@ def run(*commands: str, disk: Path = DISK, timeout: int = 600, debug: bool = Fal
                     "-state_directory", str(states), "-cfg_directory", str(folder / "cfg"),
                     "-autoboot_script", str(ROOT / "tools" / "mame" / "cpc_harness.lua"),
                     "-snapshot_directory", str(snaps), "-video", "none",
-                    "-sound", "none" if not wav else "auto",
+                    "-sound", "none" if not (wav or avi) else "auto",
                     *(["-wavwrite", str(wav)] if wav else []),
+                    *(["-aviwrite", str(avi.resolve()), "-snapsize", "768x544"] if avi else []),
                     *(["-debug", "-debugger", "none"] if debug else []),
                     "-nothrottle", "-skip_gameinfo"], cwd=ROOT, check=True, capture_output=True,
                    timeout=timeout, env={**os.environ, "CPC_RUN": str(folder)})
