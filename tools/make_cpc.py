@@ -12,6 +12,7 @@ sector of its own, and the game reads and unpacks it (src/cpc/disc.asm).
     packs.asm         THEME_CACHE, PANO_CACHE, TRACK_CACHE for the CPC's map
     cpc_objects.asm   the resident objects (traffic, vans, trucks) in Mode 0
     cpc_car.asm       the Spider in Mode 0
+    font_data.asm     the font, 3 pixels wide, each pixel doubled across
     stagepacks.asm    every theme and track pack, each assembled where it
                       runs, to theme_*.bin and track_*.bin (sjasmplus);
                       art_*.bin every stage's art
@@ -92,6 +93,7 @@ def gen(cfg, outdir):
     open(os.path.join(outdir, "packs.asm"), "w").write("\n".join(head) + "\n")
     open(os.path.join(outdir, "cpc_objects.asm"), "w").write(make_stages.resident_data(masters))
     open(os.path.join(outdir, "cpc_car.asm"), "w").write("\n".join(cpc_art.car_frames()) + "\n")
+    open(os.path.join(outdir, "font_data.asm"), "w").write("\n".join(cpc_art.font_asm()) + "\n")
     out = head + ["; the resident sprites the theme packs name (src/main.asm: at SCN_DATA)",
                   "        ORG $1B00", '        INCLUDE "cpc_objects.asm"']
     for label, lines, size, cache in packs:
@@ -156,7 +158,7 @@ def dat(cfg, outdir):
         a = where[st["art"]]
         tab += ["        db 0", f"        dw {a[0]}, {a[1]}"]
     tab.append("DashHeader:")
-    header = make_stages.round_art.dash_header()
+    header = cpc_art.dash_header()
     for y in range(8):
         tab.append("        db " + ", ".join(map(str, header[y * 32:(y + 1) * 32])))
     tab += ["FrontEndPack:   db 0", f"        dw {room['frontend'][0]}, {room['frontend'][1] * SECTOR}"]

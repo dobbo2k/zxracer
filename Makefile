@@ -200,7 +200,7 @@ run-einstein: build/einstein/speedrun.dsk
 # (local.mk) are MAME and its cpc6128 ROM set (cpc6128.rom, cpcados.rom),
 # for the tests and run-cpc.
 CPC_SRC := $(wildcard src/cpc/*.asm)
-CPC_GEN := build/cpc/packs.asm build/cpc/cpc_objects.asm build/cpc/cpc_car.asm build/cpc/stagepacks.asm build/cpc/music_notes.asm
+CPC_GEN := build/cpc/packs.asm build/cpc/cpc_objects.asm build/cpc/cpc_car.asm build/cpc/font_data.asm build/cpc/stagepacks.asm build/cpc/music_notes.asm
 CPC_DAT := build/cpc/stages.asm build/cpc/stageov_pack.asm build/cpc/screens_data.asm build/cpc/speed_raw.dat build/cpc/reserve.txt
 
 .PHONY: cpc test-cpc run-cpc
