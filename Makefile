@@ -20,7 +20,7 @@ ZXSIM := ./build/zxsim$(EXE)
 # Machine-specific settings (emulator paths); see CLAUDE.md
 -include local.mk
 
-.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet einstein test-einstein run-einstein
+.PHONY: all clean run run-tape run-realtape test shots profile video tap release cover leaflet einstein release-einstein test-einstein run-einstein
 all: build/zxracer.sna
 
 build:
@@ -42,6 +42,8 @@ $(OBJINK_STAMP): | build
 build/stages.asm: tools/make_stages.py tools/round_art.py tools/make_music.py tools/make_scenery.py tools/make_screens.py tools/gen_tables.py tools/make_font.py assets/stages.yaml assets/gfx/car.png $(OBJINK_STAMP) | build
 	ZX_OBJINK=$(ZX_OBJINK) $(PYTHON) tools/make_stages.py assets/stages.yaml build
 
+# The crew's crash close-ups (no longer in the game: the Spectrum dropped them
+# for room, the Einstein never had them)
 build/crew_data.asm: tools/make_crew.py tools/make_screens.py | build
 	$(PYTHON) tools/make_crew.py $@
 
@@ -51,7 +53,7 @@ build/music_title.asm: tools/make_music.py | build
 build/font_data.asm: tools/make_font.py | build
 	$(PYTHON) tools/make_font.py $@
 
-build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
+build/zxracer.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) $(ASMFLAGS) $(OBJINK_DEF) src/main.asm
 
 $(ZXSIM): tools/zxsim/zxsim.c | build
@@ -74,7 +76,7 @@ profile: $(ZXSIM) build/zxracer.sna
 
 # Gameplay video (build/gameplay.mp4): no timing bars, autopilot drives the game
 # Release build (no timing bars) and the tape image made from it
-build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
+build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 $(OBJINK_DEF) src/main.asm
 
 build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py assets/gfx/loading.scr src/loader.asm | build
@@ -105,7 +107,7 @@ leaflet: tools/make_leaflet.py assets/stages.yaml | build
 	mkdir -p release
 	$(PYTHON) tools/make_leaflet.py release/route_map.png build/route_map.svg
 
-build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/crew_data.asm build/music_title.asm | build
+build/video.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/video.sym -DPROFILE=0 -DAUTOPLAY=1 $(OBJINK_DEF) src/main.asm
 
 video: $(ZXSIM) build/video.sna
@@ -151,6 +153,10 @@ EIN_DAT := build/einstein/stages.asm build/einstein/stageov_pack.asm build/einst
 
 einstein: build/einstein/speedrun.dsk
 
+release-einstein: build/einstein/speedrun.dsk
+	mkdir -p release
+	cp $< release/speedrun.dsk
+
 build/einstein:
 	mkdir -p build/einstein
 
@@ -169,7 +175,7 @@ $(EIN_DAT) &: build/einstein/stagepacks.stamp tools/make_einstein.py tools/make_
 build/einstein/STAGES.DAT: build/einstein/speedrun.com build/einstein/stages_raw.dat tools/make_einstein.py
 	$(PYTHON) tools/make_einstein.py patch assets/stages.yaml build/einstein
 
-build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm build/crew_data.asm | build/einstein
+build/einstein/speedrun.com: $(SRC) $(EIN_SRC) $(EIN_GEN) $(EIN_DAT) build/music_title.asm build/tables.asm build/car_data.asm build/font_data.asm | build/einstein
 	$(ASM) --nologo --msg=war --fullpath -DEINSTEIN=1 -Ibuild -Ibuild/einstein --lst=build/einstein/speedrun.lst --sym=build/einstein/speedrun.sym src/main.asm
 
 build/einstein/speedrun.dsk: build/einstein/speedrun.com build/einstein/STAGES.DAT tools/make_einstein_disk.py
@@ -187,3 +193,55 @@ test-einstein: build/einstein/speedrun.dsk $(EIN_HARNESS)
 ALBERT ?= /c/Tatung Einstein/albert/albert.exe
 run-einstein: build/einstein/speedrun.dsk
 	"$(ALBERT)" --disk build/einstein/speedrun.dsk &
+
+# ---------------------------------------------------------------------------
+# Amstrad CPC 6128 (docs/port_cpc.md): build/cpc/speedrun.dsk, an AMSDOS
+# DATA disc: RUN"SPEED" at the BASIC prompt. CPC_MAME and CPC_ROMS
+# (local.mk) are MAME and its cpc6128 ROM set (cpc6128.rom, cpcados.rom),
+# for the tests and run-cpc.
+CPC_SRC := $(wildcard src/cpc/*.asm)
+CPC_GEN := build/cpc/packs.asm build/cpc/cpc_objects.asm build/cpc/cpc_car.asm build/cpc/font_data.asm build/cpc/stagepacks.asm build/cpc/music_notes.asm
+CPC_DAT := build/cpc/stages.asm build/cpc/stageov_pack.asm build/cpc/screens_data.asm build/cpc/speed_raw.dat build/cpc/reserve.txt
+
+.PHONY: cpc test-cpc run-cpc release-cpc
+cpc: build/cpc/speedrun.dsk
+
+release-cpc: build/cpc/speedrun.dsk
+	mkdir -p release
+	cp $< release/speedrun_cpc.dsk
+
+build/cpc:
+	mkdir -p build/cpc
+
+CPC_ART := tools/cpc_art.py tools/cpc_illustration.py tools/cpc_pictures.py
+$(CPC_GEN) &: $(CPC_ART) tools/make_cpc.py build/stages.asm | build/cpc
+	$(PYTHON) tools/make_cpc.py gen assets/stages.yaml build/cpc
+
+# every stage's packs, each assembled where it runs
+build/cpc/stagepacks.stamp: build/cpc/stagepacks.asm
+	$(ASM) --nologo --msg=war -Ibuild -Ibuild/cpc build/cpc/stagepacks.asm
+	touch $@
+
+$(CPC_DAT) &: build/cpc/stagepacks.stamp $(CPC_ART) tools/make_cpc.py tools/make_screens.py
+	$(PYTHON) tools/make_cpc.py dat assets/stages.yaml build/cpc
+
+build/cpc/base0.bin: $(SRC) $(CPC_SRC) $(CPC_GEN) $(CPC_DAT) build/music_title.asm build/tables.asm build/font_data.asm | build/cpc
+	$(ASM) --nologo --msg=war --fullpath -DCPC=1 -Ibuild -Ibuild/cpc --lst=build/cpc/speedrun.lst --sym=build/cpc/speedrun.sym src/main.asm
+
+# the overlay, the front end and the game's image into SPEED.DAT; the loader
+build/cpc/SPEED.DAT build/cpc/loader_defs.asm &: build/cpc/base0.bin build/cpc/speed_raw.dat $(CPC_ART) tools/make_cpc.py
+	$(PYTHON) tools/make_cpc.py patch assets/stages.yaml build/cpc
+
+build/cpc/speed.bin: src/cpc/loader.asm src/cpc/fdc.asm build/cpc/loader_defs.asm
+	$(ASM) --nologo --msg=war -Ibuild/cpc --sym=build/cpc/loader.sym src/cpc/loader.asm
+
+build/cpc/speedrun.dsk: build/cpc/SPEED.DAT build/cpc/speed.bin tools/make_cpc.py tools/cpc/make_dsk.py
+	$(PYTHON) tools/make_cpc.py dsk assets/stages.yaml build/cpc
+
+test-cpc: build/cpc/speedrun.dsk build/speedrun.tap
+	$(PYTHON) tests/cpc_check.py build/cpc/speedrun.dsk build/cpc/speedrun.sym build/cpc
+
+# WinAPE (CPC_WINAPE in local.mk): the disc in drive A; RUN"SPEED"
+CPC_WINAPE ?= /c/ZX Spectrum/Wonderboy/build/winape/WinApe.exe
+run-cpc: build/cpc/speedrun.dsk
+	"$(CPC_WINAPE)" "$(shell cygpath -w "$(abspath build/cpc/speedrun.dsk)")" &

@@ -13,14 +13,21 @@ EinKerbRight:
         sub (hl)
         ret z
         ld (.n + 1), a
+        IFDEF EIN_KERB4
+        call EinKerbName0       ; DE: the first cell's name
+        ld a, (ERC)
+        ELSE
         ld a, (hl)
+        ENDIF
         add a, a
         add a, a
         add a, a
         ld c, a                 ; C: the cell's first pixel
 .cell:  ld h, high EKGe
         ld b, 0
+        IFNDEF EIN_KERB4
         ld de, $FF00
+        ENDIF
         KRIGHT 0
         KRIGHT 1
         IFNDEF EIN_KERB4
@@ -28,6 +35,9 @@ EinKerbRight:
         KRIGHT 3
         ENDIF
         call EinKerbCell
+        IFDEF EIN_KERB4
+        inc de
+        ENDIF
         ld a, c
         add a, 8
         ld c, a
@@ -37,12 +47,37 @@ EinKerbRight:
         jp nz, .cell
         ret
 
-; C = the cell's first pixel, EPat its 8 lines (each pair's byte on two), B
-; the pairs over road (pair 0 in bit 3), D the AND of the pairs' bytes, E
-; their OR -> its name: solid if it can be (all kerb, all road, all grass),
-; else a slot of the kerb's colours over grass and over road, by line. BC
-; kept.
+        IFDEF EIN_KERB4
+; (HL) = a cell -> DE = its name's address
+EinKerbName0:
+        ld a, (hl)
+        ld hl, (ERowPtr)
+        add a, l
+        ld e, a
+        adc a, h
+        sub e
+        ld d, a
+        ret
+        ENDIF
+
+; C = first pixel, B the pairs over road (pair 0 in bit 3); in 4-line steps
+; EKPattern holds the groups' bytes and DE is the cell's name's address, in
+; 2-line steps EPat the patterns, D the AND of the pairs' bytes and E their
+; OR -> its name: solid if it can be (all kerb, all road, all grass), else a
+; slot of the kerb's colours over grass and over road, by line. BC kept (and
+; DE in 4-line steps).
 EinKerbCell:
+        IFDEF EIN_KERB4
+        ld hl, (EKPattern)
+        ld a, l
+        and h
+        inc a
+        ld a, (ECK)
+        jr z, .name             ; all kerb
+        ld a, l
+        or h
+        jr nz, .slot
+        ELSE
         ld a, d
         inc a
         ld a, (ECK)
@@ -50,6 +85,7 @@ EinKerbCell:
         ld a, e
         or a
         jr nz, .slot
+        ENDIF
         ld a, b                 ; no kerb: all road, all grass, or both
         cp KALL
         ld a, (ECR)
@@ -77,7 +113,13 @@ EinKerbCell:
         ld a, (EKCG)
 .commit:
         push bc
+        IFDEF EIN_KERB4
+        push de
+        call EinCommitKerb
+        pop de
+        ELSE
         call EinCommitSlot
+        ENDIF
         pop bc
         cp $FF
         jr nz, .name
@@ -85,6 +127,10 @@ EinKerbCell:
         ld (EComM), a
         ld (EComC2), a
         ret
+        IFDEF EIN_KERB4
+.name:  ld (de), a
+        ret
+        ELSE
 .name:  ld e, a
         ld a, c                 ; (its cell)
         rrca
@@ -98,6 +144,7 @@ EinKerbCell:
         inc h
 .nm:    ld (hl), e
         ret
+        ENDIF
 
 ; The runs sharing cells (a narrow road): every cell of [ERA, ERD), per
 ; pair road from D to E, kerb [L, D) and (E, R]
@@ -107,16 +154,27 @@ EinKerbMerged:
         ld hl, ERA
         sub (hl)
         ld (.n + 1), a
+        IFDEF EIN_KERB4
+        call EinKerbName0       ; DE: the first cell's name
+        ld a, (ERA)
+        ELSE
         ld a, (hl)
+        ENDIF
         add a, a
         add a, a
         add a, a
         ld c, a                 ; C: the cell's first pixel
 .cell:  ld h, high EKGe
         ld b, 0
+        IFNDEF EIN_KERB4
         ld de, $FF00
+        ENDIF
         ld ix, EKP              ; (IX: the pair; IY: its two lines)
+        IFDEF EIN_KERB4
+        ld iy, EKPattern
+        ELSE
         ld iy, EPat
+        ENDIF
 .pair:  ld a, (ix + 4)          ; road: from D, not past E
         sub c
         ld l, a
@@ -151,22 +209,32 @@ EinKerbMerged:
         cpl
         or a
 .put:
+        IFDEF EIN_KERB4
+        ld (iy + 0), a
+        inc iy
+        ELSE
         DUP 8 / KPAIRS
         ld (iy + 0), a
         inc iy
         EDUP
+        ENDIF
         rl b
+        IFNDEF EIN_KERB4
         ld l, a
         and d
         ld d, a
         ld a, l
         or e
         ld e, a
+        ENDIF
         inc ix
         ld a, ixl
         cp low (EKP + KPAIRS)
         jr nz, .pair
         call EinKerbCell
+        IFDEF EIN_KERB4
+        inc de
+        ENDIF
         ld a, c
         add a, 8
         ld c, a
@@ -177,7 +245,7 @@ EinKerbMerged:
         pop iy
         ret
 
-; From EinSendSlot, the VRAM address set: HL = a slot's colour byte, then the
+; From EinSendRun, the VRAM address set: HL = a slot's colour byte, then the
 ; mask of the lines over its second and that one: 8 colour bytes, a line
 ; each. 34 or 35 T a byte: paced enough for the picture's time too.
 EinSendCols:

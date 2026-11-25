@@ -2,10 +2,24 @@
 ; Speed Run - global constants and macros
 ; ---------------------------------------------------------------------------
 
+; The platform: the Spectrum, or with -DEINSTEIN the Tatung Einstein
+; (docs/port_einstein.md), or with -DCPC the Amstrad CPC 6128
+; (docs/port_cpc.md). Both draw their own screens: NATIVE_GFX leaves the
+; Spectrum's drawing code out and calls theirs. Both share the road's
+; projection's exact speed-ups (FAST_PROJ: the same results, quicker).
+        IFDEF EINSTEIN
+        DEFINE NATIVE_GFX
+        DEFINE FAST_PROJ
+        ENDIF
+        IFDEF CPC
+        DEFINE NATIVE_GFX
+        DEFINE FAST_PROJ
+        ENDIF
+
 ; Build options
         IFNDEF PROFILE
-        IFDEF EINSTEIN
-PROFILE         EQU 0           ; (no border on the Einstein)
+        IFDEF NATIVE_GFX
+PROFILE         EQU 0           ; (no border bars: the Spectrum's port $FE)
         ELSE
 PROFILE         EQU 1           ; 1 = border colour timing bars
         ENDIF
@@ -16,12 +30,21 @@ AUTOPLAY        EQU 0           ; 1 = the attract-mode driver also plays the gam
         IFNDEF FIXED_ELAPSED
 FIXED_ELAPSED   EQU 0           ; 1 = (testing) every update counts 3 TV frames and nothing
         ENDIF                   ; drawn depends on the timing: identical runs at any speed
+        IFDEF EINSTEIN          ; the Einstein draws no centre line (but with -DEIN_DASH):
+        IFNDEF EIN_DASH         ; pass 1 and the hill mapping leave it out (LaneX
+        DEFINE EIN_NOLANE       ; stays $FF), src/road.asm, src/hills.asm
+        ENDIF
+        ENDIF
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
 TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)
 PANO_LDI_END    EQU $BA00       ; unrolled 32-LDI chain for the panorama
 XOR_END         EQU $BB00       ; unrolled XOR chain ends here (with JP (IY))
+        IFDEF CPC
+SCN_DATA        EQU $1500       ; (the CPC: bank 5's part, in base 0 after its own code: tools/make_cpc.py SCN_DATA)
+        ELSE
 SCN_DATA        EQU $5B00       ; scenery sprites: spare RAM in bank 5 (always paged)
+        ENDIF
 FILL_END        EQU $BD00       ; unrolled fill block ends here (with RET)
 ISR_JP          EQU $BDBD       ; IM2 lands here: JP Isr
 HILL_TABLES     EQU $BB00       ; hill mapping (gaps between the unrolled chains)
@@ -34,7 +57,9 @@ STACK_TOP       EQU $C000       ; stack grows down from here ($BF01-$BFFF)
 PORT_7FFD       EQU $7FFD
 P7FFD_ROM48     EQU $10
 P7FFD_SHADOW    EQU $08         ; display bank 7 instead of bank 5
+        IFNDEF MIN_FRAMES       ; (-D: the benchmark measures the work unlocked)
 MIN_FRAMES      EQU 3           ; locked 16.7 fps: steadier than a 25/16.7 mix
+        ENDIF
 
 ; Screen layout
 ROAD_Y0         EQU 96          ; first screen line of the road
@@ -56,14 +81,19 @@ ATTR_KERB_D     EQU %01010000   ; bright red paper, black ink
 STRIPE_BIT      EQU $40         ; bit of (z + position) selecting light/dark band
 
 ; AY periods: the Spectrum's AY runs at 1.7734 MHz, the Einstein's at 2 MHz,
-; so there a period is AYN / AYD as long for the same pitch: write a period
-; as (p * AYN + AYD / 2) / AYD
+; the CPC's at 1 MHz, so there a period is AYN / AYD as long for the same
+; pitch: write a period as (p * AYN + AYD / 2) / AYD
         IFDEF EINSTEIN
 AYN             EQU 1128
 AYD             EQU 1000
         ELSE
+        IFDEF CPC
+AYN             EQU 564
+AYD             EQU 1000
+        ELSE
 AYN             EQU 1
 AYD             EQU 1
+        ENDIF
         ENDIF
 
 ; Input bits (same layout as Kempston)
@@ -73,22 +103,32 @@ IN_DOWN         EQU 2
 IN_UP           EQU 3
 IN_FIRE         EQU 4
 
-; Wait for the next TV frame (the Einstein's interrupt comes every 1 ms)
+; Wait for the next TV frame (the Einstein's interrupt comes every 1 ms,
+; the CPC's six times a frame)
         MACRO FRAME_WAIT
         IFDEF EINSTEIN
         call EinHalt
         ELSE
+        IFDEF CPC
+        call CpcHalt
+        ELSE
         halt
+        ENDIF
         ENDIF
         ENDM
 
 ; A = keyboard half-rows to read (as port $FE's high byte) -> A = their keys
-; (bits 0-4, 0: pressed); the Einstein answers from its own keyboard
+; (bits 0-4, 0: pressed); the Einstein and the CPC answer from their own
+; keyboards
         MACRO KEY_IN
         IFDEF EINSTEIN
         call EinSpecIn
         ELSE
+        IFDEF CPC
+        call CpcSpecIn
+        ELSE
         in a, ($FE)
+        ENDIF
         ENDIF
         ENDM
 

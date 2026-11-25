@@ -27,7 +27,7 @@
 ; ---------------------------------------------------------------------------
 STRIP_PAD       EQU 12              ; max kerb cells per side per row
 
-        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
+        IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 DrawRoad:
         ; per-frame constants: state pages and screen high-byte OR
         ld a, (StatePage)
@@ -130,7 +130,9 @@ RoadPass1:
         ld (P1Hill), a
         ld hl, .flat
         jr .hset
-.hills: ld a, 1
+.hills: ld a, (P1Hill)
+        or a                    ; Z: flat mapping last frame, rebuild unconditionally
+        ld a, 1
         ld (P1Hill), a
         call HillMap
         ld hl, HillStore
@@ -217,6 +219,32 @@ RoadPass1:
 .nx:    cp $FF                  ; a curve boundary or zone line (NextEvent)
         jp z, .event
 .go:    ; ---- odd line: edges and centre line from cx = total
+        IFDEF EIN_NOLANE        ; (the Einstein, no centre line: cx in BC')
+        push hl
+        exx
+        pop bc                  ; BC' = cx
+        ld h, high CXPage       ; road centre on this line, for the scenery
+        set 7, l
+        ld (hl), b
+        res 7, l
+        ld (hl), c
+        ld a, l
+.fl:    cp 0                    ; past the split? (P1ForkLim, patched)
+        jp c, .fork
+        ld h, high X1Page
+        ld a, b
+        or a
+        jr nz, .slow            ; cx outside 0..255
+        ld a, c
+        sub (hl)                ; cx - X1
+        jr c, .slow
+        ld d, a                 ; D' = first road pixel
+        ld a, c
+        dec a
+        add a, (hl)             ; cx + X1 - 1
+        jr c, .slow
+        ld e, a                 ; E' = last road pixel
+        ELSE
         ld a, l
         ld ixl, a
         ld a, h
@@ -252,6 +280,7 @@ RoadPass1:
         jr nc, .lane
         ld a, $FF
 .lane:  ld c, a                 ; C' = centre line x
+        ENDIF
 .store: jp .flat                ; (HillStore when hills are in view)
 .flat:  ; this line and the one above it
         ld h, high DEPage
@@ -263,10 +292,14 @@ RoadPass1:
         inc l
         ld (hl), e
         res 7, l
+        IFDEF EIN_NOLANE
+        dec l
+        ELSE
         ld h, high LXPage
         ld (hl), c
         dec l
         ld (hl), c
+        ENDIF
 .ff:    jr .ffs                 ; (patched: 0 with a fork in view)
         call ForkPair
 .ffs:   inc l
@@ -293,6 +326,21 @@ RoadPass1:
         jp p, .cx
         ret
 
+        IFDEF EIN_NOLANE
+.fork:  push bc                 ; (ForkLine takes cx in IX)
+        pop ix
+        jp ForkLine
+.slow:  ; BC' = cx (16-bit), HL' = X1Page + line
+        ld a, (hl)
+        push hl
+        ld h, b
+        ld l, c
+        ld c, a
+        ld b, 0
+        call Span               ; (src/fork.asm) D', E' on the screen, or $FF, 0
+        pop hl
+        jp .store
+        ELSE
 .slow:  ; IX = cx (16-bit), C' = X1, L' = line
         ld h, high LWPage
         ld b, (hl)              ; B' = LW (255: none)
@@ -341,6 +389,7 @@ RoadPass1:
         ld c, a
         pop hl
         jp .store
+        ENDIF
 
 .event: ; the curvature changes on this line: P += 3 (k' - k)
         push hl
@@ -392,66 +441,84 @@ RoadPass1:
 ; depth line the screen line shows; bit 7: that depth line is in a tunnel
 RoadBands:
         ld a, (Pos)
-        ld (.p + 1), a
-        ld (.q + 1), a
-        ld a, (TunJ0)
-        ld (.t0 + 1), a
-        ld (.t2 + 1), a
+        ld c, a
+        ld b, ROAD_LINES / 2
+        ld hl, SrcLine
+        ld d, high ZLo
         ld a, (TunJN)
-        ld (.t1 + 1), a
-        ld (.t3 + 1), a
+        or a
+        jr nz, .tunnel
+        IFDEF EINSTEIN          ; (the Einstein's open road reads the bands of
+        ld b, ROAD_LINES / 4    ; lines 0 and 4 of a row alone: src/einstein/
+        ENDIF                   ; roadgfx.asm; a tunnel's mouth all of them)
         ld a, (P1Hill)
         or a
         jr nz, .hills
-        ld hl, ZLo              ; no hills: screen line = depth line
+        ld hl, ZLo
         ld de, Band
-.flat:  ld a, l
-.t0:    sub 0
-.t1:    cp 0
-        sbc a, a
-        and $80
-        ld b, a
-        ld a, (hl)
-.q:     add a, 0
+.flat:  ld a, (hl)
+        add a, c
         and STRIPE_BIT
-        or b
         ld (de), a
-        inc l
-        inc l
-        inc e
-        inc e
-        ld a, e
-        cp low Band + ROAD_LINES
-        jr nz, .flat
-        ret
-.hills:
-        ld bc, SrcLine
-        ld de, Band
-        ld h, high ZLo
-.band:  ld a, (bc)
+        IFDEF EINSTEIN
+        ld a, l
+        add a, 4
         ld l, a
-.t2:    sub 0
-.t3:    cp 0
-        sbc a, a
-        and $80
-        ld (de), a
-        ld a, (hl)
-.p:     add a, 0
-        and STRIPE_BIT
-        ex de, hl
-        or (hl)
-        ld (hl), a
-        ex de, hl
-        inc c
-        inc c
+        add a, low Band - low ZLo
+        ld e, a
+        ELSE
+        inc l
+        inc l
         inc e
-        inc e                   ; even lines only: lines are drawn in pairs
-        ld a, e
-        cp low Band + ROAD_LINES
-        jr nz, .band
+        inc e
+        ENDIF
+        djnz .flat
         ret
 
-        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
+        ; Band and SrcLine have the same offset on their respective pages.
+        ASSERT low Band == low SrcLine
+.hills: ld e, (hl)
+        ld a, (de)
+        add a, c
+        and STRIPE_BIT
+        ld h, high Band
+        ld (hl), a
+        ld h, high SrcLine
+        inc l
+        inc l
+        IFDEF EINSTEIN
+        inc l
+        inc l
+        ENDIF
+        djnz .hills
+        ret
+
+        ; SrcLine is the identity map on flat ground, including in tunnels.
+.tunnel:
+        ld (.length + 1), a
+        ld a, (TunJ0)
+        ld (.first + 1), a
+.pair:  ld e, (hl)
+        ld a, e
+.first: sub 0
+.length: cp 0
+        ld a, (de)
+        jr c, .inside
+        add a, c
+        and STRIPE_BIT
+        jr .store
+.inside: add a, c
+        and STRIPE_BIT
+        or $80
+.store: ld h, high Band
+        ld (hl), a
+        ld h, high SrcLine
+        inc l
+        inc l
+        djnz .pair
+        ret
+
+        IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 ; --------------------------------------------------------------------------
 DrawRoadRow:
         ; both fork branches on screen in this row?

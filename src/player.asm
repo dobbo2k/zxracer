@@ -16,7 +16,7 @@ LIMIT_D         EQU 32          ; LOW gear above its top speed: engine braking
 OFFROAD_X       EQU 150             ; |PlayerX| beyond the kerb
 OFFROAD_SPEED   EQU 8
 
-CRASH_FRAMES    EQU 160         ; (time for her to tell him off, and his reply)
+CRASH_FRAMES    EQU 160         ; (once the time for the crew's lines: kept, so a crash costs as much)
 SPIN_D          EQU 48          ; a spin-out's slowing (1/256ths per frame)
 
 UpdatePlayer:
@@ -40,7 +40,7 @@ UpdatePlayer:
         ld (hl), b
         jr nz, .nz
         inc a
-        IFDEF EINSTEIN          ; (its game frames take longer: up to 8, so the
+        IFDEF NATIVE_GFX        ; (their game frames take longer: up to 8, so the
 .nz:    cp 9                    ; clock and the car keep real time)
         jr c, .el
         ld a, 8
@@ -490,7 +490,6 @@ CrashUpdate:
         jr nc, .t
         xor a
 .t:     ld (CrashTimer), a
-        call CrewSay
         xor a                   ; back into LOW for the restart
         ld (Gear), a
         xor a

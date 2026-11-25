@@ -1103,12 +1103,17 @@ EinRowRanges:
 
 ; The row's colours from its band (as src/road.asm RowAttrs): ECG grass,
 ; ECK kerb, ECR road (TMS colours), EKC a kerb cell's colour byte (the road
-; over the kerb), ELC a centre-line cell's (white over the road)
+; over the kerb), ELC a centre-line cell's (white over the road); with the
+; exact kerbs EKCG and EKCR too. As they are if the set is the last row's.
 EinRowColours:
         ld a, (ERBand)          ; its set: tunnel (bit 7), dark (bit 6)
         rlca
         rlca
         and 3
+        ld hl, ERowSetNow
+        cp (hl)
+        ret z
+        ld (hl), a
         ld l, a
         add a, a
         add a, a
@@ -1122,10 +1127,26 @@ EinRowColours:
         ld de, EAG
         ld bc, 7
         ldir
+        IFDEF EIN_KERB
+        ld a, (ECK)             ; kerb over grass, kerb over road (the exact
+        add a, a                ; kerbs' slots: src/einstein/kerbrow.asm)
+        add a, a
+        add a, a
+        add a, a
+        ld c, a
+        ld a, (ECG)
+        or c
+        ld (EKCG), a
+        ld a, (ECR)
+        or c
+        ld (EKCR), a
+        ENDIF
         ret
 
 ; A frame's 4 colour sets (ERowSets: open / tunnel, light / dark bands)
 EinColourSets:
+        ld a, $FF               ; (EAG ... ELC to be copied again)
+        ld (ERowSetNow), a
         ld de, ERowSets
         xor a
 .set:   push af
@@ -1577,10 +1598,9 @@ EinForkCells:
 
 
 ; ---------------------------------------------------------------------------
-; EPat (8 pattern bytes) and A (the colour byte) into the row's next slot:
-; noted in DirtyList if VRAM does not already hold them.
-; -> A = the slot's name ($FF: the row's slots are all used)
-EinCommitSlot:
+; A = colour. Allocate the next slot in the row and return its shadow in HL,
+; number in B and colour in C. Carry and A = $FF if the row is full.
+EinAllocSlot:
         ld c, a
         ld hl, ESlotN           ; the next free slot: [ESlotN, ESlotTop)
         ld a, (ESlotTop)
@@ -1591,15 +1611,15 @@ EinCommitSlot:
         jr nz, .down
         ld b, (hl)              ; from the bottom up
         inc (hl)
-        jr EinCommitAt
+        jr .address
 .down:  ld hl, ESlotTop         ; from the top down
         dec (hl)
         ld b, (hl)
-        jr EinCommitAt
+        jr .address
 .full:  ld a, $FF
+        scf
         ret
-; B = the slot in the row, C = the colour -> A = its name
-EinCommitAt:
+.address:
         ld a, b                 ; HL = its SlotShadow bytes
         add a, a
         add a, a
@@ -1618,7 +1638,75 @@ EinCommitAt:
         ld l, a
         jr nc, .h
         inc h
+.h:     or a                    ; success: HL addresses the slot, B is its number
+        ret
+
+        IFDEF EIN_KERB4
+EKPattern: ds 2                 ; top and bottom four scanlines
+EinCommitKerb:
+        ld c, a                 ; (EinAllocSlot, unrolled here: the kerb
+        ld hl, ESlotN           ; cells' commits are many)
+        ld a, (ESlotTop)
+        sub (hl)
+        jr z, .full
+        ld a, (EDown)
+        or a
+        jr nz, .down
+        ld b, (hl)
+        inc (hl)
+        jr .address
+.down:  ld hl, ESlotTop
+        dec (hl)
+        ld b, (hl)
+.address:
+        ld a, b
+        add a, a
+        add a, a
+        add a, b
+        add a, a
+        add a, b                ; x 11
+        ld hl, (ESlotPtr)
+        add a, l
+        ld l, a
+        jr nc, .h
+        inc h
 .h:     push hl
+        ld de, (EKPattern)
+        ld a, e
+        DUP 4
+        cp (hl)
+        jr nz, .changed
+        inc hl
+        EDUP
+        ld a, d
+        DUP 4
+        cp (hl)
+        jr nz, .changed
+        inc hl
+        EDUP
+        jp EinCommitSlot.samePixels
+.changed:
+        pop hl
+        push hl
+        DUP 4
+        ld (hl), e
+        inc hl
+        EDUP
+        DUP 4
+        ld (hl), d
+        inc hl
+        EDUP
+        jp EinCommitSlot.newColours
+.full:  ld a, $FF               ; (the row's slots all used)
+        ret
+        ASSERT SLOT_SIZE == 11
+        ENDIF
+
+; EPat holds all eight lines for scenery, portals and the generic road.
+EinCommitSlot:
+        call EinAllocSlot
+        ret c
+        push hl
         ld de, EPat             ; the same pixels? (unrolled)
         DUP 7
         ld a, (de)
@@ -1632,6 +1720,7 @@ EinCommitAt:
         jr nz, .newPat
         inc hl
         IFDEF EIN_KERB
+.samePixels:
         call .colour            ; the same pixels: the same colours?
         jr z, .same
         ELSE
@@ -1658,6 +1747,7 @@ EinCommitAt:
         pop bc
         ex de, hl
         IFDEF EIN_KERB
+.newColours:
         call .colour
         ELSE
         ld a, (hl)
@@ -1753,6 +1843,7 @@ ERC:            db 0
 ERD:            db 0
 ERBand:         db 0
 ERowSets:       ds 4 * 7        ; EAG ... ELC for each band (EinColourSets)
+ERowSetNow:     db $FF          ; the set in EAG ... ELC (EinRowColours)
 EAG:            db 0            ; attributes: grass, kerb
 EAK:            db 0
 ECG:            db 0            ; colours (TMS): grass, kerb, road

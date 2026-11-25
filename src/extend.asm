@@ -135,8 +135,8 @@ JingleRun:
 ; font's digit at double size, 16 x 16 over two cell rows (drawn once a
 ; second, so it is worked out here rather than stored)
 PrintBig:
-        IFDEF EINSTEIN
-        call EinMarkBig         ; (its four cells to be sent: src/einstein/sky.asm)
+        IFDEF NATIVE_GFX
+        call GfxMarkBig         ; (its four cells to be shown: the platform's)
         ENDIF
         push de
         push bc

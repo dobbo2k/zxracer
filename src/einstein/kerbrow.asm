@@ -19,8 +19,8 @@
 ; is made with both kerbs at once (EinKerbMerged).
 ;
 ; A slot holds two colour bytes, kerb over grass and kerb over road, and a
-; mask of the lines that take the second (SLOT_SIZE 11: EinCommitAt,
-; EinSendSlot), as Graphics II has a colour pair a line.
+; mask of the lines that take the second (SLOT_SIZE 11: EinCommitSlot,
+; EinSendRun), as Graphics II has a colour pair a line.
 ;
 ; Tuned: the pairs loaded unrolled, their extremes kept in registers; each
 ; cell's pairs unrolled, straight into EPat, through EKGe; the cell's name
@@ -75,9 +75,6 @@ EinKerbRow:
 .pairs: push iy                 ; ---- the pairs, and the runs' extremes
         ld a, (EI)
         ld c, a
-        ld b, $FF
-        ld ix, $FF00
-        ld iy, 0
         KLOAD 0
         KLOAD 1
         IFNDEF EIN_KERB4
@@ -93,18 +90,18 @@ EinKerbRow:
         cp 120
         jp nc, .wide
         ld a, b                 ; ERA: the least L's cell
-        call .cell
+        KCELL
         ld (ERA), a
         ld a, ixl               ; ERB: past the most D's
-        call .cell
+        KCELL
         inc a
         ld (ERB), a
         ld a, iyl               ; ERD: past the most R's
-        call .cell
+        KCELL
         inc a
         ld (ERD), a
         ld a, ixh               ; ERC: the least E's
-        call .cell
+        KCELL
         ld (ERC), a
         ld hl, ERB
         cp (hl)
@@ -122,19 +119,7 @@ EinKerbRow:
         pop iy
         call EinRowNames        ; ---- the names, slots, colours
         call EinRowSlots
-        call EinSlotRange
-        ld a, (ECK)             ; kerb over grass, kerb over road
-        add a, a
-        add a, a
-        add a, a
-        add a, a
-        ld c, a
-        ld a, (ECG)
-        or c
-        ld (EKCG), a
-        ld a, (ECR)
-        or c
-        ld (EKCR), a
+        call EinSlotRange       ; (EKCG, EKCR: EinRowColours)
         ld a, (ECG)
         call EinGroundName
         ld (EKGN), a
@@ -147,14 +132,27 @@ EinKerbRow:
         ld hl, ERA
         sub (hl)
         ld (.ln + 1), a
+        IFDEF EIN_KERB4
+        ld a, (hl)              ; DE: the first cell's name
+        ld hl, (ERowPtr)
+        add a, l
+        ld e, a
+        adc a, h
+        sub e
+        ld d, a
+        ld a, (ERA)
+        ELSE
         ld a, (hl)
+        ENDIF
         add a, a
         add a, a
         add a, a
         ld c, a                 ; C: the cell's first pixel
 .lc:    ld h, high EKGe
         ld b, 0
+        IFNDEF EIN_KERB4
         ld de, $FF00
+        ENDIF
         KLEFT 0
         KLEFT 1
         IFNDEF EIN_KERB4
@@ -162,6 +160,9 @@ EinKerbRow:
         KLEFT 3
         ENDIF
         call EinKerbCell
+        IFDEF EIN_KERB4
+        inc de
+        ENDIF
         ld a, c
         add a, 8
         ld c, a
@@ -181,12 +182,6 @@ EinKerbRow:
         scf
         ret
 
-; A = a pixel -> A = its cell
-.cell:  rrca
-        rrca
-        rrca
-        and 31
-        ret
 
 EKP:    ds 4                    ; the pairs' L,
         ds 4                    ; D,
@@ -197,5 +192,5 @@ EKCG:   db 0                    ; colour bytes: kerb over grass, over road
 EKCR:   db 0
 EKGN:   db 0                    ; the grass's name
 EKMerged:       db 0            ; the runs share a cell
-EComM:  db 0                    ; (EinCommitAt: the lines over the second
+EComM:  db 0                    ; (EinCommitSlot: the lines over the second
 EComC2: db 0                    ; colour byte, and it; 0 but for the kerb)

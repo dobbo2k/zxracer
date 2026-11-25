@@ -146,15 +146,18 @@ Everything before `WaitFlip` runs while the previous frame is still being sent.
 The VDP's frame interrupt is not wired to the Z80. CTC channel 2 interrupts every 1 ms
 (timer, /16, 250) and the handler reads the VDP's status. When the frame flag is set (at
 the start of the vertical blank), it counts a TV frame (`FrameCount`). If a frame is
-pending and at least `EIN_MIN_FRAMES` (4) TV frames have passed since the last was sent,
-it calls `EinUpload`. Then it plays the sound (`SoundTick`). After seeing a frame it sets
+pending, it calls `EinUpload` when the frame is due: frames go on a grid of
+`EIN_MIN_FRAMES` (4) TV frames (`EGrid`, the tick the last was due at), and a late one
+puts the grid's next ticks no more than `EIN_DEBT` (4) TV frames behind; while it is
+behind, frames go 3 TV frames apart (`EIN_MIN_GAP`), one TV frame made up each.
+`LastFlip` stays the TV frame the last was sent in (the stage's jingle waits for it). Then it plays the sound (`SoundTick`). After seeing a frame it sets
 the CTC to a 16 ms wait (/256, 250) and goes back to 1 ms polls after that, so the flag is
 seen at most 1 ms late. A frame seen at the very first poll after the wait may be late by
 an unknown time (`EFirstPoll`): its upload is all paced. A frame that begins while the
 interrupt is still busy is counted at its end, with its sound (the `.over` loop;
 `EinMirror` checks too, through `EinLateFrame`).
 
-A game frame takes at least 4 TV frames here. `Elapsed` goes up to 8 (`player.asm`) so the
+A game frame takes 4 TV frames here, or 3 while one late is made up. `Elapsed` goes up to 8 (`player.asm`) so the
 clock and the car keep real time.
 
 ### Sending a frame (`flip.asm` `EinUpload`)
@@ -181,10 +184,11 @@ blank (30,830 T) any speed is safe.
   250 every 256 T. A write of B bytes goes fast only while the count is at least
   `BLANK_END + 1 + B/8`; the first write that fails sets `EBudget` to 0 for the rest of
   the upload, since the count runs on and restarts at 250.
-- `EinSendSlot` sends one slot: its 8 pattern bytes if bit 6 of its entry is set, its colour
-  on all 8 lines if bit 7 is set. Its fast and paced paths are unrolled. A slot of two
-  colour pairs (its mask, the byte after its colour, not 0) goes through `EinSendCols`:
-  each line's pair, 34 or 35 T a byte, slow enough for the picture's time too.
+- `EinSlotRuns` scans each road row's dirty slots once for pixels and once for colours.
+  `EinSendRun` sets one VRAM address per contiguous run and streams the tiles in increasing
+  address order. Its fast and paced loops step through the strided RAM records. Mixed colour
+  tiles use `EinSendCols` at 34–35 T per byte. Colour runs of 16 or more tiles use paced
+  writes because their worst-case cost exceeds the range of the eight-bit budget argument.
 
 ## 7. The road
 
@@ -228,7 +232,7 @@ did last frame (`EMaskU`), it is composited (`EinRoadCompose`). Last comes `EinD
    group at a time through `EKGe` (a cell's pixels from v on, indexed by v - x0), each
    group's byte on its lines, over grass or over road. A cell all kerb, road or grass is
    a solid name; else a slot with kerb over grass, kerb over road and the mask of the
-   lines over road (`EComM`, `EComC2` for `EinCommitAt`). Where the runs share a cell (a
+   lines over road (`EComM`, `EComC2` for `EinCommitSlot`). Where the runs share a cell (a
    narrow road), `EinKerbMerged` makes [`ERA`, `ERD`) with both. A row with no road is
    grass; one with a group without road, or a run over 119 pixels wide, goes the exact,
    generic way (3). With `-DEIN_BLOCKS` this way is left out, and 1 and 2 are as below.
@@ -276,9 +280,11 @@ writes the car's names over the road's (`EinCarNames`).
 - `EKC`: a kerb cell's colour byte (road over kerb);
 - `ELC`: a centre-line cell's.
 
-A row's set comes from the band of its middle line (`ERBand`). In rows 16-23 the open
-road's grass becomes the verge textures (`EinGroundName`). `EinGroundPaper` maps those
-back to a paper colour.
+A row's set comes from the band of its middle line (`ERBand`). `EinRowColours` copies it
+into `EAG` ... `ELC`, and with the exact kerbs works out `EKCG` and `EKCR` (kerb over
+grass, kerb over road) too, only when the set is not the one there already
+(`ERowSetNow`, reset by `EinColourSets`). In rows 16-23 the open road's grass becomes the
+verge textures (`EinGroundName`). `EinGroundPaper` maps those back to a paper colour.
 
 ### Slots
 
@@ -289,8 +295,10 @@ back to a paper colour.
   (`EDown`). A light-band row takes its road slots from the bottom up, a dark-band row
   from the top down, and its silhouettes continue on from them. A kerb slot therefore
   keeps its light or dark colour as bands pass, and only its pixels are resent.
-- **`EinCommitSlot`:** takes the next slot. `EinCommitAt` compares `EPat` and the colour
-  with the shadow, copies what differs, and notes the slot.
+- **`EinCommitSlot`:** uses `EinAllocSlot` to take the next slot. It compares `EPat` and the colour
+  with the shadow, copies what differs, and notes the slot. Four-line kerbs use
+  `EinCommitKerb`, which compares both compact bytes against all eight shadow lines and
+  expands them on a pixel mismatch. Both paths share colour comparison and dirty flags.
 - **`DirtyList`:** one byte a changed slot (bits 0-4 the slot in its row, bit 6 pixels,
   bit 7 colour), in row order, counted per row in `EDirtyRowN`.
 - **`EinSlotBase`:** finds a row's shadow and VRAM bases once for the upload.
@@ -482,8 +490,11 @@ game-over screens run unchanged and draw into screen A.
 | `defs.asm` | No border profiling; `AYN`/`AYD`; `FRAME_WAIT` is `EinHalt`; `KEY_IN` is `EinSpecIn` |
 | `interrupt.asm` | `InitInterrupts` is `EinCtcInit`; `Isr` is `EinIsr` |
 | `scenery.asm` | `DrawObject` records the type; `RunCommand` without the car check, clipped by `.clipY` |
-| `road.asm` | No pass 2 (`DrawRoad`, `DrawRoadRow`); `RoadPrepare` sets `EinShape` |
-| `horizon.asm`, `fork.asm`, `tyres.asm`, `crew.asm`, `car.asm` | Their drawing left out (`IFNDEF EINSTEIN`) |
+| `road.asm` | No pass 2 (`DrawRoad`, `DrawRoadRow`); `RoadPrepare` sets `EinShape`; pass 1 without the centre line (`EIN_NOLANE`, `src/defs.asm`), the road's centre in BC', its slow path `Span`'s |
+| `hills.asm` | The hill mapping's loop with `ProjClip + j` in HL' and the free pairs in C'; `HillStore` and the ground without the centre line, the depth line in C' |
+| `track.asm` | `ApplyCurve`: `<< (zone - 2)` from zone 2 on |
+| `horizon.asm`, `fork.asm`, `tyres.asm`, `car.asm` | Their drawing left out (`IFNDEF EINSTEIN`) |
+| `tunnelaside.asm` | In bank 2 (on the Spectrum in bank 5, beside `tunnel.asm`): no room in bank 5 here |
 | `hud.asm`, `extend.asm`, `lampdraw.asm` | The cells they write noted to be sent; screen B only |
 | `tunnelb2.asm`, `holes.asm` | Screen B only (screen A's memory is the Einstein's); `EinCoarse` for the crash's thud |
 | `input.asm` | The joystick from `EinJoy` |
@@ -520,8 +531,9 @@ Assembly options (`-D`):
 |---|---|
 | `FIXED_ELAPSED=1` | Every update counts 3 TV frames: the same game at any speed (the benchmark) |
 | `EIN_MIN_FRAMES=3` | The 12.5 fps lock off, to measure the work alone |
+| `EIN_DEBT=n` | The TV frames late a frame may be made up by (4; 0: never, every frame at least 4 apart) |
 | `EIN_BLOCKS` | The block kerbs: ready-made edges, the outer edge on a cell's edge (12.45 fps in the attract demo, against 11.7) |
-| `EIN_KERB2` | The exact kerbs in 2-line steps, not 4 (11.1 fps) |
+| `EIN_KERB2` | The exact kerbs in 2-line steps, not 4 (11.1 fps; no longer fits: bank 2 overflows) |
 | `EIN_SLOPE=n` | With `EIN_BLOCKS`: the near rows' kerbs drawn exactly where they slope more than n pixels (4: the look before the speed cut) |
 | `EIN_DASH` | With `EIN_BLOCKS`: the centre line's sprites (none by default) |
 | `EIN_KERB`, `EIN_KERB4` | (set by `platform.asm` unless `EIN_BLOCKS`; `EIN_KERB4` unless `EIN_KERB2`): the exact kerbs, in 4-line steps; slots of 11 bytes, 11 a row in rows 12-15, the ready-made rows' code left out |
@@ -572,7 +584,7 @@ from the change and from a reference build, and compare them. For tunnels and fo
   that skips one leaves its pixels in screen B, where a later silhouette would XOR over
   them.
 - **VRAM:** with the picture on, keep accesses 32 T apart. In the interrupt, write through
-  `EinWrite`, `EinFill` or `EinSendSlot`, which follow `EBudget`. Keep interrupts off only
+  `EinWrite`, `EinFill` or `EinSendRun`, which follow `EBudget`. Keep interrupts off only
   briefly: a late frame interrupt leaves less of the blank.
 - **Registers:**
   - The interrupt saves AF, BC, DE, HL, IX and IY but not the alternate set, so the main
@@ -592,7 +604,7 @@ from the change and from a reference build, and compare them. For tunnels and fo
 - **Self-modifying code:**
   - immediates patched at run time: `RunCommand.clipY`, `EinSlopeRow`'s run constants,
     `EinWrite`'s chain entry;
-  - an IX displacement reaching across buffers: `EinDashRedo`'s ±96 from `EMaskPOld`.
+  - an IX displacement reaching across buffers: `EinDashRedo`'s Â±96 from `EMaskPOld`.
 
   Keep the patched instructions' layout when editing them.
 - **Space:** check the assertions' areas (section 3) before adding code. Code that runs

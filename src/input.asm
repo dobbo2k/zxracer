@@ -21,9 +21,9 @@ ReadInput:
 .up:    sla e
         dec d
         jr nz, .key
-        IFDEF EINSTEIN
-        call EinJoy             ; (the analogue stick: src/einstein/keys.asm)
-        or c
+        IFDEF NATIVE_GFX
+        call GfxJoy             ; (the platform's joystick: src/einstein/keys.asm,
+        or c                    ; src/cpc/keys.asm)
         ld c, a
         ELSE
 .kemp:  in a, ($1F)             ; Kempston; ignore if the bus floats high

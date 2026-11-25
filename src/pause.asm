@@ -18,8 +18,8 @@ CheckPause:
         call Silence
         ld a, (HudOr)
         push af
-        IFDEF EINSTEIN
-        ld a, $80               ; (screen B: its cells are sent)
+        IFDEF NATIVE_GFX
+        ld a, $80               ; (screen B: its cells are shown)
         ELSE
         ld a, (BackBuf)         ; 1: B is drawn next, so A is on show
         dec a
@@ -31,8 +31,8 @@ CheckPause:
         call PrintAt
         pop af
         ld (HudOr), a
-        IFDEF EINSTEIN
-        call RequestFlip        ; (PAUSED into VRAM)
+        IFDEF NATIVE_GFX
+        call RequestFlip        ; (PAUSED shown)
         call WaitFlip
         ENDIF
         call .release

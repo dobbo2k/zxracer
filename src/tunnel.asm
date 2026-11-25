@@ -36,7 +36,7 @@ DrawPortal:
         jr z, .scan
         ld a, (TunJ0)           ; in it: the way out not in sight yet?
         or a
-        ret z
+        jp z, Gate.gone         ; (the ceiling, just in: src/tunnelb2.asm Ceiling)
         ld l, low Band
         ld bc, (low Band + ROAD_LINES) * 256 + 2   ; the way out: the furthest
 .scan:  bit 7, (hl)
@@ -46,8 +46,10 @@ DrawPortal:
         ld l, a
         cp b
         jr nz, .scan
-        ret
-.found: ld a, l
+        bit 7, c                ; none on the screen: a mouth behind a crest?
+        jp nz, PortalHidden     ; (src/tunnelaside.asm)
+        jp Gate.gone            ; (the way out: the sky it was drawn on goes
+.found: ld a, l                 ; back, src/tunnelb2.asm)
         sub low Band
 .atLine:                        ; (A = the screen line; Gate comes in here)
         ld l, a
@@ -59,8 +61,14 @@ DrawPortal:
         ld e, (hl)
         ld a, e
         sub d
-        ret c
-        ld b, a                 ; B = width
+        jr nc, .edges
+        bit 7, c                ; no road on the screen there: a mouth round
+        jp nz, PortalHidden.aside   ; a bend? (else nothing)
+        jp Gate.gone
+.edges: ld b, a                 ; B = width
+        bit 7, c                ; (C = $FE: a mouth, the scan going up)
+        call nz, TunWidth       ; (as wide as at its own line, src/holes.asm)
+        ld a, b
         rrca
         rrca
         and $3F
@@ -77,7 +85,7 @@ DrawPortal:
         sbc a, a
 .c1:    call Cell
         ld e, a                 ; E = its last
-        ; the row's runs: [0, a0) [a0, D) [D, E] (E, a1] (a1, 32)
+.runs:  ; the row's runs: [0, a0) [a0, D) [D, E] (E, a1] (a1, 32)
         ld hl, PtN
         ld a, d
         or a
@@ -111,19 +119,20 @@ DrawPortal:
         sbc a, a
         ld (PtFar), a
         jr z, .h
-        ld hl, PtN
-        ld a, (hl)              ; [0, a0) takes in [a0, C0) ...
-        inc hl
+        ld a, (hl)              ; (HL = PtN + 4) (a1, 32) takes in (C1, a1] ...
+        dec l
         add a, (hl)
         ld (hl), 0
-        dec hl
+        inc l
         ld (hl), a
-        ld hl, PtN + 3
-        ld a, (hl)              ; ... and (a1, 32) takes in (C1, a1]
-        ld (hl), 0
-        inc hl
+        ld l, low PtN
+        ld a, (hl)              ; ... and [0, a0) takes in [a0, C0)
+        inc l
         add a, (hl)
+        ld (hl), 0
+        dec l
         ld (hl), a
+        ASSERT high PtN == high (PtN + 4)
 .h:     ; its height: three quarters of its width
         ld a, b
         srl a
@@ -131,12 +140,17 @@ DrawPortal:
         srl a
         add a, c
         ld c, a
-        ld a, (PtY)
-        call Cell
-        cp CAR_ROW
+        ld a, (PtY)             ; down to the row the line is nearest the
+        add a, 4                ; bottom of: the road colours a row as its
+        call Cell               ; middle line (left as the tunnel's, its
+        cp CAR_ROW              ; kerbs showed white under the opening)
         jr c, .rm
         ld a, CAR_ROW
 .rm:    ld (PtRow), a           ; rows down to the road's (not the car's)
+        sbc a, a                ; once it is down there, all the road above
+        cpl                     ; is the tunnel's: the opening shows its rows
+        ld (PatRoad + 2), a     ; (S_), as the car's rows do; till then dark
+        ASSERT D_ == 0 && S_ == $FF
         ld a, (PtY)
         sub c
         jr c, .t0
@@ -145,16 +159,7 @@ DrawPortal:
 .t0:    ld a, 4 * 8
 .t1:    call Cell
         ld (PtTop), a           ; the opening's top row (the arch above it)
-        ld b, a
-        ld a, (THEME_CACHE + 6) ; the way out: the theme's sky, its ink hidden
-        and $F8
-        ld c, a
-        rrca
-        rrca
-        rrca
-        and 7
-        or c
-        ld (PatOut + 2), a
+        ld b, a                 ; (the way out's sky: PatOut, set at a stage start)
         ld a, (PtGate)          ; a gantry: its beam (two rows when it is wide), then the posts
         or a
         jr z, .tun
@@ -164,22 +169,40 @@ DrawPortal:
         jr c, .b1
         dec a
 .b1:    dec a
-        cp 3
-        jr nc, .row
-        ld a, 3
-        jr .row
+        jr .r12
 .tun:   ld a, (TunInside)
         or a
         ld a, 3
-        jr nz, .row             ; (the way out: the whole ceiling, as the opening moves)
+        jr nz, .first           ; (the way out: the whole ceiling, as the opening moves)
         ld a, (PtRow)           ; the mouth: its face half as high again
         sub b
         srl a
         cpl
-        add a, b
-        cp 3
-        jr nc, .row
-        ld a, 3
+        add a, b                ; (no carry: above the screen - close by, the
+        jr nc, .r3              ; face was not drawn at all)
+        ld c, a
+        ld a, (PtCut)           ; its line found ($FF): and from the road's
+        inc a                   ; first row at least - beyond a crest the
+        ld a, c                 ; ground is the tunnel's too (its walls'
+        jr nz, .r12             ; colours, light and dark by turns); hidden,
+        cp ROAD_ROW0 + 1        ; the ground is its own and the face only
+        jr c, .r12              ; as high as the mouth makes it
+        ld a, ROAD_ROW0
+.r12:   cp 3                    ; (a gantry's beam comes in here)
+        jr nc, .first
+.r3:    ld a, 3
+.first: ld (PtR), a             ; (A = the first row, whatever it is)
+        ld hl, PtCut            ; a mouth behind a crest: rows down to the
+        ld a, (hl)              ; road in front only, its opening dark there
+        ld (hl), $FF            ; (then no cut again)
+        ld hl, PtRow
+        cp (hl)
+        jr nc, .clean
+        ld (hl), a
+        xor a
+        ld (PatRoad + 2), a
+.clean: call PortalClean        ; (the sky rows a portal left above this
+        ld a, (PtR)             ; frame's first: src/tunnelaside.asm)
 .row:   ld (PtR), a
         ld hl, PtRow
         cp (hl)
@@ -192,6 +215,7 @@ DrawPortal:
 
 ; A = row: its five runs in the colours of its kind
 PortalRow:
+        ld (GateWas), a         ; (its sky rows to be painted again when it goes)
         ld c, a
         call RowAttrHL
         ld a, c
@@ -211,19 +235,16 @@ PortalRow:
         ld de, PatFace
         ld a, (PtTop)
         dec a
-        cp c
+        sub c
         jr c, .opening
+        ld b, a                 ; (0: the arch's row)
         ld a, (TunInside)       ; above the opening: the way out's ceiling, or ...
         or a
         jr z, .fa
         ld de, PatCeil
         jr .go
 .fa:    ld a, (PtFar)           ; ... the mouth's face and the arch's row
-        or a
-        jr nz, .go              ; (no arch from far away)
-        ld a, (PtTop)
-        dec a
-        cp c
+        or b                    ; (no arch from far away)
         jr nz, .go
         ld de, PatArch
         jr .go

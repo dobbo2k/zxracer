@@ -109,7 +109,6 @@ ObjHit: ld e, a
         ret nc
         ld a, CRASH_FRAMES
         ld (CrashTimer), a
-        call CrewPick
         ld a, (Speed)           ; the crash, as hard as the car hit
         call CrashStart
         xor a
@@ -221,6 +220,10 @@ DrawObject:
         ld a, (hl)
         ld (SprMask), a
         inc hl
+        IFDEF CPC               ; (the CPC's: its width in Mode 0 pixels)
+        ld a, (hl)
+        ld (SprPx), a
+        ENDIF
         inc hl
         ld e, (hl)
         inc hl
@@ -250,6 +253,74 @@ DrawObject:
         call LineCentre         ; HL = cx on line ObjI
         jp c, .skip             ; no road on that line
         add hl, de              ; x
+        IFDEF CPC
+        ; ---- (the CPC's: Mode 0 bytes, 64 a line, src/cpc/sprites.asm)
+        ; the left edge: x less half its width (its Mode 0 pixels: as many
+        ; of the Spectrum's)
+        ld a, (SprPx)
+        ld e, a
+        ld d, 0
+        or a
+        sbc hl, de
+        sra h                   ; in Mode 0 pixels
+        rr l
+        ld a, (SprMask)         ; two copies: the second a pixel on
+        or a
+        jr z, .cByte
+        bit 0, l
+        jr z, .cByte
+        push hl
+        ld hl, (SprSrc)
+        ld de, (SprStride)
+        add hl, de
+        ld (SprSrc), hl
+        pop hl
+.cByte: sra h                   ; its byte
+        rr l
+        ld a, h                 ; must overlap 0..63
+        or a
+        jr z, .cPos
+        inc a
+        jp nz, .skip            ; far off the screen
+        ld a, l                 ; negative: visible if column + width > 0
+        ld b, a
+        ld a, (SprW)
+        add a, b
+        jp nc, .skip
+        jp z, .skip
+        ld a, b                 ; clipped on the left: -column bytes skipped
+        neg
+        ld c, a
+        ld a, (SprW)
+        sub c
+        ld (SprN), a
+        ld a, c
+        ld (SprSkip), a
+        ld hl, (SprSrc)
+        ld e, c
+        ld d, 0
+        add hl, de
+        ld (SprSrc), hl
+        xor a
+        jr .colSet
+.cPos:  ld a, l
+        cp 64
+        jp nc, .skip
+        ld c, a
+        ld a, 64
+        sub c                   ; bytes to the right edge
+        ld b, a
+        ld a, (SprW)
+        cp b
+        jr c, .cFits
+        ld a, b
+.cFits: ld (SprN), a
+        ld b, a
+        ld a, (SprW)
+        sub b
+        ld (SprSkip), a
+        ld a, c
+        ELSE
         ld a, (SprW)
         dec a
         add a, a
@@ -347,6 +418,7 @@ DrawObject:
         sub b
         ld (SprSkip), a
         ld a, c
+        ENDIF
 .colSet:
         ; ---- build the command (if the list has room)
         ld hl, (CmdList)
@@ -414,7 +486,7 @@ DrawObject:
         ld a, (SprH)
         ld (hl), a
         inc hl
-        IFDEF EINSTEIN
+        IFDEF NATIVE_GFX        ; (its type: the platform draws it)
         ld a, (ObjType)
         ld (hl), a
         ELSE
@@ -504,7 +576,10 @@ MulS8U8:
 
 ; HL -> draw command. XOR the sprite into the back buffer.
 RunCommand:
-        IFNDEF EINSTEIN         ; (the Einstein's car is not drawn here)
+        IFDEF CPC
+        ret                     ; (the CPC draws them from the list: src/cpc/sprites.asm)
+        ENDIF
+        IFNDEF NATIVE_GFX       ; (the Einstein's and the CPC's car is not drawn here)
         ; does the sprite overlap the player's car block (rows 20-23, cols 12-19)?
         push hl
         ld a, (hl)              ; y top

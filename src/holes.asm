@@ -9,8 +9,6 @@
 ; ---------------------------------------------------------------------------
         ORG ScrLo + $C4         ; (ScrLo + $C0..$C3 kept clear)
         ASSERT ScrLo_end <= ScrLo + $C4
-CrewSay0a: db "< WATCH THE ROAD!   ", 0
-CrewSay0b: db "   SORRY, SORRY... >", 0
 ; Arpeggios (semitones of the 2nd and 3rd notes): 1 major, 2 minor,
 ; 3 seventh, 4 minor seventh, 5 major seventh, 6 sus4, 7 power (5th, octave),
 ; 8 octave
@@ -18,15 +16,12 @@ ArpTab:         db 4, 7,  3, 7,  4, 10,  3, 10,  4, 11,  5, 7,  7, 12,  12, 12
         ASSERT $ <= ScrLo + 256
         ORG ScrHi + $C4
         ASSERT ScrHi_end <= ScrHi + $C4
-CrewSay1a: db "< ARE YOU BLIND?!   ", 0
-CrewSay1b: db "  THE SUN WAS LOW! >", 0
 ; Envelopes: start volume, the volume it fades to, fade every (mask+1)
 ; 0 pluck, 1 sustained lead, 2 soft, 3 bass, 4 heavy bass, 5 echo
 EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3,  9, 4, 3
         ASSERT $ <= ScrHi + 256
         ORG X1Page + $60
         ASSERT RoadX1_end <= X1Page + $60
-CrewSay2a: db "< MY HAIR! MY HAIR! ", 0
 ; (src/tunnel.asm DrawPortal's working variables: moved here for room)
 PtN:            ds 5
 PtY:            db 0
@@ -38,7 +33,6 @@ PtGate:         db 0                ; drawing a gantry, not a tunnel
         ASSERT $ <= X1Page + $80
         ORG X1Page + $E0
         ASSERT RoadRW_end <= X1Page + $E0
-CrewSay2b: db "   IT LOOKS GREAT! >", 0
 ; (src/music.asm's flags: moved here for room)
 MusicOn:        db 0
 SoundMode:      db 0
@@ -50,7 +44,6 @@ SqTimer:        db 0                ; interrupts left of a chirp
         ASSERT $ <= X1Page + 256
         ORG LWPage + $60
         ASSERT LaneWp_end <= LWPage + $60
-CrewSay3a: db "< LET ME DRIVE!     ", 0
 ; (src/tunnel.asm's colours and where the stage overlay is: moved here for room)
 TunWall:        db $48, $08         ; walls: bright blue, blue (light / dark bands)
 TUN_LAMP        EQU $76             ; lamps on the walls (src/road.asm RowAttrs): bright yellow
@@ -60,7 +53,6 @@ TunSky:         db C_, C_           ; the ceiling (white ink: the message line; 
         ASSERT $ <= LWPage + $80
         ORG LWPage + $E0
         ASSERT Band_end <= LWPage + $E0
-CrewSay3b: db "   NOT A CHANCE... >", 0
 ; (src/extend.asm JingleTick's: moved here for room)
 JingleHold:     db 0
 ; A new stage begins: a short high beep (C) on its first frame (extended
@@ -72,11 +64,9 @@ JingleGo:
         ASSERT $ <= LWPage + 256
         ORG ZPage + $60
         ASSERT ZLo_end <= ZPage + $60
-CrewSay4a: db "< NICE ONE, GENIUS! ", 0
         ASSERT $ <= ZPage + $80
         ORG ZPage + $E0
         ASSERT LaneW_end <= ZPage + $E0
-CrewSay4b: db "    IT JUMPED OUT! >", 0
 ; (src/stage.asm StageOv's: moved here for room)
 OvEntry:        dw 0
 OvArg:          db 0
@@ -88,41 +78,32 @@ Difficulty:     db 1
         ASSERT $ <= ZPage + 256
         ORG DEPage + $60
         ASSERT RoadD_end <= DEPage + $60
-CrewSay5a: db "< I SAID SLOW DOWN! ", 0
+; (TunWidth's end, below: moved here for room) E widened by C
+TunWidthE:
+        ld a, e
+        add a, c
+        jr nc, .e
+        sbc a, a
+.e:     ld e, a
+        ret
         ASSERT $ <= DEPage + $80
         ORG DEPage + $E0
         ASSERT RoadE_end <= DEPage + $E0
-CrewSay5b: db "   I WAS GOING TO! >", 0
         ASSERT $ <= DEPage + 256
         ORG LXPage + $60
         ASSERT LaneX_end <= LXPage + $60
-CrewSay6a: db "< LOSE THE SHADES!  ", 0
         ASSERT $ <= LXPage + $80
         ORG LXPage + $E0
         ASSERT ForkT1_end <= LXPage + $E0
-CrewSay6b: db " THEY LOOK COOL... >", 0
         ASSERT $ <= LXPage + 256
         ORG ObjPage + $60
         ASSERT ObjScale_end <= ObjPage + $60
-CrewSay7a: db "< OPEN YOUR EYES!   ", 0
         ASSERT $ <= ObjPage + $80
         ORG ObjPage + $E0
         ASSERT SizeForLine_end <= ObjPage + $E0
-CrewSay7b: db "    THEY ARE OPEN! >", 0
         ASSERT $ <= ObjPage + 256
         ORG ZHiPage + $60
         ASSERT ZHi_end <= ZHiPage + $60
-CrewTraffic:
-        dw CrewSayT0a, CrewSayT0b
-        dw CrewSayT1a, CrewSayT1b
-        dw CrewSayT2a, CrewSayT2b
-        dw CrewSay4a, CrewSay4b
-CrewSayT0a: db "< YOU HIT A LORRY!  ", 0
-CrewSayT0b: db "   IT BRAKED HARD! >", 0
-CrewSayT1a: db "< YOU TAILGATED HIM!", 0
-CrewSayT1b: db " HE WAS IN MY WAY! >", 0
-CrewSayT2a: db "< LOOK AT THAT DENT!", 0
-CrewSayT2b: db "   THAT WAS THERE! >", 0
 ; (src/extend.asm PrintBig's table: moved here for room)
 ; a nibble's 4 pixels, each doubled
 DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $F0, $F3, $FC, $FF
@@ -130,15 +111,6 @@ DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $
         ASSERT $ <= ZHiPage + 256
         ORG MaskPage + $20
         ASSERT LMaskIncl_end <= MaskPage + $20
-CrewLines:      ; her line, his reply
-        dw CrewSay0a, CrewSay0b
-        dw CrewSay1a, CrewSay1b
-        dw CrewSay2a, CrewSay2b
-        dw CrewSay3a, CrewSay3b
-        dw CrewSay4a, CrewSay4b
-        dw CrewSay5a, CrewSay5b
-        dw CrewSay6a, CrewSay6b
-        dw CrewSay7a, CrewSay7b
         ASSERT $ <= MaskPage + $40
         ORG MaskPage + $C0
         ASSERT LaneM2_end <= MaskPage + $C0
@@ -340,7 +312,7 @@ DemoTraffic:
 TimeWarn:
         ld a, (PalTime)
         or $80
-        IFNDEF EINSTEIN         ; (the Einstein: screen B only)
+        IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only)
         ld hl, $5800 + 32 + 14
         call .cells
         ENDIF
@@ -437,7 +409,11 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
         IFDEF EINSTEIN
         call EinCoarse          ; (the AY at 2 MHz: src/einstein/boot.asm)
         ELSE
+        IFDEF CPC
+        call CpcCoarse          ; (the AY at 1 MHz: src/cpc/boot.asm)
+        ELSE
         ld e, 0
+        ENDIF
         ENDIF
 .tone:  ld (CrVolA), a
         ld hl, CrMix
@@ -616,3 +592,39 @@ DrumOpen:       db 11, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
         ASSERT $ <= FILL_END - 64
+        ORG Gap2Free            ; (after the starting lights, before the XOR chain)
+; (src/tunnel.asm DrawPortal's: moved here for room) A tunnel's mouth: B, D,
+; E = the road's width and edges on the line where it meets it, HL = DEPage
+; + $80 + the line. B becomes the road's width at the mouth's own depth line
+; (the nearest in it: from outside the way out is never in sight, so the
+; tunnel's lines start at 0) and D, E are widened by as much as that is
+; more than at the line shown there. Beyond a crest the nearest line in the
+; tunnel that shows can be much further in than the mouth, and the opening
+; shrank and grew as the hill hid and showed lines; and close by, with the
+; road's edge off the screen, its width on the screen made the opening too
+; low (the arch dropped, its rows left above it). (An edge off the screen
+; stays there.) C changed.
+TunWidth:
+        ld h, high SrcLine      ; (L = $80 + the line)
+        ld l, (hl)
+        ld h, high X1Page
+        ld c, (hl)              ; the road's half-width at the line shown
+        ld a, (TunJN)
+        dec a
+        ld l, a
+        ld a, (hl)              ; ... and at the mouth
+        add a, a
+        jr nc, .w
+        sbc a, a                ; (255 at most)
+.w:     ld b, a
+        ld a, (hl)
+        sub c
+        ld c, a                 ; how much wider there
+        ld a, d
+        sub c
+        jr nc, .d
+        xor a
+.d:     ld d, a
+        jp TunWidthE
+        ASSERT low SrcLine == $80
+        ASSERT $ <= XOR_END - 5 * 8

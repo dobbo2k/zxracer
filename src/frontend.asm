@@ -1194,8 +1194,8 @@ ScreensEnter:
         call Silence
         xor a
         ld (HudOr), a           ; print into screen A
-        IFDEF EINSTEIN
-        jp EinScreensEnter      ; (src/einstein/front.asm)
+        IFDEF NATIVE_GFX
+        jp GfxScreensEnter      ; (the platform's: src/einstein/front.asm, src/cpc)
         ELSE
         ld a, P7FFD_ROM48 | P7FFD_SHADOW | 7
         ld (Port7FFD), a
@@ -1232,8 +1232,8 @@ BlankAttrs:
         ld (hl), 0
         ldir
 ShowA:
-        IFDEF EINSTEIN
-        jp EinFrontOn           ; (screen A into the VDP: src/einstein/front.asm)
+        IFDEF NATIVE_GFX
+        jp GfxFrontOn           ; (screen A shown: the platform's)
         ELSE
         ld a, P7FFD_ROM48 | 7
         ld (Port7FFD), a
@@ -1548,7 +1548,7 @@ TxtOptMenu:     db "1  KEYBOARD  Q A O P SPACE", 0
                 db "4  CHOOSE YOUR OWN KEYS", 0
                 db "5  SOUND:", 0
                 db "6  LEVEL:", 0
-        IFDEF EINSTEIN
+        IFDEF NATIVE_GFX
                 db "   JOYSTICK WORKS ANY TIME", 0
         ELSE
                 db "   KEMPSTON WORKS ANY TIME", 0

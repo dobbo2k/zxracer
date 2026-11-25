@@ -46,6 +46,8 @@ how-to-play text (`release/README.txt`) and a printable cassette inlay
 (`inlay_outside.png`, `inlay_inside.png`: 300 dpi J-card, drawn by
 `tools/make_inlay.py`: the cover art on the front, its lettering down the
 spine, screenshots and how to play inside in the game's own font).
+`make release-einstein` puts the bootable Tatung Einstein TC-01 disc in
+`release/speedrun.dsk`. Boot it in drive 0 and type `SPEEDRUN` at the XtalDOS prompt.
 `make leaflet` draws `release/route_map.png`, an A5 route map leaflet
 in an 80s print style (two spot inks with halftone tints and misregistration,
 a fold; stages, themes, endings and par times from the game's data, the
@@ -81,9 +83,7 @@ Playable prototype. Start it in Fuse (`make run`) or any 128K emulator with
   disappears behind.
 - **Car:** original convertible sprite with steering frames, braking and
   off-road slowdown. Its crew: him (mullet, shades, loud striped 80s shirt)
-  at the wheel and her (big blonde hair) beside him. After a crash, close-ups
-  of the two of them appear while the car spins: she tells him off ("< NICE
-  ONE, GENIUS!"), he answers back ("IT JUMPED OUT! >"). Handling has sideways momentum:
+  at the wheel and her (big blonde hair) beside him. Handling has sideways momentum:
   a bend pushes the car outwards with a force that grows with the square of
   the speed, as real cornering force does. At full speed steering can only
   hold the gentlest bends; the rest carry you wide unless you lift off or

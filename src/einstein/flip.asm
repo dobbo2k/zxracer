@@ -82,14 +82,16 @@ EinUpload:
         ld b, a
         call EinSlotBase
         ld hl, (EDirtyPtr)
-.slot:  ld a, (hl)
-        inc hl
-        push bc
+        push bc                 ; scan the row once for each changed plane
         push hl
-        call EinSendSlot
+        ld c, $40
+        call EinSlotRuns
         pop hl
         pop bc
-        djnz .slot
+        push bc
+        ld c, $80
+        call EinSlotRuns
+        pop bc
         ld (EDirtyPtr), hl
 .names: ld a, c                 ; then its names, if it was drawn again
         add a, low ERowDrawn
@@ -207,7 +209,7 @@ ERowShadow:     dw 0            ; (EinSlotBase: the row's first slot's bytes in
 ERowVram:       dw 0            ; SlotShadow, its pattern's VRAM address)
 
 ; E = road row (0-11): its first slot's bytes and VRAM address (ERowSlotTab:
-; ESlotPtr, ESlotName0), for EinSendSlot. BC kept.
+; ESlotPtr, ESlotName0), for EinSendRun. BC kept.
 EinSlotBase:
         ld a, e
         add a, a
@@ -238,118 +240,167 @@ EinSlotBase:
         ld (ERowVram), hl
         ret
 
-; A = a changed slot of the row (EinSlotBase): bits 0-4 the slot in the row,
-; bit 6 its pixels changed, bit 7 its colour: from SlotShadow into VRAM
-EinSendSlot:
-        ld b, a
-        and $C0
-        ld c, a                 ; C: what changed
-        xor b
-        ld b, a                 ; B: the slot
+; HL walks B dirty entries for plane C. Slots are unique in a row but
+; can be allocated from either end. Stream each run lowest address first.
+EinSlotRuns:
+.find:  ld a, (hl)
+        inc hl
+        and c
+        jr nz, .first
+        djnz .find
+        ret
+.first: dec hl
+        ld a, (hl)
+        inc hl
+        and 31
+        ld d, a                 ; lowest and highest slot in the run
+        ld e, a
+.more:  dec b
+        jr z, .send
+        ld a, (hl)
+        and c
+        jr z, .consume
+        ld a, (hl)
+        and 31
+        inc a
+        cp d
+        jr z, .lower
+        sub 2
+        cp e
+        jr nz, .send
+        inc e
+.consume:
+        inc hl
+        jr .more
+.lower: dec d
+        jr .consume
+.send:  push bc
+        push hl
+        call EinSendRun
+        pop hl
+        pop bc
+        inc b
+        djnz .find
+        ret
+
+; D..E inclusive, C = pixel ($40) or colour ($80) plane.
+EinSendRun:
+        ld a, e
+        sub d
+        inc a
+        ld (.count + 1), a
+        ld b, d
+        ld a, d
         add a, a
         add a, a
         add a, a
-        ld e, a                 ; (x 8: its pattern)
-        add a, b                ; (x 9: its bytes; a row's slots: < 256)
-        IFDEF EIN_KERB
-        add a, b                ; (x 11)
+        ld e, a
+        ld d, 0
+        ld hl, (ERowVram)
+        add hl, de
+        ex de, hl               ; DE = first VRAM tile
         add a, b
-        ASSERT SLOT_SIZE == 11
+        IFDEF EIN_KERB
+        add a, b
+        add a, b
         ENDIF
         ld hl, (ERowShadow)
         add a, l
         ld l, a
-        jr nc, .h
+        jr nc, .address
         inc h
-.h:     push hl
-        ld hl, (ERowVram)       ; DE = the pattern's VRAM address
-        ld d, 0
-        add hl, de
-        ex de, hl
-        ld b, 8                 ; its bytes: 8 a part
-        ld a, c
-        cp $C0
-        jr c, .c1
-        ld b, 16
-.c1:    call EinSpend
-        jr c, .paced
-        pop hl
-        bit 6, c                ; ---- at full speed
-        jr z, .fc
-        push bc
-        call VdpAddr
-        ld c, EIN_VDP_DATA
-        DUP 8
-        outi
-        EDUP
-        pop bc
-        jr .fc2
-.fc:    ld a, l                 ; (past the pixels)
-        add a, 8
-        ld l, a
-        jr nc, .fc2
-        inc h
-.fc2:   bit 7, c
-        ret z
-        ld a, d                 ; the colour, on all 8 lines
+.address:
+        bit 7, c
+        jr z, .addrSet
+        ld a, d
         add a, high VRAM_COL
         ld d, a
+        ld a, l
+        add a, 8
+        ld l, a
+        jr nc, .addrSet
+        inc h
+.addrSet:
         call VdpAddr
+.count: ld d, 0                 ; tiles remaining
+        ld a, d
+        add a, a
+        add a, a
+        add a, a
+        bit 7, c
+        jr nz, .colours
+        ld b, a
+        call EinSpend
+        ld c, EIN_VDP_DATA
+        jr c, .pacedPixels
+        MACRO PIXEL_RUN paced
+        DUP 8
+        outi
+        IF paced
+        nop
+        nop
+        nop
+        nop
+        ENDIF
+        EDUP
+        DUP SLOT_SIZE - 8
+        inc hl
+        EDUP
+        dec d
+        ENDM
+.pixels:
+        PIXEL_RUN 0
+        jr nz, .pixels
+        ret
+.pacedPixels:
+        PIXEL_RUN 1
+        jr nz, .pacedPixels
+        ret
+
+.colours:
+        add a, a                ; reserve 512 T/tile for mixed inks and stride
+        jr nc, .colourBudget
+        xor a                   ; long run: stay paced even if the CTC wraps
+        ld (EBudget), a
+        jr .pacedColours
+.colourBudget:
+        ld b, a
+        call EinSpend
+        jr c, .pacedColours
+        MACRO COLOUR_RUN paced, solid, advance
         IFDEF EIN_KERB
-        inc hl                  ; (or two, by line)
+        inc hl
         ld a, (hl)
         dec hl
         or a
-        jp nz, EinSendCols
+        jr z, solid
+        push hl
+        call EinSendCols        ; mixed inks already have display-safe timing
+        pop hl
+        jr advance
+solid:
         ENDIF
         ld a, (hl)
         DUP 8
         out (EIN_VDP_DATA), a
-        EDUP
-        ret
-.paced: pop hl                  ; ---- past the blank: paced, 32 T a byte
-        bit 6, c
-        jr z, .pc
-        push bc
-        call VdpAddr
-        ld c, EIN_VDP_DATA
-        DUP 8
-        outi
-        nop
-        nop
-        nop
+        IF paced
+        DUP 6
         nop
         EDUP
-        pop bc
-        jr .pc2
-.pc:    ld a, l
-        add a, 8
-        ld l, a
-        jr nc, .pc2
-        inc h
-.pc2:   bit 7, c
-        ret z
-        ld a, d
-        add a, high VRAM_COL
-        ld d, a
-        call VdpAddr
-        IFDEF EIN_KERB
-        inc hl                  ; (or two, by line)
-        ld a, (hl)
-        dec hl
-        or a
-        jp nz, EinSendCols
         ENDIF
-        ld a, (hl)
-        ld c, EIN_VDP_DATA
-        DUP 8
-        out (c), a
-        nop
-        nop
-        nop
-        nop
-        nop
         EDUP
+advance:
+        ld bc, SLOT_SIZE
+        add hl, bc
+        dec d
+        ENDM
+.fastColours:
+        COLOUR_RUN 0, .solidFast, .advanceFast
+        jr nz, .fastColours
+        ret
+.pacedColours:
+        COLOUR_RUN 1, .solidPaced, .advancePaced
+        jr nz, .pacedColours
         ret
 
 ; ---------------------------------------------------------------------------
