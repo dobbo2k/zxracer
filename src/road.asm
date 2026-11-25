@@ -27,7 +27,7 @@
 ; ---------------------------------------------------------------------------
 STRIP_PAD       EQU 12              ; max kerb cells per side per row
 
-        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
+        IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 DrawRoad:
         ; per-frame constants: state pages and screen high-byte OR
         ld a, (StatePage)
@@ -518,7 +518,7 @@ RoadBands:
         djnz .pair
         ret
 
-        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
+        IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 ; --------------------------------------------------------------------------
 DrawRoadRow:
         ; both fork branches on screen in this row?

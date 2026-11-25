@@ -10,7 +10,11 @@
 ; Packs live in banks 0/1/3/4/6, which share the $C000 slot with bank 7, so a
 ; theme is copied through TRACK_CACHE in chunks (the track is loaded after).
 ; ---------------------------------------------------------------------------
+        IFDEF CPC
+TRACK_CACHE_SIZE EQU $4000 - TRACK_CACHE    ; (the CPC's: the top of base 0)
+        ELSE
 TRACK_CACHE_SIZE EQU $8000 - TRACK_CACHE
+        ENDIF
         IFNDEF FIRST_STAGE
 FIRST_STAGE     EQU 0               ; (testing: start on another stage)
         ENDIF
@@ -60,6 +64,20 @@ StageOvE:
         ld (OvMusic), a
         call MusicStop
         call WaitFlip           ; (no flip may happen meanwhile)
+        IFDEF CPC
+        ld a, (OvBlank)         ; the screen on show blanked: every pen black
+        or a
+        call nz, CpcBlack
+        ld hl, (StageOvPack + 1)    ; the overlay into the hidden screen, from
+        ld bc, (StageOvPack + 3)    ; the disc (src/cpc/disc.asm)
+        ld de, STAGEOV_AT
+        call CpcLoad
+        ld a, (OvArg)
+        ld hl, (OvEntry)
+        call .go
+        call CpcMotorOff
+        jr .after
+        ENDIF
         IFDEF EINSTEIN
         ld a, (EOvClobbered)    ; the overlay is resident, unless the front
         or a                    ; end has drawn over it: then from the disc
@@ -130,6 +148,9 @@ CopyFromBank:
         IFDEF EINSTEIN
         jp EinRead              ; (no banks: HL records of STAGES.DAT, BC of them)
         ENDIF
+        IFDEF CPC
+        jp CpcLoad              ; (from the disc: HL its first sector, BC bytes)
+        ENDIF
         push bc
         ld b, a
         ld a, 1
@@ -158,7 +179,7 @@ CopyFromBank:
 ; The end of a display reset (OvResetDisplay, in the overlay): screen B,
 ; cleared and labelled, over screen A - and over the overlay with it.
 CopyScreenBA:
-        IFDEF EINSTEIN
+        IFDEF NATIVE_GFX
         ret                     ; (the Spectrum's screens: not shown here)
         ENDIF
         ld hl, $C000

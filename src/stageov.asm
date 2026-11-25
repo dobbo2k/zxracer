@@ -530,7 +530,7 @@ ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40
 ; so that is the last thing done.
 OvResetDisplay:
         call WaitFlip
-        IFNDEF EINSTEIN
+        IFNDEF NATIVE_GFX
         ; ---- a Kempston joystick? One reads 0 in bits 5-7 at all times. With
         ; none, port $1F floats: on a 128K or +2 the screen bytes the ULA is
         ; reading, $FF in the border. A pixel byte with bits 5-7 clear passed
@@ -645,7 +645,11 @@ OvResetDisplay:
         IFDEF EINSTEIN
         jp EinResetDisplay      ; screen B into the VDP (src/einstein/flip.asm)
         ELSE
+        IFDEF CPC
+        jp CpcResetDisplay      ; screen B into both screens (src/cpc)
+        ELSE
         jp CopyScreenBA
+        ENDIF
         ENDIF
 .state: ld bc, StAD_end - StAD   ; (just the tables: the rest of each page
         xor a                   ; holds other data - src/holes.asm)
@@ -742,6 +746,10 @@ CopyToCache:
         IFDEF EINSTEIN
         ex de, hl               ; (no banks: DE's records of STAGES.DAT, BC of them)
         jp EinRead
+        ENDIF
+        IFDEF CPC
+        ex de, hl               ; (from the disc: DE its first sector, BC bytes)
+        jp CpcLoad
         ENDIF
         ld (LdBank), a
         ld (LdSrc), de

@@ -184,3 +184,12 @@ EGroundPapers   EQU EGroundPatterns + 32
         ; (keys.asm, disc.asm, front.asm: in bank 2's code, src/main.asm)
 EinArt:                         ; (the end of the platform code)
         ASSERT $ <= $4000              ; (the stage overlay: src/main.asm)
+
+; The shared code's hooks (NATIVE_GFX, src/defs.asm): the Einstein's
+GfxMarkCell     EQU EinMarkCell     ; a HUD cell written (src/hud.asm)
+GfxMarkBig      EQU EinMarkBig      ; a big digit's four (src/extend.asm)
+GfxLampCells    EQU EinLampCells    ; the starting lamps' (src/lampdraw.asm)
+GfxScreensEnter EQU EinScreensEnter ; the front end's screens (src/frontend.asm)
+GfxFrontOn      EQU EinFrontOn      ; screen A shown
+GfxPicture      EQU EinPicture      ; a picture (src/pics.asm)
+GfxJoy          EQU EinJoy          ; the joystick (src/input.asm)

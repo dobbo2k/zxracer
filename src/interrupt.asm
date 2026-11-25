@@ -14,13 +14,20 @@ InitInterrupts:
         IFDEF EINSTEIN
         jp EinCtcInit           ; the 50 Hz tick from the CTC (src/einstein/boot.asm)
         ELSE
+        IFDEF CPC
+        jp CpcIntInit           ; the Gate Array's six a frame (src/cpc/boot.asm)
+        ELSE
         ret
+        ENDIF
         ENDIF
 
 ; 50 Hz handler. Counts frames and performs a pending flip at the top of the
 ; frame (before the beam reaches the display), at most every MIN_FRAMES frames.
         IFDEF EINSTEIN
 Isr     EQU EinIsr              ; (src/einstein/boot.asm: the VDP's frames, polled)
+        ELSE
+        IFDEF CPC
+Isr     EQU CpcIsr              ; (src/cpc/boot.asm: six a frame, one at VSYNC)
         ELSE
 Isr:
         push af
@@ -53,4 +60,5 @@ Isr:
         pop af
         ei
         reti
+        ENDIF
         ENDIF

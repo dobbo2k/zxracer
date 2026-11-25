@@ -3,23 +3,32 @@
 ; Target: ZX Spectrum 128K, assembled with sjasmplus; with -DEINSTEIN the
 ; Tatung Einstein (docs/port_einstein.md): the same game at the same
 ; addresses in a flat 64K, with src/einstein/ in place of the Spectrum's
-; screen, input, sound out, interrupt and paging.
+; screen, input, sound out, interrupt and paging; with -DCPC the Amstrad
+; CPC 6128 (docs/port_cpc.md): bank 2's code and tables where they are,
+; bank 5's residents $4000 lower, src/cpc/ for the rest.
 ; ---------------------------------------------------------------------------
         IFDEF EINSTEIN
         DEVICE NOSLOT64K
         ELSE
+        IFDEF CPC
+        DEVICE AMSTRADCPC6128
+        ELSE
         DEVICE ZXSPECTRUM128
+        ENDIF
         ENDIF
         INCLUDE "defs.asm"
         IFDEF EINSTEIN
         INCLUDE "einstein/platform.asm" ; the COM file's entry at $0100, the platform code
+        ENDIF
+        IFDEF CPC
+        INCLUDE "cpc/platform.asm"      ; base 0: the CPC's code (bank 7 at $C000)
         ENDIF
 
         ORG $8000
 start:
         di
         ld sp, STACK_TOP
-        IFNDEF EINSTEIN
+        IFNDEF NATIVE_GFX
         ld a, P7FFD_ROM48 | 7   ; display bank 5, bank 7 paged at $C000
         ld (Port7FFD), a
         ld bc, PORT_7FFD
@@ -55,7 +64,24 @@ MainLoop:
         call EinFlash           ; (the timer's last ten seconds)
         call RequestFlip        ; then into VRAM, in the vertical blank
         jr MainLoop
-        ELSE
+        ENDIF
+        IFDEF CPC
+MainLoop:
+        call CheckPause
+        call ReadInput
+        call UpdatePlayer
+        call RoadPrepare
+        call WaitFlip           ; (the last frame shown: the hidden screen at $4000)
+        call CpcDraw            ; the road and the panorama (src/cpc)
+        call DrawPortal         ; (a tunnel's mouth, the gantry: screen B's attributes)
+        call DrawSprites        ; traffic and scenery projected: the command list
+        call CpcSprites         ; drawn from it, then the car (src/cpc)
+        call DrawHud            ; (into screen B: the cells it writes are noted)
+        call CpcCells           ; and converted into the hidden screen
+        call RequestFlip        ; shown from the next VSYNC due
+        jr MainLoop
+        ENDIF
+        IFNDEF NATIVE_GFX
 MainLoop:
         call CheckPause
         BORDER 1                ; blue: game logic
@@ -86,8 +112,8 @@ MainLoop:
         ENDIF
 
         INCLUDE "interrupt.asm"
-        IFDEF EINSTEIN
-        INCLUDE "einstein/screen.asm"   ; (FillA: the rest is in src/einstein)
+        IFDEF NATIVE_GFX
+        INCLUDE "einstein/screen.asm"   ; (FillA: the rest is the platform's)
         ELSE
         INCLUDE "screen.asm"
         ENDIF
@@ -127,6 +153,12 @@ MainLoop:
         INCLUDE "einstein/slope.asm"    ; (a sloped row of the near road)
         ENDIF
         ENDIF
+        IFDEF CPC               ; (in the room the Spectrum's drawing code leaves)
+        INCLUDE "pause.asm"
+        INCLUDE "beep.asm"
+        INCLUDE "gap4.asm"
+        INCLUDE "cpc/bank2.asm"
+        ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES
 
@@ -135,6 +167,9 @@ CodeEnd:
 TablesEnd:
         ASSERT TablesEnd <= PANO_LDI_END - 64
         INCLUDE "tyres.asm"     ; (in the gap before the panorama's chain)
+        IFDEF CPC               ; (no panorama bitmap nor road pass 2: their
+        INCLUDE "cpc/chains.asm"        ; chains' room for the CPC's)
+        ENDIF
         IFDEF EINSTEIN          ; (no panorama bitmap nor road pass 2: their
         INCLUDE "einstein/static.asm"   ; chains' room for code)
         ASSERT $ <= PANO_LDI_END - 64
@@ -147,7 +182,8 @@ TablesEnd:
 OutiEnd:
         ret
         INCLUDE "einstein/reset.asm"    ; (more of the display reset)
-        ELSE
+        ENDIF
+        IFNDEF NATIVE_GFX
         ASSERT $ <= PANO_LDI_END - 64
 
 ; Unrolled LDI chain for the panorama: entered at PanoLdiEnd - 2*n
@@ -218,7 +254,7 @@ FillBlock:
         inc l
         EDUP
         ret
-        IFNDEF EINSTEIN
+        IFNDEF NATIVE_GFX
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
         INCLUDE "beep.asm"
         INCLUDE "gap4.asm"
@@ -274,14 +310,22 @@ CmdListB        EQU $10000 - THEME_TOP
         IFDEF EINSTEIN
         INCLUDE "einstein_objects.asm"
         ELSE
+        IFDEF CPC
+        INCLUDE "cpc_objects.asm"       ; (build/cpc: the resident objects in Mode 0)
+        ELSE
         INCLUDE "resident_data.asm"
+        ENDIF
         ENDIF
         INCLUDE "font_data.asm"
         IFDEF EINSTEIN
         INCLUDE "spider.asm"
         INCLUDE "einstein/ground.asm"
         ELSE
+        IFDEF CPC
+        INCLUDE "cpc_car.asm"           ; (build/cpc: the Spider in Mode 0)
+        ELSE
         INCLUDE "car_data.asm"
+        ENDIF
         ENDIF
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
@@ -292,6 +336,9 @@ CmdListB        EQU $10000 - THEME_TOP
         INCLUDE "tunnel.asm"    ; tunnels
         IFNDEF EINSTEIN
         INCLUDE "tunnelaside.asm"   ; (the Einstein's: in bank 2)
+        ENDIF
+        IFDEF CPC
+        INCLUDE "cpc/resident.asm"  ; (the CPC's code that is not time-critical)
         ENDIF
 PrevHillInputs: ds 2 + 3 * MAX_BOUNDS + 1
 ScnEnd:
@@ -319,6 +366,24 @@ ScnEnd:
         ; the COM file: $0100 up to the stack
         SAVEBIN "build/einstein/speedrun.com", $0100, STACK_TOP - 256 - $0100
         ELSE
+        IFDEF CPC
+; The between-stages overlay and the front end, for the disc
+; (tools/make_cpc.py: packed into SPEED.DAT, read when needed)
+        ORG $4000
+        OUTPUT "build/cpc/stageov.bin"
+        INCLUDE "stageov.asm"
+        OUTEND
+        ASSERT $ <= ART_INPUT
+        ORG $C000
+        OUTPUT "build/cpc/frontend.bin"
+        DISP THEME_CACHE
+        INCLUDE "frontend.asm"
+        ENT
+        OUTEND
+        ; the game's image: base 0 and base 2 (bank 7 starts empty)
+        SAVEBIN "build/cpc/base0.bin", $0000, $4000
+        SAVEBIN "build/cpc/base2.bin", $8000, $4000
+        ELSE
         IF AUTOPLAY
         SAVESNA "build/video.sna", start
         ELSE
@@ -326,6 +391,7 @@ ScnEnd:
         SAVESNA "build/release.sna", start     ; (no timing bars: the tape is made from this)
         ELSE
         SAVESNA "build/zxracer.sna", start
+        ENDIF
         ENDIF
         ENDIF
         ENDIF

@@ -323,7 +323,7 @@ Span:   push hl
 .none:  ld de, $FF00
         ret
 
-        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
+        IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 ; --------------------------------------------------------------------------
 ; A row with both branches on screen. Every cell is classified from the
 ; line pairs' spans (grass, road; kerb where an edge passes), the attributes

@@ -10,10 +10,31 @@ AY_SEL          EQU $FFFD
 AY_DATA         EQU $BFFD
 ENGINE_IDLE     EQU (1400 * AYN + AYD / 2) / AYD    ; tone period at standstill (~80 Hz)
 ENGINE_STEP     EQU 50              ; period decrease per speed unit (EngineUpdate: shifts;
-                                    ; the Einstein's 2 MHz AY: 56)
+                                    ; the Einstein's 2 MHz AY: 56, the CPC's 1 MHz: 28)
 
 ; A = register, E = value
 AyWrite:
+        IFDEF CPC               ; (A, E and the flags kept; BC used)
+        push af
+        ld b, $F4               ; the AY's bus is the PPI's port A, its
+        out (c), a              ; function port C's bits 6-7: the register
+        ld bc, $F6C0            ; selected,
+        out (c), c
+        ld c, 0
+        out (c), c
+        cp 7                    ; (the mixer: port A an input, for the
+        ld a, e                 ; keyboard, and port B)
+        jr nz, .v
+        and $3F
+.v:     ld b, $F4
+        out (c), a              ; its value written
+        ld bc, $F680
+        out (c), c
+        ld c, 0
+        out (c), c
+        pop af
+        ret
+        ENDIF
         IFDEF EINSTEIN
         out (EIN_PSG_SELECT), a ; (A kept, as on the Spectrum)
         push af
@@ -58,6 +79,16 @@ EngineUpdate:
         ld c, l                 ; 16
         add hl, hl              ; 32
         ELSE
+        IFDEF CPC               ; (revs x 28 = 16 + 8 + 4: 50 at 1 MHz)
+        add hl, hl
+        add hl, hl
+        ld d, h
+        ld e, l                 ; 4
+        add hl, hl
+        ld b, h
+        ld c, l                 ; 8
+        add hl, hl              ; 16
+        ELSE
         add hl, hl
         ld d, h
         ld e, l                 ; 2
@@ -67,6 +98,7 @@ EngineUpdate:
         ld b, h
         ld c, l                 ; 16
         add hl, hl              ; 32
+        ENDIF
         ENDIF
         add hl, bc
         add hl, de

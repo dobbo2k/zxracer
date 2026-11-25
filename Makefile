@@ -193,3 +193,50 @@ test-einstein: build/einstein/speedrun.dsk $(EIN_HARNESS)
 ALBERT ?= /c/Tatung Einstein/albert/albert.exe
 run-einstein: build/einstein/speedrun.dsk
 	"$(ALBERT)" --disk build/einstein/speedrun.dsk &
+
+# ---------------------------------------------------------------------------
+# Amstrad CPC 6128 (docs/port_cpc.md): build/cpc/speedrun.dsk, an AMSDOS
+# DATA disc: RUN"SPEED" at the BASIC prompt. CPC_MAME and CPC_ROMS
+# (local.mk) are MAME and its cpc6128 ROM set (cpc6128.rom, cpcados.rom),
+# for the tests and run-cpc.
+CPC_SRC := $(wildcard src/cpc/*.asm)
+CPC_GEN := build/cpc/packs.asm build/cpc/cpc_objects.asm build/cpc/cpc_car.asm build/cpc/stagepacks.asm build/cpc/music_notes.asm
+CPC_DAT := build/cpc/stages.asm build/cpc/stageov_pack.asm build/cpc/screens_data.asm build/cpc/speed_raw.dat build/cpc/reserve.txt
+
+.PHONY: cpc test-cpc run-cpc
+cpc: build/cpc/speedrun.dsk
+
+build/cpc:
+	mkdir -p build/cpc
+
+$(CPC_GEN) &: tools/cpc_art.py tools/make_cpc.py build/stages.asm | build/cpc
+	$(PYTHON) tools/make_cpc.py gen assets/stages.yaml build/cpc
+
+# every stage's packs, each assembled where it runs
+build/cpc/stagepacks.stamp: build/cpc/stagepacks.asm
+	$(ASM) --nologo --msg=war -Ibuild -Ibuild/cpc build/cpc/stagepacks.asm
+	touch $@
+
+$(CPC_DAT) &: build/cpc/stagepacks.stamp tools/make_cpc.py tools/make_screens.py
+	$(PYTHON) tools/make_cpc.py dat assets/stages.yaml build/cpc
+
+build/cpc/base0.bin: $(SRC) $(CPC_SRC) $(CPC_GEN) $(CPC_DAT) build/music_title.asm build/tables.asm build/font_data.asm | build/cpc
+	$(ASM) --nologo --msg=war --fullpath -DCPC=1 -Ibuild -Ibuild/cpc --lst=build/cpc/speedrun.lst --sym=build/cpc/speedrun.sym src/main.asm
+
+# the overlay, the front end and the game's image into SPEED.DAT; the loader
+build/cpc/SPEED.DAT build/cpc/loader_defs.asm &: build/cpc/base0.bin build/cpc/speed_raw.dat tools/make_cpc.py
+	$(PYTHON) tools/make_cpc.py patch assets/stages.yaml build/cpc
+
+build/cpc/speed.bin: src/cpc/loader.asm src/cpc/fdc.asm build/cpc/loader_defs.asm
+	$(ASM) --nologo --msg=war -Ibuild/cpc --sym=build/cpc/loader.sym src/cpc/loader.asm
+
+build/cpc/speedrun.dsk: build/cpc/SPEED.DAT build/cpc/speed.bin tools/make_cpc.py tools/cpc/make_dsk.py
+	$(PYTHON) tools/make_cpc.py dsk assets/stages.yaml build/cpc
+
+test-cpc: build/cpc/speedrun.dsk
+	$(PYTHON) tests/cpc_check.py build/cpc/speedrun.dsk build/cpc/speedrun.sym build/cpc
+
+# WinAPE (CPC_WINAPE in local.mk): the disc in drive A; RUN"SPEED"
+CPC_WINAPE ?= /c/ZX Spectrum/Wonderboy/build/winape/WinApe.exe
+run-cpc: build/cpc/speedrun.dsk
+	"$(CPC_WINAPE)" "$(shell cygpath -w "$(abspath build/cpc/speedrun.dsk)")" &

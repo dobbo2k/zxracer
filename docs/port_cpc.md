@@ -521,3 +521,53 @@ measurements come first of all: they decide the memory map's fallbacks.
 3. **The HUD:** Mode 0, with the doubled-pixel font; no Mode 1 band (5.7).
 4. **The art:** new art for the CPC, not converted from the Einstein's
    (5.6, phase A).
+
+## 11. Progress
+
+### Phase 0 (25 November 2026)
+
+- **`NATIVE_GFX` and `FAST_PROJ`** (`src/defs.asm`): the shared files test
+  `NATIVE_GFX` where they mean "not the Spectrum's screen", `FAST_PROJ`
+  for the exact speed-ups (`ApplyCurve`, `HillMap`); `EIN_NOLANE` and the
+  bands of lines 0 and 4 stay the Einstein's. The hooks the shared code
+  calls are named for no platform (`GfxMarkCell`, `GfxMarkBig`,
+  `GfxLampCells`, `GfxScreensEnter`, `GfxFrontOn`, `GfxPicture`,
+  `GfxJoy`): the Einstein's `platform.asm` points them at its own. The
+  Spectrum's tape and the Einstein's `SPEEDRUN.COM` and `STAGES.DAT` are
+  byte-identical to before. `MIN_FRAMES` has its `IFNDEF` guard.
+- **`make cpc`** builds `build/cpc/speedrun.dsk` (`tools/make_cpc.py`: gen,
+  the stage packs, dat, the game, patch, the loader, dsk): `RUN"SPEED"`.
+  `src/cpc/`: `platform.asm` (the map), `boot.asm` (`CpcBoot`, the
+  interrupt, the frame grid), `flip.asm`, `keys.asm` (the scan in the
+  interrupt, `CpcSpecIn` for `KEY_IN`, the joystick), `disc.asm` and
+  `fdc.asm` (Wonder Boy's reader), `loader.asm` (`SPEED.BIN`), and the
+  drawing's stubs (`draw.asm`). Sjasmplus can't use labels that begin
+  `CPC_` (the define `CPC` is put in their place): the frame grid's are
+  `FLIP_DEBT` and `FLIP_GAP`.
+- **The tools:** `tools/cpc/make_dsk.py`, `tools/cpc_harness.py` with
+  `tools/mame/cpc_harness.lua` (Wonder Boy's, without its autoplay; with
+  `reg`, `frame`, `save`), `CPC_MAME` and `CPC_ROMS` in `local.mk`.
+- **The packs don't fit in RAM** (5.11's measure): the Einstein's packs
+  alone pack to about 61K, and the CPC's Mode 0 art and pictures will be
+  more, against the 48K of banks 4-6. So the fallback: the packs are on
+  the disc, in `SPEED.DAT`, each packed (`zpack`) from a sector of its
+  own, and read when needed (`CpcLoad`: into bank 4, then unpacked from
+  there a byte at a time with bank 4 paged in, to wherever it goes). The
+  stage table holds (first sector, packed bytes) where the Spectrum has
+  (bank, address, length), as the Einstein's. `SPEED.DAT` is the disc's
+  first file (from sector 4), so its packs' places don't depend on the
+  loader's size; the game's image is last in it. The disc: 122 of 356
+  sectors so far.
+- **The loader:** AMSDOS loads `SPEED.BIN` at $1000 and it moves itself to
+  $C000 (base 3). Loaded at $C000 it was cleared by the firmware as the
+  program started (the screen is reset).
+- **Base 0:** the CPC's code $0000-$0479 so far; the residents $1B00-$3209
+  (5.9K: without the Spectrum's car); 2.9K free before the track cache at
+  $3DA0; 5.7K free between. **Bank 2:** `CodeEnd` $97FE, 2.8K free before
+  the tables.
+- **The benchmark with nothing drawn** (`-DFIXED_ELAPSED=1`, game frames
+  20-320 of the attract demo): locked, 3.000 TV frames a game frame (16.67
+  fps); unlocked (`-DMIN_FRAMES=1`), 1.480: the shared work, the interrupt
+  and the HUD into the shadow take 29.6 ms a game frame, as section 6
+  estimated (27-31 ms with the interrupts). About 30 ms a game frame are
+  left for the CPC's drawing at the 3-TV-frame lock.

@@ -209,7 +209,7 @@ ApplyCurve:
         push hl
         push bc
         push de
-        IFDEF EINSTEIN          ; (A = CurC) the zone's 2 or more: << (zone - 2),
+        IFDEF FAST_PROJ         ; (A = CurC) the zone's 2 or more: << (zone - 2),
         ld l, a                 ; exactly the same, with fewer shifts
         rlca
         sbc a, a

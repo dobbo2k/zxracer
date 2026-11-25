@@ -312,7 +312,7 @@ DemoTraffic:
 TimeWarn:
         ld a, (PalTime)
         or $80
-        IFNDEF EINSTEIN         ; (the Einstein: screen B only)
+        IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only)
         ld hl, $5800 + 32 + 14
         call .cells
         ENDIF
@@ -409,7 +409,11 @@ CrashTickA:                     ; A: squeal while spinning, else the thud
         IFDEF EINSTEIN
         call EinCoarse          ; (the AY at 2 MHz: src/einstein/boot.asm)
         ELSE
+        IFDEF CPC
+        call CpcCoarse          ; (the AY at 1 MHz: src/cpc/boot.asm)
+        ELSE
         ld e, 0
+        ENDIF
         ENDIF
 .tone:  ld (CrVolA), a
         ld hl, CrMix

@@ -113,7 +113,7 @@ HillMap:
         ld hl, 0
         ld d, h
         ld e, l
-        IFDEF EINSTEIN
+        IFDEF FAST_PROJ
         ; (the Einstein's loop: the same, quicker - ProjClip + j in HL' and
         ; the pairs still free in C' rather than IY and IXL, the line last
         ; in view in E', both events looked for with one test each)

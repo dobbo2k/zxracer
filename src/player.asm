@@ -40,7 +40,7 @@ UpdatePlayer:
         ld (hl), b
         jr nz, .nz
         inc a
-        IFDEF EINSTEIN          ; (its game frames take longer: up to 8, so the
+        IFDEF NATIVE_GFX        ; (their game frames take longer: up to 8, so the
 .nz:    cp 9                    ; clock and the car keep real time)
         jr c, .el
         ld a, 8

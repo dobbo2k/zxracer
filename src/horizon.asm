@@ -7,7 +7,7 @@
 ; ---------------------------------------------------------------------------
 PANO_Y          EQU 80                  ; first line (character row 10)
 
-        IFNDEF EINSTEIN         ; (the Spectrum's drawing: not in the Einstein build)
+        IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 ; When this game frame already runs late (2 TV frames since the last flip)
 ; and the panorama is only one step (4 pixels) behind, skip it: it is a
 ; distant band and catching up a frame later is invisible. Further behind

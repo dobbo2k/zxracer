@@ -7,7 +7,7 @@ LampDraw:
         call z, MusicGo
         ld a, (HudOr)
         push af
-        IFNDEF EINSTEIN         ; (the Einstein: screen B only; screen A's
+        IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only; screen A's
         xor a                   ; memory holds the stage overlay there)
         call .scr
         ENDIF
@@ -15,8 +15,8 @@ LampDraw:
         call .scr
         pop af
         ld (HudOr), a
-        IFDEF EINSTEIN
-        jp EinLampCells         ; (their cells to be sent: src/einstein/sky.asm)
+        IFDEF NATIVE_GFX
+        jp GfxLampCells         ; (their cells to be shown: the platform's)
         ELSE
         ret
         ENDIF

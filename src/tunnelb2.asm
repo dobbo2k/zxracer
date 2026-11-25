@@ -13,7 +13,7 @@ Ceiling:
         ldi
         ldi
         jr z, .sky
-        IFNDEF EINSTEIN         ; (the Einstein: screen B only; screen A's memory
+        IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only; screen A's memory
         ld hl, $4840            ; holds its buffers) going in: the backdrop's pixels
         call .clear             ; cleared (both screens; drawn again on the way out)
         ENDIF

@@ -413,7 +413,7 @@ DrawObject:
         ld a, (SprH)
         ld (hl), a
         inc hl
-        IFDEF EINSTEIN
+        IFDEF NATIVE_GFX        ; (its type: the platform draws it)
         ld a, (ObjType)
         ld (hl), a
         ELSE
@@ -503,7 +503,7 @@ MulS8U8:
 
 ; HL -> draw command. XOR the sprite into the back buffer.
 RunCommand:
-        IFNDEF EINSTEIN         ; (the Einstein's car is not drawn here)
+        IFNDEF NATIVE_GFX       ; (the Einstein's and the CPC's car is not drawn here)
         ; does the sprite overlap the player's car block (rows 20-23, cols 12-19)?
         push hl
         ld a, (hl)              ; y top
