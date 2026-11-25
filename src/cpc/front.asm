@@ -193,15 +193,110 @@ CFrontSync:
         ret
 
 ; A picture (ShowPic): A = its sectors, HL = its first (on the disc): the
-; Spectrum's screen into screen A, then shown
+; CPC's own (tools/cpc_pictures.py), a screen's 16K block, read straight
+; into base 3 (shown); its inks at $600; its text panel's rows (from the
+; row at $611) the Spectrum's cells, in the other 2Ks' unshown parts, put
+; into the copy and screen A and converted (the front end prints there)
 GfxPicture:
+        push af
+        push hl
+        call CpcBlack
+        ld bc, CRTC_SELECT + 12 ; base 3 shown
+        out (c), c
+        ld bc, CRTC_WRITE + CRTC_B
+        out (c), c
+        ld a, 1
+        ld (CpcHidden), a       ; (base 3 at $4000 meanwhile: C3)
+        pop hl
+        pop af
         ld b, a
         ld c, 0
         sla b                   ; (x 512)
         ld de, $4000
         call CpcLoad
         call CpcMotorOff
-        jp GfxFrontOn
+        ld hl, $C000            ; the copy: empty but the panel
+        ld de, $C001
+        ld bc, 6911
+        ld (hl), 0
+        ldir
+        ld a, ($4611)
+        ld (CRow), a
+        ld (.r0 + 1), a
+        ld hl, $4E00            ; (its first row's cells)
+.row:   ld a, (CRow)
+        cp 24
+        jr nc, .rows
+        push hl
+        and $18                 ; its bitmap: 8 lines of 32
+        or $C0
+        ld d, a
+        ld a, (CRow)
+        rrca
+        rrca
+        rrca
+        and $E0
+        ld e, a
+        ld b, 8
+.ln:    push bc
+        push de
+        ld bc, 32
+        ldir
+        pop de
+        inc d
+        pop bc
+        djnz .ln
+        ld a, (CRow)            ; its attributes: $D800 + row x 32
+        rrca
+        rrca
+        rrca
+        ld e, a
+        and 3
+        or $D8
+        ld d, a
+        ld a, e
+        and $E0
+        ld e, a
+        ld bc, 32
+        ldir
+        pop hl
+        ld a, h                 ; the next 2K's
+        add a, 8
+        ld h, a
+        ld hl, CRow
+        inc (hl)
+        ld h, a
+        ld l, 0
+        set 1, h                ; ($x600: H's bits 1-2 set, L 0)
+        set 2, h
+        jr .row
+.rows:  ld hl, $4600            ; its pens (and so each Spectrum colour's)
+        call CpcPens
+.r0:    ld b, 0                 ; the panel's cells into base 3
+.cr:    ld c, 0
+.cc:    push bc
+        call CpcCell
+        pop bc
+        inc c
+        bit 5, c
+        jr z, .cc
+        inc b
+        ld a, b
+        cp 24
+        jr c, .cr
+        xor a                   ; screen A as the copy (C1)
+        ld (CpcHidden), a
+        call CpcSelect
+        ld hl, $C000
+        ld de, $4000
+        ld bc, 6912
+        ldir
+        ld a, 1
+        ld (CFrontOn), a
+        ld hl, 0
+        ld (CFrontCur), hl
+        ret
+CRow:   db 0
 
 ; (CpcResetDisplay) the game's display again
 CpcFrontOff:

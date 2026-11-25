@@ -339,6 +339,9 @@ CpcHw:  add a, low SpecHw
 ; stage_art); and each Spectrum colour's pen (CSpecPB)
 CpcPalette:
         ld hl, ART_BITMAP + 512 + 640
+; HL = 17 hardware colours: the pens and the border those; each Spectrum
+; colour's pen found (CSpecPB)
+CpcPens:
         ld de, CPens
         ld bc, GA_PORT
         xor a
