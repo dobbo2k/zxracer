@@ -12,14 +12,9 @@ CpcDraw:
         jp CpcHorizon
 
 
-; The shared code's hooks (NATIVE_GFX, src/defs.asm); GfxMarkCell,
-; GfxMarkBig, GfxLampCells: src/cpc/cells.asm
-GfxScreensEnter:                ; the front end's screens (src/frontend.asm)
-        ret
-GfxFrontOn:                     ; screen A shown
-        ret
-GfxPicture:                     ; a picture (src/pics.asm)
-        ret
+; (The shared code's hooks, NATIVE_GFX: GfxMarkCell, GfxMarkBig,
+; GfxLampCells in src/cpc/cells.asm; GfxScreensEnter, GfxFrontOn, GfxPicture
+; in src/cpc/front.asm)
 
 ; ---- the panorama (rows 10-11): the stage's (PANO_CACHE: the Spectrum's,
 ; 1 bit a pixel, 256 pixels by 16 lines; and a copy 4 pixels on) made a
@@ -450,6 +445,7 @@ CpcClear:
 ; screens cleared, the panorama made Mode 0, every cell of rows 0-9 (and
 ; the panorama's, in a tunnel) converted into both
 CpcResetDisplay:
+        call CpcFrontOff
         call CpcPalette
         ld a, (PenByte + PEN_SKY)
         call CpcClearBoth

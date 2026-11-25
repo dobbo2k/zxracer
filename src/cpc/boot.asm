@@ -137,11 +137,22 @@ CpcIsr:
         ei
         reti
 
-; The next TV frame (FRAME_WAIT). Everything kept.
+; The next TV frame (FRAME_WAIT; in the front end its share of cells
+; first: src/cpc/front.asm). Everything kept.
 CpcHalt:
         push af
         push hl
-        ld hl, FrameCount
+        ld a, (CFrontOn)
+        or a
+        jr z, .w0
+        push bc
+        push de
+        push ix
+        call CFrontSync
+        pop ix
+        pop de
+        pop bc
+.w0:    ld hl, FrameCount
         ld a, (hl)
 .w:     halt
         cp (hl)
