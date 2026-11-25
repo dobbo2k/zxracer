@@ -408,6 +408,11 @@ LoadPacks:
         call UnLZ
         ld hl, ART_BITMAP
         ld de, PANO_CACHE
+        IFDEF CPC
+        ld bc, 64 * PANO_H
+        ldir
+        ret
+        ELSE
         ld bc, 512
         ldir
         ; DE = second panorama. Keep the first nibble for the seam of each row.
@@ -456,12 +461,19 @@ LoadPacks:
         jr nz, .row
         ret
 
-        ENDIF
+        ENDIF                   ; CPC
+        ENDIF                   ; EINSTEIN
 
 ; Scratch in the hidden display, beyond the overlay and below screen-A data.
 ART_INPUT       EQU $4A00
 ART_BITMAP      EQU $5200
+        IFDEF CPC
+CpcCloudData    EQU ART_BITMAP + 64 * PANO_H
+CpcStageInks    EQU CpcCloudData + 640
+        ASSERT CpcStageInks + 17 <= $5B00
+        ELSE
         ASSERT ART_BITMAP + 512 + 640 <= $5B00
+        ENDIF
 
 StageHeaders:
         ld hl, (THEME_CACHE)
@@ -589,7 +601,11 @@ OvResetDisplay:
         ; Fixed sky artwork sits below the message and between the portraits.
         ; Copy just once, before CopyScreenBA duplicates the complete display.
         IFNDEF EINSTEIN
+        IFDEF CPC
+        ld hl, CpcCloudData
+        ELSE
         ld hl, ART_BITMAP + 512
+        ENDIF
         ld b, 48
 .cloud: push bc
         push hl

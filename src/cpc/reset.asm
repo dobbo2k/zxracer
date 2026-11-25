@@ -3,51 +3,21 @@
 ; 2: on the CPC all RAM is as fast)
 ; ---------------------------------------------------------------------------
 
-; ---- the panorama (rows 10-11): the stage's (PANO_CACHE: the Spectrum's,
-; 1 bit a pixel, 256 pixels by 16 lines; and a copy 4 pixels on) made a
-; Mode 0 one there at a display reset (64 bytes a line), then drawn into a
-; screen when its scroll there is not the one wanted, a byte (the
-; Spectrum's 4-pixel step) at a time. In a tunnel its rows are the
-; ceiling: the shadow's cells.
-PANO_INK        EQU ((PEN_PANO_F & 1) * $C0) | (((PEN_PANO_F >> 1) & 1) * $0C) | (((PEN_PANO_F >> 2) & 1) * $30) | (((PEN_PANO_F >> 3) & 1) * $03)
-PANO_PAPER      EQU ((PEN_PANO_N & 1) * $C0) | (((PEN_PANO_N >> 1) & 1) * $0C) | (((PEN_PANO_N >> 2) & 1) * $30) | (((PEN_PANO_N >> 3) & 1) * $03)
+; The stage overlay installs a ready-to-scroll Mode 0 panorama in PANO_CACHE.
 CPanoA:         db $FF          ; the byte each screen's panorama starts at
 CPanoB:         db $FF          ; ($FF: not drawn)
         ASSERT high CPanoA == high CPanoB
 CTunWas:        db 0            ; TunInside as last seen
 
-; PANO_CACHE's first copy made a Mode 0 one in its place (from its end down)
-CpcPanoConvert:
-        ld hl, PANO_CACHE + 32 * PANO_H - 1
-        ld de, PANO_CACHE + 64 * PANO_H - 1
-        ld bc, 32 * PANO_H
-.b:     ld a, (hl)
-        push hl
-        ld l, a
-        ld h, high CHalf2
-        ld a, (hl)              ; its second Mode 0 byte's ink pixels
-        and PANO_INK ^ PANO_PAPER
-        xor PANO_PAPER
-        ld (de), a
-        dec de
-        dec h
-        ld a, (hl)              ; its first's
-        and PANO_INK ^ PANO_PAPER
-        xor PANO_PAPER
-        ld (de), a
-        dec de
-        pop hl
-        dec hl
-        dec bc
-        ld a, b
-        or c
-        jr nz, .b
-        ld hl, PANO_CACHE       ; its first line not all paper
+CpcPanoReset:
+        ld a, (PenByte + PEN_SKY)
+        ld e, a
+        ld hl, PANO_CACHE       ; first line containing landscape pixels
         ld b, 0
 .top:   ld c, 64
 .tb:    ld a, (hl)
         inc hl
-        cp PANO_PAPER
+        cp e
         jr nz, .found
         dec c
         jr nz, .tb
@@ -127,6 +97,7 @@ CpcHorizon:
 .k:     ld b, a                 ; B = the first line, 0-15
         ld a, PANO_H
         sub b
+        ret z                   ; an entirely empty panorama on a scroll
         ld (.n + 1), a
         ld a, b                 ; its address: line 80 + B
         and 7
@@ -736,7 +707,21 @@ CpcHw:  add a, low SpecHw
 ; Array's colours, after the panorama and the clouds: tools/make_cpc.py
 ; stage_art); and each Spectrum colour's pen (CSpecPB)
 CpcPalette:
-        ld hl, ART_BITMAP + 512 + 640
+        ld hl, CpcStageInks
+        call CpcPens
+        ; Outdoor cells use bright cyan (day) or magenta (sunset) as a
+        ; sky token. Map it to the same native sky ink as the panorama.
+        ld a, (THEME_CACHE + 6)
+        rrca
+        rrca
+        rrca
+        and 7
+        add a, low CSpecPB + 8
+        ld l, a
+        ld h, high CSpecPB
+        ld a, (PenByte + PEN_SKY)
+        ld (hl), a
+        ret
 ; HL = 17 hardware colours: the pens and the border those; each Spectrum
 ; colour's pen found (CSpecPB)
 CpcPens:
@@ -779,7 +764,7 @@ CpcPens:
         jr z, .got
         inc hl
         djnz .find
-        ld e, 15
+        ld e, 2                 ; bright white fallback
 .got:   ld a, e                 ; its byte
         add a, low PenByte
         ld l, a
@@ -831,7 +816,7 @@ CpcResetDisplay:
         call CpcPalette
         ld a, (PenByte + PEN_SKY)
         call CpcClearBoth
-        call CpcPanoConvert
+        call CpcPanoReset
         ld a, (TunInside)
         ld (CTunWas), a
         ld hl, CSkyAttr         ; (the sky's attributes as they are now)

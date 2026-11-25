@@ -46,6 +46,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cpc_art                              # noqa: E402
 import cpc_illustration                     # noqa: E402
+import cpc_landscape
 import cpc_pictures                         # noqa: E402
 import make_music                           # noqa: E402
 import make_stages                          # noqa: E402
@@ -81,19 +82,20 @@ def cpc_sprites():
 
 
 def stage_art(theme, stage):
-    """make_stages.stage_art's, the stage's 17 pens appended to what is
-    packed (unpacked at ART_BITMAP + 512 + 640: CpcPalette)."""
+    """Nine shared attributes, then compressed Mode 0 horizon, cloud mask and inks."""
     palette = {**theme["palette"], **stage.get("palette", {})}
-    style = theme["horizon"]["style"]
-    seed = stage["seed"]
-    horizon = make_stages.round_art.panorama(style, seed, stage.get("vista"))
-    clouds = make_stages.round_art.sky(style, seed)
-    assert len(horizon.tobytes()) == 512 and len(clouds.tobytes()) == 640
-    pens = cpc_illustration.stage_pens(stage["theme"], palette, stage.get("palette"))
-    return bytes(palette[key] for key in make_stages.PALETTE_KEYS) + make_stages.make_screens.lz(
-        horizon.tobytes() + clouds.tobytes() + pens)
-
-
+    style, seed = theme["horizon"]["style"], stage["seed"]
+    horizon = cpc_landscape.landscape(style, seed, stage.get("vista"))
+    pixels = list(horizon.getdata())
+    packed_horizon = bytes(cpc_art.byte(a, b) for a, b in zip(pixels[::2], pixels[1::2]))
+    clouds = cpc_landscape.cloud_mask(style, seed).resize((160, 32), resample=0)
+    palette["sky"], colours = cpc_illustration.stage_colours(stage["theme"], style, stage.get("vista"))
+    palette["hud"] = 0x47  # white instruments on a black fascia
+    inks = bytes(cpc_illustration.CPC[c][1] for c in colours + [cpc_illustration.BLACK_C])
+    art = bytes(palette[key] for key in make_stages.PALETTE_KEYS) + make_stages.make_screens.lz(
+        packed_horizon + clouds.tobytes() + inks)
+    assert len(art) <= 0x800, "compressed stage art overlaps ART_BITMAP"
+    return art
 
 
 def sectors(n):

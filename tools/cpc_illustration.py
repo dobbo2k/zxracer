@@ -51,10 +51,10 @@ THEMES = {
                S4: RED_C, S5: PINK_C},
     "alpine": {GROUND_L: PCYAN_C, GROUND_D: PBLUE_C, SKY: BCYAN_C, PANO_INK: BLUE_C,
                PANO_PAPER: PCYAN_C, S1: BBLUE_C, S2: BLUE_C, HUD: BBLUE_C, S3: GREEN_C,
-               S4: SEAGREEN_C, S5: RED_C},
+               S4: RED_C, S5: ORANGE_C},
     "country": {GROUND_L: BGREEN_C, GROUND_D: GREEN_C, SKY: BCYAN_C, PANO_INK: GREEN_C,
-                PANO_PAPER: PCYAN_C, S1: LIME_C, S2: PGREEN_C, HUD: GREEN_C, S3: RED_C,
-                S4: YELLOW_C, S5: ORANGE_C},
+                PANO_PAPER: PCYAN_C, S1: BGREEN_C, S2: PGREEN_C, HUD: GREEN_C, S3: RED_C,
+                S4: RED_C, S5: ORANGE_C},
     "sunset": {GROUND_L: PURPLE_C, GROUND_D: MAUVE_C, SKY: BMAGENTA_C, PANO_INK: MAGENTA_C,
                PANO_PAPER: PMAGENTA_C, S1: GREEN_C, S2: BGREEN_C, HUD: MAGENTA_C, S3: ORANGE_C,
                S4: RED_C, S5: BCYAN_C},
@@ -73,44 +73,35 @@ def pens(theme):
     return [table[k] for k in range(16)]
 
 
-# The Spectrum's colours (BRIGHT x 8 + colour) as the CPC's firmware colours
-SPEC_FW = (BLACK_C, BLUE_C, RED_C, MAGENTA_C, GREEN_C, CYAN_C, YELLOW_C, GREY_C,
-           BLACK_C, BBLUE_C, BRED_C, BMAGENTA_C, BGREEN_C, BCYAN_C, BYELLOW_C, BWHITE_C)
+# Native firmware colours: sky, verge light/shade, distant ink and haze.
+LIGHTING = {
+    "harbour": (20, 25, 15, 10, 23),
+    "beacon":  (11, 22, 19,  1, 23),
+    "liner":   (17, 25, 16,  5, 23),
+    "mesas":   (11, 25, 15,  4, 23),
+    "arch":    (25, 16, 15,  4, 23),
+    "needles": (17, 25, 15,  1, 14),
+    "ruins":   (23, 25, 15,  4, 14),
+    "peaks":   (20, 23, 14, 10, 11),
+    "gondola": (14, 23, 22,  5, 11),
+    "lodge":   (11, 23, 14,  4, 22),
+    "hills":   (20, 21,  9, 10, 19),
+    "mill":    (11, 19,  9,  1, 23),
+    "manor":   (16, 25,  9, 10, 19),
+    "wheel":   ( 7, 17,  5,  1, 16),
+    "skyline": ( 7, 17,  5,  1, 16),
+    "city_bridge": (5,  7, 14,  1, 17),
+}
 
 
-def stage_pens(theme_name, palette, stage_palette=None):
-    """A stage's 16 pens and the border as the Gate Array's colours (17
-    bytes, src/cpc/reset.asm CpcPalette): its theme's CPC palette if it has
-    one (with the stage's own sky, panorama, ground and HUD colours from its
-    Spectrum palette, STAGE_PALETTE: each return to a region looks new),
-    else made from the stage's Spectrum palette (attributes: sky, pano, hud,
-    grass_l, grass_d)."""
-    if theme_name in THEMES:
-        table = {**FIXED, **THEMES[theme_name]}
-        def paper(a): return SPEC_FW[((a >> 3) & 7) + (8 if a & 0x40 else 0)]
-        def ink(a): return SPEC_FW[(a & 7) + (8 if a & 0x40 else 0)]
-        own = stage_palette or {}           # the stage's own colours over its theme's
-        if "sky" in own:
-            table[SKY] = paper(own["sky"])
-        if "pano" in own:
-            table[PANO_INK], table[PANO_PAPER] = ink(own["pano"]), paper(own["pano"])
-            if table[PANO_INK] == table[PANO_PAPER]:
-                table[PANO_INK] = THEMES[theme_name][PANO_INK]
-        for key, pen in (("grass_l", GROUND_L), ("grass_d", GROUND_D)):
-            if key in own and paper(own[key]) not in (BWHITE_C, BRED_C, GREY_C):
-                table[pen] = paper(own[key])
-        if "hud" in own:
-            table[HUD] = paper(own["hud"])
-        fw = [table[k] for k in range(16)]
-    else:
-        def paper(a): return SPEC_FW[((a >> 3) & 7) + (8 if a & 0x40 else 0)]
-        def ink(a): return SPEC_FW[(a & 7) + (8 if a & 0x40 else 0)]
-        table = {**FIXED, GROUND_L: paper(palette["grass_l"]), GROUND_D: paper(palette["grass_d"]),
-                 SKY: paper(palette["sky"]), PANO_INK: ink(palette["pano"]), PANO_PAPER: paper(palette["pano"]),
-                 S1: BBLUE_C, S2: BLUE_C, HUD: paper(palette["hud"]), S3: BCYAN_C, S4: MAGENTA_C,
-                 S5: GREEN_C}
-        fw = [table[k] for k in range(16)]
-    return bytes(CPC[c][1] for c in fw) + bytes([CPC[BLACK_C][1]])
+def stage_colours(theme, style, vista=None):
+    key = "city_bridge" if vista == "bridge" and style == "skyline" else vista or style
+    sky, light, dark, distant, haze = LIGHTING["peaks" if key == "bridge" else key]
+    colours = pens(theme)
+    colours[SKY] = sky
+    colours[GROUND_L], colours[GROUND_D] = light, dark
+    colours[PANO_INK], colours[PANO_PAPER] = distant, haze
+    return (0x58 if style == "skyline" else 0x68), colours
 
 
 def canvas(w, h):
@@ -169,6 +160,15 @@ def palm():
                 d.line((x, y, x + (1 if reach > 0 else -1), y + 3 + 3 * (1 - t)), S1)   # leaflets
         d.line(pts[:14], S2)                                                  # its lit rib
     d.ellipse((cx - 4, cy - 3, cx + 4, cy + 4), S1)
+    # Swept feather fronds, split into broad leaflets at road scale.
+    for side in (-1, 1):
+        for reach, lift in ((23, 30), (16, 39), (11, 20)):
+            for k in range(1, 7):
+                t = k / 7
+                x = cx + side * reach * t
+                y = cy - lift * math.sin(t * 2.5) + 16 * t
+                d.polygon([(x-side*2, y+1), (x, y-2),
+                           (x+side*5, y+5+k), (x+side*2, y+4)], S2 if k < 5 else S1)
     for nx in (-3, 1):
         d.ellipse((cx + nx - 2, cy + 1, cx + nx + 1, cy + 6), S4)             # coconuts
     return outline(im)
@@ -179,6 +179,8 @@ def bush():
     im, d = canvas(40, 70)
     for x, y, r in ((10, 46, 12), (20, 40, 15), (30, 46, 11), (18, 52, 13), (28, 54, 10)):
         d.ellipse((x - r * 0.6, y - r, x + r * 0.6, y + r), S1)
+    for x, y in ((5,48),(10,33),(20,27),(29,38),(33,50)):
+        d.polygon([(x-4,y+12),(x-2,y+3),(x,y),(x+4,y+4),(x+3,y+8)], S2)
     for x, y, r in ((14, 36, 6), (22, 31, 7), (30, 38, 5)):
         d.ellipse((x - r * 0.6, y - r, x + r * 0.6, y + r), S2)
     return outline(im)
@@ -196,6 +198,13 @@ def tower():
     for y in range(44, 73, 8):
         d.rectangle((6, y, 34, y + 3), RED)
     d.rectangle((12, 52, 28, 62), S5)
+    d.rectangle((5, 73, 35, 78), S3)
+    d.line((15, 79, 11, 154), S3, 2)
+    d.line((19, 79, 15, 154), S4, 2)
+    for y in range(84, 152, 9):
+        x = 15 - (y-79)//19
+        d.line((x, y, x+4, y), WHITE, 2)
+    d.line((19, 52, 19, 62), WHITE, 2)
     d.polygon([(2, 44), (20, 26), (38, 44)], RED)
     d.line((20, 26, 20, 6), BLACK)
     d.polygon([(20, 6), (32, 11), (20, 16)], YELLOW)
@@ -268,16 +277,21 @@ def cactus():
         d.line((x, 14, x, 160), S2)
     d.line((7, 38, 7, 66), S2)
     d.line((40, 52, 40, 82), S2)
+    for x, y in ((20, 26), (36, 46), (7, 34)):
+        d.ellipse((x-2, y-3, x+3, y+2), RED)
+        d.point((x, y-2), YELLOW)
     return outline(im)
 
 
 def rock(light=S5, dark=S4):
     """A heap of boulders, lit from above left."""
     im, d = canvas(48, 60)
-    for x0, y0, x1, y1 in ((2, 22, 30, 59), (20, 12, 46, 59), (12, 34, 38, 59)):
-        d.ellipse((x0, y0, x1, y1), dark)
-    for x0, y0, x1, y1 in ((5, 25, 20, 40), (24, 15, 38, 30), (15, 37, 26, 46)):
-        d.ellipse((x0, y0, x1, y1), light)
+    for x, y, w, h in ((1,24,26,34), (19,10,27,48), (12,35,24,24)):
+        d.polygon([(x,y+h),(x+1,y+h//2),(x+w//3,y),(x+w*3//4,y+2),
+                   (x+w,y+h//2),(x+w-2,y+h)], dark)
+        d.polygon([(x+1,y+h//2),(x+w//3,y),(x+w*3//4,y+2),
+                   (x+w//2,y+h//2),(x+3,y+h*3//4)], light)
+        d.line((x+w//3,y+1,x+w*3//4,y+3), WHITE, 2)
     return outline(im)
 
 
@@ -318,7 +332,7 @@ def pine():
     for w, y in ((22, 150), (19, 124), (16, 98), (12, 72), (8, 46)):
         top = y - 38
         d.polygon([(24 - w, y), (24, top), (24 + w, y)], S3)
-        d.polygon([(24 - w, y), (24 - w + 4, y - 4), (24, top), (24, top + 6)], S4)
+        d.polygon([(24 - w, y), (24 - w + 4, y - 4), (24, top), (24, top + 6)], PANO_PAPER)
         d.line((24 - w + 2, y - 2, 24 - 2, top + 8), WHITE)
     d.polygon([(21, 10), (24, 2), (27, 10)], WHITE)
     return outline(im)
@@ -336,6 +350,9 @@ def chalet():
         d.rectangle((x, 90, x + 8, 106), BLACK)
         d.rectangle((x + 1, 91, x + 7, 105), YELLOW)
         d.line((x + 4, 90, x + 4, 106), BLACK)
+    d.polygon([(4,68),(32,24),(60,68),(45,54),(38,52),(30,38),(14,62)], WHITE)
+    d.rectangle((41,31,46,50), S5)
+    d.rectangle((40,29,47,32), WHITE)
     d.rectangle((26, 120, 38, 149), BLACK)
     d.line((8, 112, 56, 112), WHITE, 2)
     for x in range(10, 56, 4):
@@ -371,6 +388,12 @@ def tree():
         d.ellipse((x0, y0, x1, y1), S1)
     for x0, y0, x1, y1 in ((8, 14, 26, 46), (6, 50, 20, 82), (24, 26, 36, 46)):
         d.ellipse((x0, y0, x1, y1), S2)
+    rng = random.Random(21)
+    for _ in range(52):
+        x, y = rng.randrange(5,52), rng.randrange(10,106)
+        if im.getpixel((x,y)) == S1:
+            d.line((x-1,y+3,x,y,x+2,y-1), S2, 2)
+    d.polygon([(23,183),(27,168),(29,134),(30,174),(35,183)], S3)
     return outline(im)
 
 
@@ -378,6 +401,8 @@ def windmill():
     """A tower mill: white walls, a cap, four sails across it."""
     im, d = canvas(56, 176)
     d.polygon([(14, 175), (20, 70), (36, 70), (42, 175)], WHITE)
+    d.polygon([(31,74),(36,74),(42,175),(34,175)], GROUND_L)
+    d.line((17,132,39,132), S3, 3)
     d.rectangle((24, 150, 32, 175), BLACK)
     d.rectangle((25, 104, 31, 114), BLACK)
     d.pieslice((16, 54, 40, 86), 180, 360, S5)
@@ -414,6 +439,9 @@ def lamp():
     d.rectangle((5, 176, 14, 191), BLACK)
     d.line((10, 30, 26, 22), BLACK, 3)
     d.rectangle((20, 22, 30, 28), BLACK)
+    d.line((9,39,9,172), S5)
+    d.line((7,178,12,178), S3, 2)
+    d.line((11,30,23,24), S5)
     d.rectangle((21, 28, 29, 34), YELLOW)
     d.rectangle((23, 34, 27, 36), WHITE)
     return im
@@ -426,9 +454,13 @@ def billboard():
         d.rectangle((x, 70, x + 3, 143), BLACK)
     d.rectangle((0, 8, 63, 74), WHITE)
     d.rectangle((3, 12, 60, 70), S5)
-    d.ellipse((6, 18, 26, 64), YELLOW)
-    for k, y in enumerate((22, 36, 50)):
-        d.rectangle((30, y, 58 - 6 * k, y + 8), WHITE)
+    d.rectangle((5, 15, 58, 67), HUD)
+    d.ellipse((24, 18, 43, 52), YELLOW)
+    for y in (37, 42, 47):
+        d.line((23, y, 45, y), S3, 2)
+    d.polygon([(5,58),(19,37),(32,57),(44,41),(58,61),(58,67),(5,67)], S5)
+    d.polygon([(15,67),(35,49),(40,49),(47,67)], BLACK)
+    d.line((31,66,37,52), WHITE, 2)
     d.rectangle((0, 8, 63, 74), None, BLACK)
     return im
 
@@ -442,6 +474,9 @@ def traffic_car():
     d.rounded_rectangle((2, 20, 45, 44), 4, YELLOW)
     d.polygon([(8, 20), (12, 6), (35, 6), (39, 20)], YELLOW)
     d.polygon([(11, 19), (14, 9), (33, 9), (36, 19)], BLACK)
+    d.polygon([(14,16),(16,10),(23,10),(18,16)], PANO_PAPER)
+    d.line((5,22,42,22), BLACK, 3)
+    d.rectangle((3,38,44,41), S4)
     d.rectangle((4, 26, 10, 30), RED)
     d.rectangle((37, 26, 43, 30), RED)
     d.rectangle((16, 34, 31, 38), WHITE)
@@ -454,6 +489,10 @@ def van():
     """A delivery van, white with a red stripe."""
     im, d = canvas(48, 76)
     d.rectangle((2, 4, 45, 66), WHITE)
+    for x in (6, 26):
+        d.rectangle((x,10,x+14,27), BLACK)
+        d.polygon([(x+2,24),(x+5,13),(x+12,13),(x+7,24)], PANO_PAPER)
+    d.rectangle((3,63,44,66), S4)
     d.rectangle((2, 30, 45, 36), RED)
     d.line((23, 4, 23, 66), BLACK)
     d.rectangle((25, 40, 27, 46), BLACK)
@@ -473,6 +512,10 @@ def truck():
     for y in (20, 44, 68):
         d.line((4, y, 25, y), BLACK)
         d.line((29, y, 51, y), BLACK)
+    for x in (7, 45):
+        d.rectangle((x,7,x+2,78), S4)
+    d.polygon([(12,55),(29,24),(42,24),(25,55)], RED)
+    d.polygon([(21,55),(36,29),(40,29),(26,55)], YELLOW)
     d.rectangle((2, 82, 53, 90), RED)
     d.rectangle((4, 84, 10, 88), YELLOW)
     d.rectangle((45, 84, 51, 88), YELLOW)
@@ -492,28 +535,36 @@ def spider(pose):
     wheel, in two phases; 5, 6 right)."""
     im, d = canvas(CAR_W, CAR_H)
     turn = {0: 0, 1: -1, 2: 1, 3: -1, 4: -1, 5: 1, 6: 1}[pose]
-    x0, x1 = 2, 29                                  # the body's sides at the bottom
-    top = 2 * turn                                  # the top's swing
-    # the tyres, the far one a little wider in a turn
-    d.rectangle((x0, 22, x0 + 5 + (turn > 0), 31), BLACK)
-    d.rectangle((x1 - 5 - (turn < 0), 22, x1, 31), BLACK)
-    # the tail: wide and low, a black band of grille between the lamps
-    d.polygon([(x0 + 1 + top, 12), (x1 - 1 + top, 12), (x1, 18), (x1, 25), (x0, 25), (x0, 18)], RED)
-    d.rectangle((x0 + 1, 18, x1 - 1, 20), BLACK)
-    for lx in (x0 + 2, x1 - 6):                     # round tail lamps
-        d.rectangle((lx, 18, lx + 4, 20), RED)
-        d.rectangle((lx + 1, 18, lx + 3, 20), YELLOW)
-    d.rectangle((14, 22, 17, 24), WHITE)            # the plate
-    d.line((x0 + 1, 25, x1 - 1, 25), BLACK)
-    d.rectangle((x0 + 3, 26, x0 + 5, 27), WHITE)    # exhausts
-    d.rectangle((x1 - 5, 26, x1 - 3, 27), WHITE)
-    # the deck, lit along its crest; the roll hoop and the driver
-    d.line((x0 + 2 + top, 13, x1 - 2 + top, 13), WHITE)
-    d.polygon([(10 + top, 12), (12 + top, 6), (19 + top, 6), (21 + top, 12)], BLACK)
-    d.ellipse((13 + top, 2, 18 + top, 8), WHITE)    # the helmet
-    d.line((13 + top, 5, 18 + top, 5), RED)
-    d.rectangle((x0 + top, 10, x0 + 2 + top, 11), BLACK)      # mirrors
-    d.rectangle((x1 - 2 + top, 10, x1 + top, 11), BLACK)
+    x0, x1 = 2, 29
+    # A low, open two-seater. The raked windscreen and occupants move
+    # together in a bend while the wide tail stays planted.
+    t = 2 * turn
+    d.polygon([(6+t,12),(10+t,4),(21+t,4),(25+t,12)], BLACK)
+    d.polygon([(9+t,10),(11+t,5),(20+t,5),(22+t,10)], PANO_PAPER)
+    d.line((11+t,5,19+t,5), WHITE)
+    for x, hair in ((12+t, BLACK), (18+t, YELLOW)):
+        d.rectangle((x,7,x+2,10), hair)
+        d.rectangle((x,10,x+3,12), S4)
+    d.rectangle((3+t,10,5+t,11), RED)
+    d.rectangle((26+t,10,28+t,11), RED)
+    for x in (3,24):
+        d.rectangle((x,21,x+4,29), BLACK)
+    d.polygon([(2,17),(6+t,12),(24+t,12),(29,17),(30,22),(28,26),
+               (4,26),(1,22)], S4)
+    d.polygon([(2,17),(6+t,12),(24+t,12),(29,17),(28,19),(3,19)], RED)
+    d.line((4,16,8,13), WHITE)
+    d.line((23,13,27,16), S4)
+    d.polygon([(10,13),(21,13),(23,16),(8,16)], BLACK)
+    d.line((11,14,20,14), S4)
+    d.line((3,18,28,18), WHITE)
+    d.rectangle((3,19,28,22), BLACK)
+    for x in (4, 7, 23, 26):
+        d.rectangle((x,20,x+1,21), RED)
+    d.line((10,20,20,20), S4)
+    d.rectangle((14,23,17,24), YELLOW)
+    d.line((5,26,26,26), BLACK)
+    for x in (5,24):
+        d.line((x,27,x+2,27), WHITE)
     if pose >= 3:
         second = pose in (4, 6)
         right = pose in (3, 4)                      # (left turn: the right wheel)

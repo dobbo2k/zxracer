@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import cpc_harness as h  # noqa: E402
+from make_screens import unlz  # noqa: E402
 
 ENGINE_IDLE = (1400 * 564 + 500) // 1000      # src/sound.asm at 1 MHz
 NUM_STAGES = 15
@@ -33,7 +34,7 @@ def main(disk, sym, outdir):
     disk, sym, outdir = Path(disk), Path(sym), Path(outdir)
     folder = outdir / "check"
     # ---- boot, the title, the demo; a game; the AY
-    r = h.run("ay on", *h.boot(), "frames 300", "peek8 gs0 GameState", "peek8 dm0 DemoMode",
+    r = h.run("ay on", *h.boot(), "until CRow 24 6000", "until CFrontOn 1 600", "frames 12", "peek8 gs0 GameState", "peek8 dm0 DemoMode",
               "shot title", "untilw GameFrames 200 6000", "peek16 gf0 GameFrames", "shot demo",
               "hold SPACE", "frames 10", "release", "frames 400", "peek8 gs1 GameState",
               "peek8 dm1 DemoMode", "peek16 gf1 GameFrames", "hold Q", "frames 150", "release",
@@ -59,12 +60,13 @@ def main(disk, sym, outdir):
     for name in ("title", "demo", "game"):
         shutil.copy(folder / f"{name}.png", outdir / f"cpc_{name}.png")
     # ---- every stage (a boot each five: the demo goes back to the title in time)
-    for first in range(0, NUM_STAGES - 1, 5):
-        group = range(first, min(first + 5, NUM_STAGES - 1))
+    for first in range(0, NUM_STAGES, 5):
+        group = range(first, min(first + 5, NUM_STAGES))
         cmds = list(h.boot()) + ["untilw GameFrames 20 6000"]
         for st in group:
             cmds += [f"poke8 CStageReq {st + 1}", "frames 200", f"peek8 s{st} Stage",
                      f"peek16 g{st} GameFrames", "frames 60", f"peek16 h{st} GameFrames",
+                     f"peekn pano{st} PANO_CACHE 1024", f"peekn inks{st} CPens 17",
                      f"shot stage_{st:02}"]
         r = h.run(*cmds, disk=disk, sym=sym, folder=folder, timeout=1200)
         for st in group:
@@ -72,12 +74,15 @@ def main(disk, sym, outdir):
                 fail(f"stage {st} did not load (Stage {r[f's{st}']})")
             if int(r[f"h{st}"]) <= int(r[f"g{st}"]):
                 fail(f"stage {st}: the game stopped")
+            art = unlz((sym.parent / f"art_{st}.bin").read_bytes()[9:])
+            if bytes.fromhex(r[f"pano{st}"]) != art[:1024] or bytes.fromhex(r[f"inks{st}"]) != art[-17:]:
+                fail(f"stage {st}: the panorama or palette differs from its art pack")
             shutil.copy(folder / f"stage_{st:02}.png", outdir / f"stage_{st:02}.png")
     # ---- the Spectrum's tape
     tap, release = ROOT / "build" / "speedrun.tap", ROOT / "release" / "speedrun.tap"
     if tap.exists() and not filecmp.cmp(tap, release, shallow=False):
         fail("build/speedrun.tap differs from release/")
-    print(f"cpc_check: passed (the demo, a game, the AY, {NUM_STAGES - 1} stages)")
+    print(f"cpc_check: passed (the demo, a game, the AY, {NUM_STAGES} stages)")
 
 
 if __name__ == "__main__":

@@ -3,13 +3,14 @@
 The CPC port draws its own art (`docs/port_cpc.md` 5.6, decided 24 November
 2026): for Mode 0's pixels, twice as wide as tall, and the CPC's 27 colours,
 16 pens at a time. The Spectrum's and the Einstein's pictures only say what
-each thing is. Phase A of the plan; the coast theme first, for approval.
+each thing is.
 
 ## Where it comes from
 
 | File | What |
 |---|---|
-| `tools/cpc_illustration.py` | The masters, drawn in code: indexed images in Mode 0 pixels, each value a pen (255 transparent), at twice the largest size shown. The themes' palettes (`THEMES`), each stage's 17 colours (`stage_pens`) |
+| `tools/cpc_illustration.py` | The masters, drawn in code: indexed images in Mode 0 pixels, each value a pen (255 transparent), at twice the largest size shown. The themes' palettes (`THEMES`), each stage's lighting (`stage_colours`) |
+| `tools/cpc_landscape.py` | Scrolling 128 × 16 landscapes for every route and the fixed cloud or sunset mask. The title and goal postcards reuse the same art. |
 | `tools/cpc_art.py` | The masters made the game's bytes: scaled to the Spectrum's ladder of sizes (`shrink`: each pixel the pen most of its block is), one copy or two a pixel apart (`emit_type`); the Spider's poses compiled, a line of straight code each (`car_code`); the font (`FONT`), the HUD's top strip (`dash_header`), the loading screen (`loading_screen`) |
 | `tools/make_cpc.py` | Hands the masters to `make_stages` (each theme its own, the traffic resident); the stage's pens appended to its art pack |
 
@@ -28,17 +29,16 @@ on them); a master's width follows from its height.
 | 6 | the stage's | the sky |
 | 7, 8 | the stage's | the panorama: its ink, its paper |
 | 9, 10 | the theme's | scenery (a tunnel's walls, light and dark, on alpine stages) |
-| 11 | the stage's | the HUD's panel |
+| 11 | the theme's | dark accents on buildings, bridges and signs |
 | 12 | bright yellow | the timer, lamps, a tunnel's arch, the Spider's lamps |
 | 13, 14, 15 | the theme's | scenery |
 
-Traffic and the signs drive through every theme, so they use the fixed
-pens only. The HUD, the messages and the sky's cells (still converted from
+The Spider and traffic share dark red body shading and reflect the stage's haze colour in their glass. The HUD, the messages and the sky's cells (still converted from
 the Spectrum's shadow) find each Spectrum colour's pen by its colour
 (`src/cpc/reset.asm CpcPalette`, `CSpecPB`).
 
 A stage's 16 pens and its border travel in its art pack: unpacked at
-`ART_BITMAP + 512 + 640`, after the panorama and the clouds, where
+`ART_BITMAP + 1024 + 640`, after the panorama and the clouds, where
 `CpcPalette` reads them at the display reset.
 
 ## Done so far (25 November 2026)
@@ -63,7 +63,13 @@ A stage's 16 pens and its border travel in its art pack: unpacked at
   panel's Spectrum cells in the other 2Ks' unshown parts: the front end
   prints and blinks its text there as before (`src/cpc/front.asm
   GfxPicture`); the title's labels in the CPC's font.
-- **Still the Spectrum's drawing, in the CPC's pens:** the stage's sky
-  (its clouds) and the panorama, 1 bit a pixel. A Mode 0 sky and panorama
-  of their own would need about 3.5K and 1K a stage, and a clean copy of
-  the sky to put back where objects cover it.
+- **Arcade redraw:** each stage now loads a packed 1,024-byte Mode 0
+  panorama straight into the scrolling cache. Sailboats and a liner,
+  mesas and a rock arch, alpine cable cars, valley villages and a lit
+  waterfront use multiple pens on one scanline. The static sky uses a
+  CPC-drawn cloud mask or striped sun through the existing shadow cells.
+  Native sky colours map to the same ink above and inside the panorama.
+- The seven Spider poses now show an open two-seat cockpit, louvred engine
+  cover, paired rear lamps and twin exhausts. Traffic has reflective glass
+  or delivery graphics, and the roadside masters include feathered palm
+  fronds, a laddered lookout, faceted rock and a neon boulevard poster.

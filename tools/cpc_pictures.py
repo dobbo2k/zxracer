@@ -20,7 +20,7 @@ import cpc_art
 import cpc_illustration as ci
 import make_scenery as scn
 import make_screens
-import round_art
+import cpc_landscape
 
 W, H = 128, 192
 
@@ -109,7 +109,7 @@ def sky(p, top, bottom, style, seed, cloud_pen, sun=None):
     if sun:
         x, y, r = sun
         p.d.ellipse((x - r, y - 2 * r, x + r, y + 2 * r), ci.YELLOW)
-    p.bits(round_art.sky(style, seed), 24, top + 4, cloud_pen)
+    p.bits(cpc_landscape.cloud_mask(style, seed), 24, top + 4, cloud_pen, xscale=1)
 
 
 def title(loading=False):
@@ -118,13 +118,22 @@ def title(loading=False):
     p = Picture(ci.pens("coast"), 24 if loading else 21)
     d = p.d
     d.rectangle((0, 0, W - 1, 47), ci.HUD)                         # the fascia
-    p.text(11, 7, "SPEED RUN", ci.S5, 3, 4)                         # its shadow
-    p.text(10, 5, "SPEED RUN", ci.WHITE, 3, 4)
-    for x in (0, 3, 6, 112, 115, 118, 121, 124):
-        d.line((x, 45, x + 3, 40), ci.SKY, 1)
+    # A slanted chrome wordmark over a red extrusion. Each stripe follows
+    # the letter silhouettes, including their counters.
+    logo = Picture(p.pens, 24)
+    logo.text(0, 0, "SPEED RUN", ci.WHITE, 3, 4)
+    chrome = (ci.WHITE, ci.PANO_PAPER, ci.SKY, ci.S5, ci.WHITE, ci.GROUND_L, ci.S3)
+    for depth in (3, 2, 1, 0):
+        for y in range(28):
+            for x in range(105):
+                if logo.im.getpixel((x,y)) == ci.WHITE:
+                    d.point((9+x+(27-y)//5+depth, 6+y+depth*2),
+                            ci.S4 if depth > 1 else ci.RED if depth else chrome[y//4])
+    for x in range(-8, 128, 7):
+        d.line((x, 46, x+4, 41), ci.S5, 2)
     sky(p, 48, 104, "harbour", 1, ci.WHITE, sun=(98, 66, 7))
     d.rectangle((0, 88, W - 1, 103), ci.PANO_PAPER)
-    p.bits(round_art.panorama("harbour", 1), 0, 88, ci.PANO_INK)
+    p.im.paste(cpc_landscape.landscape("harbour", 1), (0, 88))
     p.road(104, 168, 60, 64, 4, 120, (ci.GROUND_L, ci.GROUND_D), (ci.WHITE, ci.RED))
     pm = ci.palm()
     for x, base, h in ((-6, 150, 70), (-2, 124, 36), (100, 124, 40), (110, 160, 76)):
@@ -141,14 +150,13 @@ def title(loading=False):
 def goal(theme_name, theme):
     """A goal's postcard: the region's sky, backdrop and scenery, the
     gantry's GOAL! banner, the Spider over the line; rows 17-23 its text."""
-    pal = theme["palette"]
-    p = Picture(_fw_pens(theme_name, pal), 17)
+    _, colours = ci.stage_colours(theme_name, theme["horizon"]["style"])
+    p = Picture(colours, 17)
     d = p.d
     style, seed = theme["horizon"]["style"], theme["horizon"]["seed"]
     sky(p, 0, 72, style, seed, ci.WHITE, sun=(100, 40, 6) if theme_name == "sunset" else None)
     d.rectangle((0, 56, W - 1, 71), ci.PANO_PAPER)
-    pano = round_art.panorama(**theme["horizon"])
-    p.bits(pano, 0, 56, ci.PANO_INK)
+    p.im.paste(cpc_landscape.landscape(**theme["horizon"]), (0, 56))
     p.road(72, 136, 64, 64, 10, 100, (ci.GROUND_L, ci.GROUND_D), (ci.WHITE, ci.RED), band=8)
     big, _, landmark, _ = theme["types"]
     masters = ci.cpc_masters(theme_name)
@@ -170,13 +178,6 @@ def goal(theme_name, theme):
         d.rectangle((x, y, x, y + 1), r.choice((ci.RED, ci.YELLOW, ci.WHITE, ci.S2)))
     p.master(ci.spider(0), 48, 134, 32)
     return p
-
-
-def _fw_pens(theme_name, pal):
-    """A goal's pens: its theme's, the stage's own colours over them."""
-    b = ci.stage_pens(theme_name, pal, pal)
-    hw_to_fw = {v[1]: k for k, v in ci.CPC.items()}
-    return [hw_to_fw[x] for x in b[:16]]
 
 
 def pictures(cfg):

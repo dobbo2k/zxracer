@@ -213,7 +213,7 @@ release-cpc: build/cpc/speedrun.dsk
 build/cpc:
 	mkdir -p build/cpc
 
-CPC_ART := tools/cpc_art.py tools/cpc_illustration.py tools/cpc_pictures.py
+CPC_ART := tools/cpc_landscape.py tools/cpc_art.py tools/cpc_illustration.py tools/cpc_pictures.py
 $(CPC_GEN) &: $(CPC_ART) tools/make_cpc.py build/stages.asm | build/cpc
 	$(PYTHON) tools/make_cpc.py gen assets/stages.yaml build/cpc
 
