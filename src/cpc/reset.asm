@@ -790,6 +790,10 @@ CpcClearBoth:
         jp CpcSelect
 ; A = a RAM configuration: the screen it puts at $4000 cleared to E
 CpcClear:
+        push af                 ; (CRamNow: not known while it is ours:
+        ld a, $FF               ; src/cpc/tyres.asm)
+        ld (CRamNow), a
+        pop af
         ld bc, GA_PORT
         out (c), a
         ld (.sp + 1), sp
@@ -834,7 +838,12 @@ CpcResetDisplay:
         pop af
         ld (CpcHidden), a
         jp CpcSelect
-.one:   ld bc, GA_PORT
+.one:
+        push af                 ; (CRamNow: not known while it is ours:
+        ld a, $FF               ; src/cpc/tyres.asm)
+        ld (CRamNow), a
+        pop af
+        ld bc, GA_PORT
         out (c), a
         and 2
         rrca

@@ -128,7 +128,8 @@ CpcIsr:
         call CpcShow            ; the screen just drawn shown (src/cpc/flip.asm)
         xor a
         ld (FlipPending), a
-.snd:   call SoundTick
+.snd:   call CpcTyreTick        ; (the rear tyres' tread: src/cpc/tyres.asm)
+        call SoundTick
         call CpcScan            ; the keyboard's 10 lines (src/cpc/keys.asm)
         pop de
         pop hl

@@ -151,6 +151,8 @@ MainLoop:
         INCLUDE "einstein/car.asm"
         INCLUDE "einstein/dash.asm"     ; (the tail lamps; -DEIN_DASH: the centre line)
         INCLUDE "einstein/objcolour.asm"    ; (an object's ground in a two-colour cell)
+HOLD_PART       DEFL 1
+        INCLUDE "einstein/rowhold.asm"      ; (no road row shown half written: EinElapsed)
         IFDEF EIN_KERB
         INCLUDE "einstein/kerbrow.asm"  ; (a prototype: the near kerbs exact)
         ENDIF

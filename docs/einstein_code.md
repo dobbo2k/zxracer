@@ -168,6 +168,26 @@ if it was drawn again (`ERowDrawn`: 1 from `BaseNames`, 2 from `NameBuf`). A row
 before its names, so a row never shows new names over old patterns. Then the car's
 changed cells (`EinCarSync`) and the sky's noted cells (`EinMirror`).
 
+**The raster.** An upload averages about 56K T, against a 30.8K T blank, so it often runs
+on into the picture (in the attract demo about 40% finish after the raster has reached row
+10). If the raster reaches a row between its slots and its names, that TV frame shows its
+old names over its new slots: tiles from the wrong cells (or the car between its new
+patterns and its colours). So before each road row's writes, and the car's
+(`EinRowHold`, `EinCarHold`, `rowhold.asm`), while the upload is timed (the CTC's 16 ms
+wait, started as the frame was seen), the raster's place is worked out from the CTC
+(`EinElapsed`, a count each 256 T, its reloads counted): a row whose writes could meet it
+waits till it has gone past. The row then shows its old frame, whole, for that TV frame.
+Rows written before the raster got there and rows written after it still show different
+frames in that one TV frame (a torn picture: about 3.5% of TV frames in the attract
+demo). Only an upload that starts behind the raster at row 10, or fits before it gets
+there, could avoid that. The frame rate is unchanged (694 game frames in 6,000 TV frames
+either way).
+
+Albert draws each line as the raster finishes it and shows the frame when line 191 is
+done (`Machine::presented`, since 25 November 2026), as a television does. Before, it
+drew all of VRAM at its own moments, which caught uploads halfway: about one picture in
+six torn in the attract demo.
+
 ## 6. Writing VRAM
 
 With the picture on, VRAM accesses must be at least 32 T apart or the chip loses them.
@@ -430,6 +450,19 @@ The Spider's 32 cells are the bottom third's patterns 224-255, at rows 20-23, co
 - **Sending:** `EinCarSync` reads the pattern runs directly from the resident pose and
   uploads contiguous runs of marked colours from `ECarCol`. A left smoke-puff change
   sends 16 pattern bytes and a right one sends 24.
+- **Rolling tyres** (`eintyres.asm`, as the Spectrum's `src/tyres.asm`): the rear tyres
+  are the bottom row's cells 0-1 and 6-7 (patterns 248, 249, 254, 255), their tread on
+  line 3. Each TV frame the interrupt moves the tread on by the speed (`EinTyreTick`: a
+  row each 21 depth units, three positions); when it has moved, `EinTyreDraw` writes the
+  four cells' lines 2-6 (the shown pose's tread line or plain line 4, two tread lines
+  three apart, colours with the ground's paper where the art has none). `EinUpload` also
+  draws them after `EinCarSync` (under the car's raster hold), since that may have sent
+  the cells again, and notes the pose now shown (`ETyrePose`). Not in the front end, a
+  display reset or the smoke poses. `EinTyreTick` is at the platform code's end, the
+  drawing at the theme cache's last 192 bytes (`EIN_TAIL`: `tools/make_einstein.py`
+  keeps theme packs below it; the alpine pack, the fullest, ends 14 bytes short), the
+  data in the ZPage table page's hole. About 3-4K T in a TV frame when the tread moves;
+  the frame rate is unchanged (694 game frames in 6,000 TV frames).
 
 ## 12. The display reset
 
@@ -572,7 +605,12 @@ its header) runs commands after booting the disc:
 - `fliphist N` gives the TV frames between frames sent;
 - `fastpc N` shows where VRAM writes came too fast;
 - `linehist SYM N` counts how often an address is reached;
-- `wait16 GameFrames N` with `shot` takes a picture at a given game frame.
+- `linereg SYM N` counts, at each time an address is reached, register C and the raster
+  line (`EinUpload.row+4`: each road row's first write);
+- `wait16 GameFrames N` with `shot` takes a picture at a given game frame;
+- `rshot FILE` and `rrecord N PREFIX` take the picture as the raster drew it (what a
+  television shows: `Machine::presented`), where `shot` and `record` draw VRAM as it is.
+  Where a frame's `rrecord` and `record` differ, VRAM was written while the raster drew it.
 
 **The benchmark.** Assemble with `-DFIXED_ELAPSED=1` (and `-DEIN_MIN_FRAMES=3` for the
 work alone). Boot, `wait16 GameFrames 20`, then `wait16 GameFrames 320`: it prints the TV

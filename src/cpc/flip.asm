@@ -49,6 +49,7 @@ CpcSelect:
         ld a, (CpcHidden)
         add a, a
         or RAM_A                ; C1, or C3 with B hidden
+        ld (CRamNow), a         ; (known: src/cpc/tyres.asm)
         ld b, high GA_PORT
         out (c), a
         pop bc
@@ -80,4 +81,8 @@ CpcShow:
         ld a, (CpcHidden)
         xor 1
         ld (CpcHidden), a
+        ld a, (CCarLast)        ; (its pose, its tyres as drawn:
+        ld (CTyrePose), a       ; src/cpc/tyres.asm)
+        ld a, $FF
+        ld (CTyreShown), a
         ret

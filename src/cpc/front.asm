@@ -41,6 +41,10 @@ GfxFrontOn:
         ld de, $C000
         ld bc, 6912
         ldir
+        push af                 ; (CRamNow: not known while it is ours:
+        ld a, $FF               ; src/cpc/tyres.asm)
+        ld (CRamNow), a
+        pop af
         ld bc, GA_PORT | RAM_B  ; every cell into base 3
         out (c), c
         ld b, 0
@@ -171,6 +175,10 @@ CFrontSync:
         set 7, h
         ld (hl), a
         push bc                 ; converted into base 3
+        push af                 ; (CRamNow: not known while it is ours:
+        ld a, $FF               ; src/cpc/tyres.asm)
+        ld (CRamNow), a
+        pop af
         ld bc, GA_PORT | RAM_B
         out (c), c
         pop bc

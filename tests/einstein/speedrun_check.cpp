@@ -150,9 +150,14 @@ std::string hex_bytes(const std::vector<std::uint8_t>& bytes) {
     return out;
 }
 
-void save_ppm(const ein::Machine& m, const std::string& path) {
+// raster: the last frame as the raster drew it (what a television shows:
+// Machine::presented), else VRAM as it is now
+void save_ppm(const ein::Machine& m, const std::string& path, bool raster = false) {
     std::vector<std::uint32_t> frame(ein::Tms9129::kWidth * ein::Tms9129::kHeight);
-    m.vdp.render(frame.data());
+    if (raster)
+        std::copy(m.presented(), m.presented() + frame.size(), frame.begin());
+    else
+        m.vdp.render(frame.data());
     std::ofstream out(path, std::ios::binary);
     out << "P6\n" << ein::Tms9129::kWidth << ' ' << ein::Tms9129::kHeight << "\n255\n";
     for (std::uint32_t pixel : frame) {
@@ -165,14 +170,17 @@ void save_ppm(const ein::Machine& m, const std::string& path) {
 // <prefix>.wav (48 kHz mono), for a video.
 class Recorder {
 public:
-    Recorder(ein::Machine& m, const std::string& prefix)
-        : m_(m), prefix_(prefix), video_(prefix + ".rgb", std::ios::binary),
+    Recorder(ein::Machine& m, const std::string& prefix, bool raster = false)
+        : m_(m), raster_(raster), prefix_(prefix), video_(prefix + ".rgb", std::ios::binary),
           frame_(ein::Tms9129::kWidth * ein::Tms9129::kHeight), rgb_(frame_.size() * 3), samples_(4096) {
         m_.psg.set_audio_enabled(true);
         m_.psg.clear_samples();
     }
     void frame() {
-        m_.vdp.render(frame_.data());
+        if (raster_)
+            std::copy(m_.presented(), m_.presented() + frame_.size(), frame_.begin());
+        else
+            m_.vdp.render(frame_.data());
         for (std::size_t p = 0; p < frame_.size(); ++p) {
             rgb_[p * 3] = char((frame_[p] >> 16) & 0xff);
             rgb_[p * 3 + 1] = char((frame_[p] >> 8) & 0xff);
@@ -198,6 +206,7 @@ public:
 
 private:
     ein::Machine& m_;
+    bool raster_;
     std::string prefix_;
     std::ofstream video_;
     std::vector<std::uint32_t> frame_;
@@ -312,6 +321,9 @@ int main(int argc, char** argv) {
             std::printf("vram_%s=%s\n", address_text.c_str(), hex_bytes(bytes).c_str());
         } else if (command == "shot") {
             save_ppm(m, next());
+        } else if (command == "rshot") {
+            // rshot FILE: the last frame as the raster drew it
+            save_ppm(m, next(), true);
         } else if (command == "rec_start") {
             // rec_start PREFIX: from here every frame (whatever the commands)
             // to PREFIX.rgb and the sound to PREFIX.wav, until rec_stop
@@ -342,9 +354,12 @@ int main(int argc, char** argv) {
             const std::uint64_t limit = m.tstates + std::uint64_t(std::stod(next()) * ein::Machine::kCpuClockHz);
             while (!at_program_pc(m, pc) && m.tstates < limit) step(m);
             std::printf("until_%s=%d\n", name.c_str(), at_program_pc(m, pc) ? 1 : 0);
-        } else if (command == "record") {
+        } else if (command == "record" || command == "rrecord") {
+            // rrecord: each frame as the raster drew it (what a television
+            // shows), not VRAM at the frame's end
+            const bool raster = command == "rrecord";
             const int count = std::stoi(next());
-            Recorder recorder(m, next());
+            Recorder recorder(m, next(), raster);
             for (int k = 0; k < count; ++k) {
                 run_frames(m, 1);
                 recorder.frame();
@@ -377,6 +392,19 @@ int main(int argc, char** argv) {
                 std::printf("profile=%-24s %9.0f T a frame %5.1f%% %8.2f calls a frame\n", order[k].second.c_str(),
                             double(order[k].first) / count, 100.0 * double(order[k].first) / total,
                             double(calls[order[k].second]) / count);
+        } else if (command == "linereg") {
+            // linereg SYM N: run N TV frames; at each time the PC reaches SYM,
+            // register C and the raster line, counted (the road row hold's
+            // check: src/einstein/rowhold.asm)
+            const std::uint16_t at = symbol(next());
+            const int count = std::stoi(next());
+            const auto target = m.vdp.frames() + std::uint64_t(count);
+            std::map<std::pair<int, int>, int> hist;
+            while (m.vdp.frames() < target) {
+                if (m.cpu.pc.w == at) ++hist[{m.cpu.bc.b.l, m.vdp.line()}];
+                m.step();
+            }
+            for (const auto& [k, n] : hist) std::printf("reg=%d line=%d %d\n", k.first, k.second, n);
         } else if (command == "linehist") {
             // linehist SYM N: run N TV frames; the raster lines (by 8) at which
             // the PC reached SYM

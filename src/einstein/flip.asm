@@ -59,6 +59,12 @@ RequestFlip:
 EinUpload:
         ld a, (ELongWait)       ; (timed: the CTC's wait started as the frame
         ld (EBudget), a         ; was seen; else paced)
+        ld (EHoldOn), a         ; (and each row kept out of the raster's way:
+        ld hl, 0                ; src/einstein/rowhold.asm)
+        ld (EHoldBase), hl
+        dec l
+        ld a, l
+        ld (EHoldLast), a
         ld hl, DirtyList
         ld (EDirtyPtr), hl
         IFDEF EIN_DASH
@@ -67,6 +73,7 @@ EinUpload:
         call EinPanoSend        ; (the panorama's cells under silhouettes)
         ld c, MIRROR_ROWS       ; (the panorama's and the road's rows)
 .row:   push bc
+        call EinRowHold         ; (not while the raster could reach it)
         ld a, c                 ; a road row's changed slots: EDirtyRowN of
         sub ROAD_ROW0           ; them, next in DirtyList
         jr c, .names
@@ -127,8 +134,13 @@ EinUpload:
         ld a, c
         cp 24
         jr nz, .row
+        call EinCarHold         ; (not while the raster could reach it)
         call EinCarSync         ; ---- the car's cells
+        ld a, (CarShownB)       ; (the pose now shown: its tyres' tread, which
+        ld (ETyrePose), a       ; may have been sent again, at its place:
+        call EinTyreDraw        ; src/einstein/eintyres.asm)
         jp EinMirror            ; ---- the sky's cells written
+
 
 ; The writes in the vertical blank (30,830 T) go at full speed while it
 ; lasts, by the clock: the interrupt saw the frame at most 1 ms (and its own

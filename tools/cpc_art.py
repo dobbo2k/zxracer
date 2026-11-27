@@ -193,7 +193,27 @@ def car_code(spider):
     out += [f"        dw CCL{n}, CCL{n}j + 1" for n in range(len(lines))]
     out.append("CCarPoses:                   ; per pose: its lines")
     out += ["        db " + ", ".join(str(i) for i in ids) for ids in poses]
+    # The rear tyres' bytes (src/cpc/tyres.asm): lines TYRE_Y .. + 2, bytes
+    # TYRE_BYTES, the same in the steering poses (0-2) and opaque there; the
+    # tread line's and a plain line's
+    rows = []
+    for k in range(3):
+        px = spider(k).load()
+        rows.append([[px[x, y] for x in range(CAR_W // 2)] for y in range(TYRE_Y, TYRE_Y + 3)])
+    assert rows[0] == rows[1] == rows[2], "the steering poses' tyres differ"
+    def tyre(y):
+        pix = rows[0][y - TYRE_Y]
+        assert all(pix[2 * i] != 255 and pix[2 * i + 1] != 255 for i in TYRE_BYTES), y
+        return [byte(pix[2 * i], pix[2 * i + 1]) for i in TYRE_BYTES]
+    out += [f"CTYRE_Y EQU {TYRE_Y}",
+            "CTyreTread: db " + ", ".join(f"${v:02X}" for v in tyre(TYRE_Y)),
+            "CTyrePlain: db " + ", ".join(f"${v:02X}" for v in tyre(TYRE_Y + 1))]
+    assert tyre(TYRE_Y + 1) == tyre(TYRE_Y + 2)
     return out + code
+
+
+TYRE_Y = 27                     # the Spider's tyres: its lines 27-29 (the tread on 27)
+TYRE_BYTES = (2, 3, 12, 13)     # their Mode 0 bytes, opaque in every steering pose
 
 
 # The HUD's and the front end's font for the CPC (docs/port_cpc.md 5.7):

@@ -68,6 +68,16 @@ JingleGo:
         ASSERT $ <= LWPage + 256
         ORG ZPage + $60
         ASSERT ZLo_end <= ZPage + $60
+        IFDEF EINSTEIN          ; (src/einstein/eintyres.asm: the tyres' tread)
+; Per phase (rows to the next tread line), the source of lines 2-6
+ETyreLines:     db 3, 4, 4, 3, 4,  4, 3, 4, 4, 3,  4, 4, 3, 4, 4
+ETyreAcc:       db 0            ; depth units towards the next row
+ETyrePhase:     db 1            ; 0-2: rows from line 2 to the first tread line
+        ASSERT ETyrePhase == ETyreAcc + 1
+ETyreShown:     db $FF          ; the phase drawn ($FF: the car sent again)
+ETyrePose:      db $FF          ; the pose the screen shows (EinUpload)
+ETyreBuf:       ds 10
+        ENDIF
         IFDEF ZX_OBJINK         ; (src/objink.asm: a cell's object and ground
 OS:             ds 8            ; pixels, and the bits in a nibble)
 OG:             ds 8
@@ -152,6 +162,10 @@ DblNib:         db $00, $03, $0C, $0F, $30, $33, $3C, $3F, $C0, $C3, $CC, $CF, $
         IFDEF ZX_OBJINK
 OBJ_PART        DEFL 3
         INCLUDE "objinkb2.asm"  ; (objects' inks: putting their cells back)
+        ENDIF
+        IFDEF EINSTEIN
+HOLD_PART       DEFL 2
+        INCLUDE "einstein/rowhold.asm"  ; (no road row shown half written)
         ENDIF
         ASSERT $ <= ZHiPage + 256
         ORG MaskPage + $20

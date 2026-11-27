@@ -170,6 +170,11 @@ EGroundPapers   EQU EGroundPatterns + 32
         ORG $0100
         jp EinBoot              ; (the theme cache follows at THEME_CACHE)
 
+        ORG EIN_TAIL            ; (the theme cache's last bytes: no theme pack
+TYRE_PART       DEFL 2          ; reaches them, tools/make_einstein.py)
+        INCLUDE "eintyres.asm"  ; (the rear tyres drawn)
+        ASSERT $ <= PANO_CACHE
+
         ORG EIN_CODE
         INCLUDE "boot.asm"
         INCLUDE "vdp.asm"
@@ -182,7 +187,9 @@ EGroundPapers   EQU EGroundPatterns + 32
         INCLUDE "kerbcell.asm"  ; (a prototype: the kerbs exact; with kerbrow.asm)
         ENDIF
         ; (keys.asm, disc.asm, front.asm: in bank 2's code, src/main.asm)
-EinArt:                         ; (the end of the platform code)
+TYRE_PART       DEFL 1
+        INCLUDE "eintyres.asm"  ; (the rear tyres' tread on, each TV frame)
+EinArt:                        ; (the end of the platform code)
         ASSERT $ <= $4000              ; (the stage overlay: src/main.asm)
 
 ; The shared code's hooks (NATIVE_GFX, src/defs.asm): the Einstein's

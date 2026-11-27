@@ -1,3 +1,4 @@
 ; ---------------------------------------------------------------------------
 ; CPC: resident code that is not time-critical (bank 5's part, base 0)
 ; ---------------------------------------------------------------------------
+        INCLUDE "tyres.asm"      ; the rear tyres' tread rolls

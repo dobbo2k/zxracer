@@ -31,6 +31,8 @@ CpcLoad:
         ld (CLoadN), a
         pop hl
         call FdcPlace           ; D, E: its first sector's place
+        ld a, $FF               ; (CRamNow: not known, src/cpc/tyres.asm)
+        ld (CRamNow), a
         ld bc, GA_PORT | RAM_BANK4
         out (c), c
         ld hl, $4000
@@ -71,6 +73,8 @@ FdcBorder:
 ; packed bytes are read through CUnGet; what has been unpacked is copied
 ; from where it went (matches), the hidden screen's configuration in.
 CpcUnpack:
+        ld a, $FF               ; (CRamNow: not known, src/cpc/tyres.asm)
+        ld (CRamNow), a
         ld a, (CpcHidden)       ; (the configuration CUnGet puts back)
         add a, a
         or RAM_A

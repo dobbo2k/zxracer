@@ -131,7 +131,8 @@ EinIsr:
         call EinUpload
         xor a
         ld (FlipPending), a
-.snd:   call SoundTick
+.snd:   call EinTyreTick        ; (the rear tyres' tread: src/einstein/eintyres.asm)
+        call SoundTick
 .over:  ld a, (EFrontOn)        ; a frame begun meanwhile (a long one: a full
         or a                    ; car, a tunnel's sky)? Counted, with its sound;
         jr nz, .done            ; and 1 ms polls again (the phase lost)

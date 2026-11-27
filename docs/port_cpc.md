@@ -694,3 +694,19 @@ The approach now takes 5 TV frames a game frame (6 just before the mouth),
 inside 3.5. The yellow row under the HUD and the missing message line on
 the first two frames inside, and the way out's blocky opening, are the
 Spectrum's too (the shared code's).
+
+### Rolling tyres (27 November 2026)
+
+The rear tyres' tread rolls, as the Spectrum's (`src/cpc/tyres.asm`): the
+Spider's tyres show on its lines 27-29, their Mode 0 bytes 2, 3, 12 and 13
+opaque and the same in every steering pose (`tools/cpc_art.py car_code`
+checks it and writes `CTyreTread` and `CTyrePlain`). Each VSYNC interrupt
+moves the tread on by the speed (a row each 21 depth units, three
+positions) and, when it has moved or a new frame is shown, writes those
+12 bytes into the screen on show: that screen is put at `$4000` for them,
+then the main code's RAM configuration again. That is `CRamNow`, set by
+`CpcSelect`; the disc's loader and unpacker, the front end's conversion
+and the display reset set it to `$FF` (not known) before they change the
+configuration themselves, and the tyres wait for `CpcSelect`. Not in the
+front end or the smoke poses (`CTyrePose`, from `CpcShow`). `make
+test-cpc` passes.
