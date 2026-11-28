@@ -2,16 +2,20 @@
 ; is a circle in the lamp's colour in a black 2 x 2 cell box; state 5 clears
 ; them back to sky.
 LampDraw:
+        IFNDEF ZX48
         ld a, c                 ; green: the music starts
         cp 4
         call z, MusicGo
+        ENDIF
         ld a, (HudOr)
         push af
         IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only; screen A's
+        IFNDEF ZX48
         xor a                   ; memory holds the stage overlay there)
         call .scr
         ENDIF
-        ld a, $80
+        ENDIF
+        ld a, RACE_HIOR
         call .scr
         pop af
         ld (HudOr), a

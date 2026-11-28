@@ -6,6 +6,11 @@
 ; when the scroll position changed since this buffer last showed it.
 ; ---------------------------------------------------------------------------
 PANO_Y          EQU 80                  ; first line (character row 10)
+        IFDEF ZX48
+PANO_SCROLL_MASK EQU $F8
+        ELSE
+PANO_SCROLL_MASK EQU $FC
+        ENDIF
 
         IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 ; When this game frame already runs late (2 TV frames since the last flip)
@@ -17,10 +22,20 @@ DrawHorizonIfTime:
         or a
         ret nz
         ld a, (HorizonX + 1)
-        and $FC
+        and PANO_SCROLL_MASK
         ld hl, (PanoLast)
         sub (hl)
         ret z                   ; up to date
+        IFDEF ZX48
+        ld a, (hl)
+        inc a
+        jr z, DrawHorizon       ; first view after a checkpoint or a tunnel
+        ld a, (FrameCount)
+        ld hl, LastFlip
+        sub (hl)
+        cp MIN_FRAMES - 1
+        ret nc                  ; leave the last refresh for the car and objects
+        ELSE
         add a, 4
         cp 9
         jr nc, DrawHorizon      ; 8+ pixels behind: always redraw
@@ -32,15 +47,19 @@ DrawHorizonIfTime:
         sub (hl)
         cp MIN_FRAMES
         ret nc
+        ENDIF
 
 DrawHorizon:
         ld a, (HorizonX + 1)            ; scroll in pixels
-        and $FC
+        and PANO_SCROLL_MASK
         ld hl, (PanoLast)
         cp (hl)
         ret z
         ld (hl), a
         ld c, a
+        IFDEF ZX48
+        ld hl, (StPano)
+        ELSE
         ; copy = (scroll >> 2) & 1  ->  source base = Panorama + copy * 512
         rrca
         rrca
@@ -52,6 +71,10 @@ DrawHorizon:
 .cp:    add hl, de
         djnz .cp
 .base:  ld (.src + 1), hl
+        ENDIF
+        IFDEF ZX48
+        ld (.src + 1), hl
+        ENDIF
         ; byte rotation b = scroll >> 3: copy bytes [b, 32) then [0, b)
         ld a, c
         rrca

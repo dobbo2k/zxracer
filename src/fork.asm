@@ -64,7 +64,11 @@
 
 COCKPIT         EQU $60             ; in the row state page (SaveCockpit)
 SpanBuf         EQU CXPage + $60    ; DrawForkRow: per line pair D1 E1 D2 E2 RW
+        IFDEF ZX48
+ForkList        EQU ScrLo + $E0
+        ELSE
 ForkList        EQU CXPage + $E0    ; DrawForkRow: cells to write (32 bytes)
+        ENDIF
 
 ; Per frame, before pass 1: which lines lie past the split (lines
 ; 0 .. ForkLim - 1) and the constants ForkLine needs. A branch's offset on
@@ -335,7 +339,11 @@ DrawForkRow:
         ld a, (CurI)
         ld c, a
         ld de, SpanBuf
+        IFDEF ZX48
+        ld b, 2                 ; render the two halves of a fork row
+        ELSE
         ld b, 4
+        ENDIF
 .gather:
         ld l, c
         ld h, high DEPage
@@ -367,10 +375,18 @@ DrawForkRow:
 .rw:    ld a, 0
         ld (de), a
         ld a, e
+        IFDEF ZX48
+        add a, 20               ; keep the first and last pair in slots 0 and 3
+        ld e, a
+        ld a, c
+        add a, 6
+        ld c, a
+        ELSE
         add a, 4
         ld e, a
         inc c
         inc c
+        ENDIF
         djnz .gather
         ; ---- the row's colours (light or dark band)
         ld a, (CurI)
@@ -411,7 +427,11 @@ DrawForkRow:
         call .roadPair
         ld ix, SpanBuf
         ld h, high ForkCls
+        IFDEF ZX48
+        ld b, 2
+        ELSE
         ld b, 4
+        ENDIF
 .kp:    push bc
         ld d, (ix + 0)
         ld e, (ix + 1)
@@ -420,12 +440,21 @@ DrawForkRow:
         ld d, (ix + 2)
         ld e, (ix + 3)
         call KerbCells
+        IFDEF ZX48
+        ld de, 24
+        ELSE
         ld de, 8
+        ENDIF
         add ix, de
         pop bc
         djnz .kp
 
         ; ---- old centre lines on the row's lines go (as in DrawRoadLine)
+        IFDEF ZX48
+        ld hl, (RaceBitmapBase)
+        ld (ForkBL), hl         ; low and high bytes of current strip
+        ASSERT ForkBH == ForkBL + 1
+        ELSE
         ld a, (CurRow)
         ld b, a
         and 7
@@ -439,6 +468,7 @@ DrawForkRow:
         ld hl, BufHiOr
         or (hl)
         ld (ForkBH), a          ; row's first line high byte
+        ENDIF
         ld a, (StatePage)
         inc a
         ld h, a
@@ -480,6 +510,16 @@ DrawForkRow:
         sub low ForkCls
         ld (.bo + 1), a
         ld (.bo2 + 1), a
+        IFDEF ZX48
+        ld hl, (RaceAttrBase)
+        ld a, (CurRow)
+        cp CAR_ROW
+        ld a, .writeAttr - .skipCar - 2
+        jr c, .carGate
+        xor a
+.carGate:
+        ld (.skipCar + 1), a
+        ELSE
         ld a, (CurRow)
         ld l, a
         ld h, 0
@@ -491,15 +531,29 @@ DrawForkRow:
         ld a, (AttrHi)
         add a, h
         ld h, a                 ; HL = the row's attributes
+        ENDIF
         ld de, ForkCls
         exx
         ld hl, ForkList
         ld de, ForkList + 31
         exx
         ld b, 32
-.cell:  ld a, (de)              ; new attribute
+.cell:
+        IFDEF ZX48
+.skipCar:
+        jr .writeAttr
+        ld a, l
+        and 31
+        sub CAR_COL
+        cp CAR_W
+        jr c, .nx
+.writeAttr:
+        ENDIF
+        ld a, (de)              ; new attribute
         ld c, (hl)              ; old
+        IFNDEF ZX48
         ld (hl), a
+        ENDIF
 .ak:    cp 0                    ; kerb?
         jr z, .kerb
         ld a, c
@@ -507,7 +561,15 @@ DrawForkRow:
         jr z, .clr
 .o2:    cp 0
         jr nz, .nx
-.clr:   ld a, e
+.clr:
+        IFDEF ZX48
+        ld a, (PalRoad)
+        ld c, a
+        ld a, (de)
+        cp c
+        call z, CoverRaceRoadCell
+        ENDIF
+        ld a, e
 .bo:    add a, 0
         exx
         ld (de), a
@@ -532,6 +594,7 @@ DrawForkRow:
         ld (ForkNC), a
         exx
         ; the car's open cockpit takes the colours of what lies under it
+        IFNDEF ZX48
         ld a, (CurRow)
         cp CAR_ROW
         jr c, .bitmap
@@ -539,13 +602,18 @@ DrawForkRow:
         ld a, 1
         ld (CarDirty), a
         ld (CarAttrDirty), a
+        ENDIF
 
 .bitmap:
         ; ---- per line pair: write the listed cells on both lines
         ld a, (ForkBH)
         ld d, a
         ld ix, SpanBuf
+        IFDEF ZX48
+        ld b, 2
+        ELSE
         ld b, 4
+        ENDIF
 .pair:  push bc
         push de
         ld c, (ix + 1)
@@ -579,6 +647,16 @@ DrawForkRow:
         inc d
         ld (de), a
         dec d
+        IFDEF ZX48
+        inc d
+        inc d
+        ld (de), a
+        inc d
+        ld (de), a
+        dec d
+        dec d
+        dec d
+        ENDIF
         djnz .cl
 .noClr: ld a, (ForkNK)          ; kerb cells
         or a
@@ -623,8 +701,25 @@ DrawForkRow:
         inc d
         ld (de), a
         dec d
+        IFDEF ZX48
+        inc d
+        inc d
+        ld (de), a
+        inc d
+        ld (de), a
+        dec d
+        dec d
+        dec d
+        ENDIF
         djnz .kl
-.pDone: ld bc, 8
+.pDone:
+        IFDEF ZX48
+        ld bc, 24
+        inc d
+        inc d
+        ELSE
+        ld bc, 8
+        ENDIF
         add ix, bc
         inc d
         inc d
@@ -644,7 +739,11 @@ DrawForkRow:
         ld a, (CurI)
         add a, 8
         ld (CurI), a
+        IFDEF ZX48
+        jp PublishRaceAttrs
+        ELSE
         ret
+        ENDIF
 
 ; HL = span entry: fill road cells [(D + 7) >> 3, (E + 1) >> 3) of both spans
 .roadPair:
@@ -725,6 +824,39 @@ KerbCells:
 
 ; Row 20's attributes under the car's open cockpit (columns 12-19), kept per
 ; buffer for DrawCar.
+        IFDEF ZX48
+; Publish a row's staged terrain colours after its kerb pixels are ready.
+; The player car keeps its own attributes. Save the terrain beneath its
+; open cockpit separately.
+PublishRaceAttrs:
+        call InkRacePortalRow
+        ld de, (RaceAttrBase)
+        ld hl, ForkCls
+        ld a, (CurRow)
+        cp CAR_ROW
+        jp c, PanoLdiEnd - 64
+        ld bc, CAR_COL
+        ldir
+        ld a, CAR_W
+        add a, l
+        ld l, a
+        ld a, CAR_W
+        add a, e
+        ld e, a
+        ld bc, 32 - CAR_COL - CAR_W
+        ldir
+        ld a, (CurRow)
+        cp CAR_ROW
+        ret nz
+SaveRaceCockpit:
+        ld hl, ForkCls + CAR_COL
+        ld de, StateA3 + COCKPIT
+        ld bc, CAR_W
+        ldir
+        ld a, 1
+        ld (CarAttrDirty), a
+        ret
+        ELSE
 SaveCockpit:
         push hl
         push de
@@ -743,6 +875,7 @@ SaveCockpit:
         pop de
         pop hl
         ret
+        ENDIF
 
 ; A row DrawForkRow drew goes back to the normal renderer: clear the kerb
 ; cells it left (found by their attributes) on all 8 lines.
@@ -752,6 +885,15 @@ ClearKerbCells:
         ld a, (PalKerbD)
         ld (.k2 + 1), a
         ld a, (CurRow)
+        IFDEF ZX48
+        cp CAR_ROW
+        ld a, .load - .clip - 2
+        jr c, .set
+        xor a
+.set:   ld (.clip + 1), a
+        ld de, (RaceBitmapBase)
+        ld hl, (RaceAttrBase)
+        ELSE
         ld l, a
         ld h, 0
         add hl, hl
@@ -776,13 +918,30 @@ ClearKerbCells:
         ld a, (BufHiOr)
         or b
         ld d, a
+        ENDIF
         ld b, 32
-.cell:  ld a, (hl)
+.cell:
+        IFDEF ZX48
+.clip:  jr .load
+        ld a, l
+        and 31
+        sub CAR_COL
+        cp CAR_W
+        jr c, .nx
+.load:
+        ENDIF
+        ld a, (hl)
 .k1:    cp 0
         jr z, .clr
 .k2:    cp 0
         jr nz, .nx
-.clr:   ld c, d
+.clr:
+        IFDEF ZX48
+        push hl
+        call CoverStaleRaceKerb
+        pop hl
+        ENDIF
+        ld c, d
         xor a
         DUP 7
         ld (de), a

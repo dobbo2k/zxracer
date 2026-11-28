@@ -6,10 +6,15 @@ LastFlip:       db 0
 FlipPending:    db 0
 FlipValue:      db 0
 Port7FFD:       db 0
-BackBuf:        db 1            ; buffer being drawn: 0 = A, 1 = B
+BackBuf:        db RACE_HIOR / $80 ; buffer being drawn: 0 = A, 1 = B
 BufHiOr:        db 0
+        IFDEF ZX48
+AttrHi:         db high RACE_ATTRS
+StatePage:      db high StateA1
+        ELSE
 AttrHi:         db 0
 StatePage:      db 0
+        ENDIF
 
 Input:          db 0
 DemoMode:       db 1            ; attract mode until a steering key is pressed

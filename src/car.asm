@@ -93,6 +93,9 @@ DRIFT_LOOK      EQU 40              ; |P| (the bend's push): the car yaws into t
 SMOKE_AT        EQU 72              ; ... and its rear tyres smoke (past what steering holds)
 
         IFNDEF NATIVE_GFX       ; (the Einstein and the CPC draw their own)
+        IFDEF ZX48
+        INCLUDE "zx48/car_rows.asm"
+        ELSE
 DrawCar:
         call CarFrame           ; C = frame
         ld a, c                 ; frames 3-6 (smoke, spinning): the squeal
@@ -172,6 +175,7 @@ DrawCar:
         ld hl, (CarTopSrc)
         ld bc, CAR_TOP_PX
         add hl, bc
+        ENDIF
 .attrs:
         xor a
         ld (CarAttrDirty), a

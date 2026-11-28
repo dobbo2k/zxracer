@@ -12,18 +12,24 @@ CheckPause:
         KEY_IN
         and PAUSE_BIT
         ret nz
+        IFNDEF ZX48
         call WaitFlip           ; (the frame just drawn is on show)
+        ENDIF
         ld a, 1
         ld (Mute), a
         call Silence
         ld a, (HudOr)
         push af
+        IFDEF ZX48
+        xor a                   ; the fixed display at $4000
+        ELSE
         IFDEF NATIVE_GFX
         ld a, $80               ; (screen B: its cells are shown)
         ELSE
         ld a, (BackBuf)         ; 1: B is drawn next, so A is on show
         dec a
         and $80
+        ENDIF
         ENDIF
         ld (HudOr), a
         ld bc, MSG_ROW * 256 + MSG_COL

@@ -271,6 +271,22 @@ def track_pack(name, segs, objs, stage_len, tunnel=None):
     return out, size
 
 
+def fitted_track(row, seed, theme):
+    """Build the exact shared track, fitting the 608-byte active cache."""
+    segs, objs, stage_len, tunnel = make_track(row, seed, theme)
+    size = 16 + 4 * (len(segs) + len(objs))
+    while size > TRACK_CACHE_SIZE:
+        small = [i for i, obj in enumerate(objs) if obj[2] in (5, 9)]
+        if not small:
+            small = [i for i, (z, _, kind) in enumerate(objs) if kind == 4 and 1000 < z < stage_len - SPLIT_LEN]
+        if not small:
+            raise ValueError(f"row {row + 1}, seed {seed}: {size} bytes, the track cache holds {TRACK_CACHE_SIZE}")
+        drop = set(small[::2][:(size - TRACK_CACHE_SIZE + 3) // 4])
+        objs = [obj for i, obj in enumerate(objs) if i not in drop]
+        size -= 4 * len(drop)
+    return segs, objs, stage_len, tunnel
+
+
 def theme_pack(name, theme, masters=None):
     pal = theme["palette"]
     # DrawForkRow finds the kerb cells it drew by their attributes
@@ -365,19 +381,8 @@ def stage_packs(cfg, masters=None):
             art_sizes[art] = len(data)
             asm = ["        db " + ", ".join(map(str, data[i:i + 32])) for i in range(0, len(data), 32)]
             packs.append((art, asm, len(data), None))
-            segs, objs, stage_len, tunnel = make_track(r, st["seed"], themes[st["theme"]])
+            segs, objs, stage_len, tunnel = fitted_track(r, st["seed"], themes[st["theme"]])
             lines, size = track_pack(label, segs, objs, stage_len, tunnel)
-            while size > TRACK_CACHE_SIZE:          # too long: a little less small scenery
-                small = [i for i, o in enumerate(objs) if o[2] in (5, 9)]
-                if not small:
-                    small = [i for i, (z, _, kind) in enumerate(objs) if kind == 4 and 1000 < z < stage_len - SPLIT_LEN]
-                if not small:
-                    break
-                drop = set(small[::2][:(size - TRACK_CACHE_SIZE + 3) // 4])
-                objs = [o for i, o in enumerate(objs) if i not in drop]
-                lines, size = track_pack(label, segs, objs, stage_len, tunnel)
-            if size > TRACK_CACHE_SIZE:
-                raise SystemExit(f"{label}: {size} bytes, the cache holds {TRACK_CACHE_SIZE}")
             packs.append((label, lines, size, TRACK_CACHE))
             stages.append({"row": r, "col": k, "theme": theme_label[st["theme"]], "track": label, "art": art,
                            "par": par_time(segs, stage_len)})

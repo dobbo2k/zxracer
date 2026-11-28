@@ -116,6 +116,7 @@ ObjHit: ld e, a
         ret
 
 ; Replay the draw commands this buffer holds (XOR = erase).
+        IFNDEF ZX48
 EraseSprites:
         ld hl, (CmdList)
         ld a, (hl)              ; count
@@ -135,6 +136,7 @@ EraseSprites:
         jp ClaimRestore         ; (the cells ObjInk drew over: src/objink.asm)
         ELSE
         ret
+        ENDIF
         ENDIF
 
 ; Project visible objects, XOR them onto the back buffer and record the
@@ -197,9 +199,16 @@ DrawObject:
         ld a, (hl)
         cp $FF
         jp z, .skip
+        IFDEF ZX48
+        ld e, a
+        add a, a
+        add a, a
+        add a, e                ; 5 bytes per compact directory entry
+        ELSE
         add a, a
         add a, a
         add a, a                ; 8 bytes per directory entry
+        ENDIF
         ld e, a
         ld d, 0
         ld a, (ObjType)
@@ -216,17 +225,30 @@ DrawObject:
         pop de
         add hl, de
         ld a, (hl)
+        IFDEF ZX48
+        and $0F
+        ENDIF
         ld (SprW), a
+        IFDEF ZX48
+        ld a, (hl)
+        and $40
+        ELSE
         inc hl
         ld a, (hl)
         ld (SprH), a
         inc hl
         ld a, (hl)
+        ENDIF
         ld (SprMask), a
         inc hl
+        IFDEF ZX48
+        ld a, (hl)
+        ld (SprH), a
+        ELSE
         IFDEF CPC               ; (the CPC's: its width in Mode 0 pixels)
         ld a, (hl)
         ld (SprPx), a
+        ENDIF
         ENDIF
         inc hl
         ld e, (hl)
@@ -235,8 +257,12 @@ DrawObject:
         inc hl
         ld (SprSrc), de
         ld e, (hl)
+        IFDEF ZX48
+        ld d, 0
+        ELSE
         inc hl
         ld d, (hl)
+        ENDIF
         ld (SprStride), de
         ; ---- x = cx + (ObjX * scale) >> 6, then the left edge
         ld a, (ObjI)
@@ -333,6 +359,19 @@ DrawObject:
         ld d, 0
         or a
         sbc hl, de              ; left edge
+        IFDEF ZX48
+        bit 2, l
+        jr z, .noShift
+        ld a, (SprMask)
+        or a
+        jr z, .noShift
+        push hl
+        ld hl, (SprSrc)
+        ld de, (SprStride)
+        add hl, de
+        ld (SprSrc), hl
+        pop hl
+        ELSE
         ; shift copy: shift & mask, scaled down to a copy index
         ld a, (SprMask)
         and l
@@ -369,6 +408,7 @@ DrawObject:
         add hl, de
 .m3:    ld (SprSrc), hl
         pop hl
+        ENDIF
 .noShift:
         ; column = left >> 3 (signed); must overlap 0..31
         sra h
@@ -490,6 +530,10 @@ DrawObject:
         ld a, (SprH)
         ld (hl), a
         inc hl
+        IFDEF ZX48
+        ld a, (ObjType)
+        ld (hl), a
+        ELSE
         IFDEF NATIVE_GFX        ; (its type: the platform draws it)
         ld a, (ObjType)
         ld (hl), a
@@ -499,11 +543,14 @@ DrawObject:
         ld (hl), a
         ENDIF
         ENDIF
+        ENDIF
         inc hl
         ld (CmdPtr), hl
+        IFNDEF ZX48
         ld de, -CMD_SIZE
         add hl, de
         call RunCommand
+        ENDIF
         ld hl, (CmdList)
         inc (hl)
 .skip:  or a                    ; no carry: keep going
@@ -579,6 +626,7 @@ MulS8U8:
         ret
 
 ; HL -> draw command. XOR the sprite into the back buffer.
+        IFNDEF ZX48
 RunCommand:
         IFDEF CPC
         ret                     ; (the CPC draws them from the list: src/cpc/sprites.asm)
@@ -681,3 +729,4 @@ RunCommand:
         ld (.lcol + 1), a
         pop de
         ret
+        ENDIF

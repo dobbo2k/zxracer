@@ -40,15 +40,9 @@ UpdatePlayer:
         ld (hl), b
         jr nz, .nz
         inc a
-        IFDEF NATIVE_GFX        ; (their game frames take longer: up to 8, so the
-.nz:    cp 9                    ; clock and the car keep real time)
+.nz:    cp ELAPSED_MAX + 1
         jr c, .el
-        ld a, 8
-        ELSE
-.nz:    cp 5
-        jr c, .el
-        ld a, 4
-        ENDIF
+        ld a, ELAPSED_MAX
 .el:    ld (Elapsed), a
         call ForkPlayer         ; past the split: carried along the branch
         ; gear: fire (SPACE) changes between LOW and HIGH
@@ -289,7 +283,9 @@ UpdatePlayer:
 .inStage:
         call AddScore
         call UpdateTrack
+        IFNDEF ZX48
         call EngineUpdate
+        ENDIF
         call UpdateTraffic
         jp UpdateObjects
 

@@ -15,6 +15,19 @@
         DEFINE NATIVE_GFX
         DEFINE FAST_PROJ
         ENDIF
+        IFDEF ZX48
+        DEFINE FAST_PROJ
+        ENDIF
+
+        IFDEF NATIVE_GFX
+ELAPSED_MAX     EQU 8
+        ELSE
+        IFDEF ZX48
+ELAPSED_MAX     EQU 8           ; keep the 50 Hz clock if a render overruns
+        ELSE
+ELAPSED_MAX     EQU 4
+        ENDIF
+        ENDIF
 
 ; Build options
         IFNDEF PROFILE
@@ -37,7 +50,18 @@ FIXED_ELAPSED   EQU 0           ; 1 = (testing) every update counts 3 TV frames 
         ENDIF
 
 ; Memory map (bank 2, $8000-$BFFF, always paged)
+        IFDEF ZX48
+TABLES          EQU $A200
+TRACK_CACHE     EQU $7DA0
+RACE_PIXELS     EQU $4000
+RACE_ATTRS      EQU $5800
+RACE_HIOR       EQU 0
+        ELSE
 TABLES          EQU $A300       ; page-aligned lookup tables (build/tables.asm)
+RACE_PIXELS     EQU $C000
+RACE_ATTRS      EQU $D800
+RACE_HIOR       EQU $80
+        ENDIF
 PANO_LDI_END    EQU $BA00       ; unrolled 32-LDI chain for the panorama
 XOR_END         EQU $BB00       ; unrolled XOR chain ends here (with JP (IY))
         IFDEF CPC
@@ -58,7 +82,11 @@ PORT_7FFD       EQU $7FFD
 P7FFD_ROM48     EQU $10
 P7FFD_SHADOW    EQU $08         ; display bank 7 instead of bank 5
         IFNDEF MIN_FRAMES       ; (-D: the benchmark measures the work unlocked)
+        IFDEF ZX48
+MIN_FRAMES      EQU 4           ; 12.5 fps on the 50 Hz display
+        ELSE
 MIN_FRAMES      EQU 3           ; locked 16.7 fps: steadier than a 25/16.7 mix
+        ENDIF
         ENDIF
 
 ; Screen layout

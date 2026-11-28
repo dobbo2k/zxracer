@@ -469,7 +469,7 @@ def size_indices(name):
     return [max(1, k - lift) for k in range(len(SIZES))]
 
 
-def emit_type(name, label=None, *, master=None, previews=True):
+def emit_type(name, label=None, *, master=None, previews=True, shifts_by_size=None, trim_unshifted=False):
     """Sprite directory and data for one type.
 
     Returns (consts, directory, data) lists of assembler lines. The
@@ -487,10 +487,10 @@ def emit_type(name, label=None, *, master=None, previews=True):
         dirl.append(f"        db {entry}_w, {entry}_h, {entry}_m, 0")
         dirl.append(f"        dw {entry}, {entry}_s")
     for k in sorted(set(indices)):
-        nshift = shifts[k]
+        nshift = shifts[k] if shifts_by_size is None else min(shifts[k], shifts_by_size.get(k, 1))
         h = max(2, round(SIZES[k] * factor))
         img = scaled(master, h)
-        wb = (img.width + 7) // 8 + 1        # one byte of shift padding
+        wb = (img.width + 7) // 8 + (nshift > 1 or not trim_unshifted)
         step = 8 // nshift
         mask = {1: 0, 2: 4, 4: 6, 8: 7}[nshift]
         lab = f"{label}_{k}"

@@ -92,7 +92,9 @@ def main(path):
     # edges; per-row "both branches on screen" flags and DrawForkRow scratch
     lines += page("CXPage", ("CXLo", [0] * ROAD_LINES), ("CXHi", [0] * ROAD_LINES))
     lines += page("DE2Page", ("RoadD2", [0xFF] * ROAD_LINES), ("RoadE2", [0] * ROAD_LINES))
-    lines += ["RowFork EQU DE2Page + $60", "ForkCls EQU DE2Page + $E0"]
+    lines += ["RowFork EQU DE2Page + $60", "        IFDEF ZX48",
+              "ForkCls EQU ScrHi + $E0", "        ELSE",
+              "ForkCls EQU DE2Page + $E0", "        ENDIF"]
     # DxTab[d >> 6] = fork_dx / 4 (capped)
     lines += [f"SPLIT_LEN EQU {SPLIT_LEN}", "        ALIGN 256", "DxTab:"]
     dx = [min(255, round(fork_dx(k * 64 + 32) / 4)) for k in range(256)]
@@ -130,9 +132,13 @@ def main(path):
     #   St2: centre-line x per line ($FF = none)
     #   RowSt: kerb cell ranges a, b, c, d per row (4 bytes each) / band per row at +$80
     for buf in "AB":
+        if buf == "B":
+            lines.append("        IFNDEF ZX48")
         lines += page(f"State{buf}1", (f"St{buf}D", [0] * ROAD_LINES), (f"St{buf}E", [0] * ROAD_LINES))
         lines += page(f"State{buf}2", (f"St{buf}Lane", [0xFF] * ROAD_LINES))
         lines += page(f"State{buf}3", (f"Row{buf}Ranges", [0] * 48), (f"Row{buf}Band", [0xFF] * 12))
+        if buf == "B":
+            lines.append("        ENDIF")
 
     # Mask page: LMask[b] = pixels left of bit b; lane masks for half-width w, start bit b
     lmask = [(~(0xFF >> b)) & 0xFF for b in range(8)]

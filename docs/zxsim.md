@@ -1,6 +1,6 @@
-# zxsim — headless 128K emulator for testing and profiling
+# zxsim — headless Spectrum emulator for testing and profiling
 
-`tools/zxsim/zxsim.c` is a small, dependency-free ZX Spectrum 128K emulator written
+`tools/zxsim/zxsim.c` is a small, dependency-free ZX Spectrum emulator written
 for this project. It is not a playable emulator. It exists so that every change can
 be checked automatically: screenshots, frame rate, and exact cycle counts.
 
@@ -8,8 +8,8 @@ be checked automatically: screenshots, frame rate, and exact cycle counts.
   `tests/cputest.asm`.
 - 128K paging via `$7FFD`, shadow screen (bank 7), approximate memory contention
   using 128K timings (70,908 T per frame, 228 T per line).
-- IM1/IM2 interrupts at the start of each frame. No ROM is loaded (the game never
-  uses it), and execution entering `$0000-$3FFF` is reported as an error.
+- IM1/IM2 interrupts at the start of each frame. By default no ROM is loaded
+  and execution entering `$0000-$3FFF` is reported.
 - Screen and border are captured line by line, so tearing and border timing bars
   show up in screenshots exactly as on hardware.
 - FLASH attributes swap ink and paper every 16 frames, as on hardware.
@@ -33,9 +33,17 @@ zxsim game.sna [options]
   -d ADDR:LEN     hex-dump memory at exit
   -a              print the AY registers at exit
   -v FILE         write every frame as raw RGB24 320x288 (video capture; - for stdout)
+  --screens ADDR:FILE  sample the whole screen when execution reaches ADDR.
+                       Records are a little-endian 32-bit refresh number followed
+                       by 256x192 row-major palette indices.
+  --capture-from F     start -v and --screens at refresh F
   -y FILE         write the 14 AY registers at the end of every frame
   -q              no summary line
   -T file.tap     tape boot instead of a snapshot (see below)
+  -48             use the fixed 48K map and 69,888 T-state frame timing
+  --rom FILE      install a 16 KiB ROM
+  --rom-tape F    start the complete tape at frame F running the ROM from reset
+  --eject F       disconnect the tape at frame F
   -x PERCENT      tape speed for -T (default 100)
   -R SEED         fill RAM and the ROM area with random bytes first
 ```
@@ -48,6 +56,11 @@ sync, 855 / 1710 T pulses per bit, a second's silence between blocks - for the
 game's own loader to read. `-x PERCENT` plays the tape slower or faster, `-R SEED`
 fills memory (and the absent ROM) with random bytes first. `tests/tapecheck.py`
 uses these to load `build/speedrun.tap` end to end.
+
+The 48K port uses `-48 --rom FILE --rom-tape F -T build/zx48/speedrun48.tap`.
+The simulator runs the 48K ROM from reset and exposes the complete tape
+signal. `tests/zx48_check.py` enters `LOAD ""` through the emulated keyboard
+and tests restarting after the tape is disconnected.
 
 The summary line reports `flips` (writes to `$7FFD` that change the displayed
 screen), so `fps = flips × 50 / frames`.

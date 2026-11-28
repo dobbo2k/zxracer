@@ -79,10 +79,38 @@ profile: $(ZXSIM) build/zxracer.sna
 build/release.sna: $(SRC) build/tables.asm build/stages.asm build/car_data.asm build/font_data.asm build/music_title.asm | build
 	$(ASM) --nologo --msg=war --fullpath -Ibuild --sym=build/release.sym -DPROFILE=0 -DRELEASE=1 $(OBJINK_DEF) src/main.asm
 
-build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py assets/gfx/loading.scr src/loader.asm | build
+build/speedrun.tap: build/release.sna tools/make_tap.py tools/zpack.py assets/gfx/loading.scr src/loader.asm src/unpack.asm | build
 	$(PYTHON) tools/make_tap.py build/release.sna build/release.sym $@
 
 tap: build/speedrun.tap
+
+# 48K Spectrum. The ROM loads the whole game in one session.
+ZX48_BUILD := build/zx48
+ZX48_SRC := $(wildcard src/zx48/*.asm)
+ZX48_ARCHIVE := $(ZX48_BUILD)/zx48_table.asm $(ZX48_BUILD)/zx48_archive.asm $(ZX48_BUILD)/zx48_resident.asm
+.PHONY: zx48 run-zx48 test-zx48 release-zx48
+zx48: $(ZX48_BUILD)/speedrun48.tap $(ZX48_BUILD)/memory_map.txt
+
+$(ZX48_ARCHIVE) &: assets/stages.yaml tools/make_zx48.py tools/zpack.py tools/make_tap.py tools/make_stages.py tools/make_scenery.py tools/round_art.py tools/gen_tables.py tools/make_screens.py tools/make_music.py assets/gfx/car.png
+	$(PYTHON) tools/make_zx48.py gen $(ZX48_BUILD)
+
+$(ZX48_BUILD)/speedrun.bin $(ZX48_BUILD)/resident.bin $(ZX48_BUILD)/speedrun.sym $(ZX48_BUILD)/speedrun.sna &: $(SRC) $(ZX48_SRC) $(ZX48_ARCHIVE) build/tables.asm build/car_data.asm build/font_data.asm
+	$(ASM) --nologo --msg=war --fullpath -Ibuild -I$(ZX48_BUILD) --sym=$(ZX48_BUILD)/speedrun.sym -DZX48=1 -DPROFILE=0 src/main.asm
+
+$(ZX48_BUILD)/speedrun48.tap $(ZX48_BUILD)/memory_map.txt &: $(ZX48_BUILD)/speedrun.bin $(ZX48_BUILD)/resident.bin $(ZX48_BUILD)/speedrun.sym tools/make_zx48.py
+	$(PYTHON) tools/make_zx48.py tap $(ZX48_BUILD)
+
+run-zx48: zx48
+	"$(FUSE)" --machine 48 $(FUSE_OPTS) --tape $(ZX48_BUILD)/speedrun48.tap
+
+release-zx48: $(ZX48_BUILD)/speedrun48.tap
+	mkdir -p release
+	cp $< release/speedrun48.tap
+
+# Set ZX48_ROM to the 16 KiB ROM used for the 48K tape boot test.
+ZX48_ROM ?=
+test-zx48: zx48 $(ZXSIM)
+	$(PYTHON) tests/zx48_check.py $(ZXSIM) $(ZX48_BUILD) $(if $(ZX48_ROM),--rom "$(ZX48_ROM)")
 
 # The release folder: both tape files, how to play, a printable inlay
 # (screenshots from an autopilot run)

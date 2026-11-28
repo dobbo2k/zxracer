@@ -10,6 +10,10 @@
 ; Packs live in banks 0/1/3/4/6, which share the $C000 slot with bank 7, so a
 ; theme is copied through TRACK_CACHE in chunks (the track is loaded after).
 ; ---------------------------------------------------------------------------
+        IFDEF ZX48
+        INCLUDE "zx48/stage.asm"
+        INCLUDE "zx48/front.asm"
+        ELSE
         IFDEF CPC
 TRACK_CACHE_SIZE EQU $4000 - TRACK_CACHE    ; (the CPC's: the top of base 0)
         ELSE
@@ -187,6 +191,7 @@ CopyScreenBA:
         ld bc, 6912
         ldir
         ret
+        ENDIF
 
 ; The car reached the end of the stage: the goal on the last row, else the
 ; next stage (OvCheckpoint) with the last game frame on show meanwhile.
@@ -196,11 +201,15 @@ Checkpoint:
         ld a, (StageRow)
         cp NUM_ROWS
         jr nc, .goal
+        IFDEF ZX48
+        jp OvCheckpoint
+        ELSE
         ld a, 1                 ; the interrupt's sound off till the new stage
         ld (Mute), a            ; (StageOvE turns it on again, after the load)
         ld hl, OvCheckpoint
         ld e, 0
         jp StageOvE
+        ENDIF
 .goal:  ld a, (GameState)
         cp ST_PLAYING
         jp nz, Restart          ; attract mode: round again

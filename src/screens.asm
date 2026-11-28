@@ -10,7 +10,9 @@ ATTRACT_LOOPS   EQU 360             ; game frames of demo between title screens
 ; From the demo (and at power-on): the title screens; then a game if a key
 ; was pressed, else the demo carries on where it was.
 GoTitle:
+        IFNDEF ZX48
         call LoadFrontEnd
+        ENDIF
         call TitleScreen
         or a
         jp nz, StartGame
@@ -29,7 +31,9 @@ Attract:
 EndGame:
         ld a, ST_ATTRACT
         ld (GameState), a
+        IFNDEF ZX48
         call LoadFrontEnd
+        ENDIF
         call GameOverScreens
         or a
         jp nz, StartGame

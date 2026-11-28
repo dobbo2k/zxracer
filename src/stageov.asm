@@ -15,6 +15,7 @@ OvReloadStage:
         call LoadPacks
         jp OvResetDisplay
 
+        IFNDEF ZX48
 ; The front-end overlay into bank 7 (over the theme cache)
 OvLoadFrontEnd:
         ld hl, FrontEndPack
@@ -29,6 +30,7 @@ OvLoadFrontEnd:
         ld b, (hl)
         ld hl, THEME_CACHE
         jp CopyToCache
+        ENDIF
 
 ; A new game: the clock, the score and the starting lights afresh, from the
 ; first stage
@@ -156,16 +158,20 @@ OvCheckpoint:
         call DiffEntry
         inc hl
         ld c, (hl)              ; this level's bonus
+        IFNDEF ZX48
         ld a, 1                 ; a beep as the new stage shows (or the flourish)
         ld (JingleHold), a
         ld hl, JingleGo
         ld (JinglePtr), hl
+        ENDIF
         ld hl, TxtTimeBonus
         ld a, (OvFast)
         or a
         jr z, .b
+        IFNDEF ZX48
         ld hl, JingleExt        ; with a flourish
         ld (JinglePtr), hl
+        ENDIF
         ld a, c
         add a, EXTRA_BONUS
         daa
@@ -230,8 +236,10 @@ RestartState:
 .rv:    ld (hl), 0
         inc hl
         djnz .rv
+        IFNDEF ZX48
         ld hl, 0                ; no jingle
         ld (JinglePtr), hl
+        ENDIF
         ld hl, START_POS
         ld (Pos), hl
         ld hl, 0
@@ -245,7 +253,9 @@ RestartState:
         ld (Sliding), a
         ld (CrashTimer), a
         ld (Spin), a
+        IFNDEF ZX48
         ld (CrashOn), a         ; (no crash sound left over)
+        ENDIF
         ld a, 1 << IN_FIRE      ; (a fire press that started the game is no gear change)
         ld (FireWas), a
         pop af
@@ -318,6 +328,7 @@ LoadStage:
 
 ; A = stage index: copy its theme and track packs into the caches (and
 ; nothing else: the demo carries on after the front end with this).
+        IFNDEF ZX48
 LoadPacks:
         push af
         call WaitFlip           ; (no flip may happen while banks are paged)
@@ -474,8 +485,10 @@ CpcStageInks    EQU CpcCloudData + 640
         ELSE
         ASSERT ART_BITMAP + 512 + 640 <= $5B00
         ENDIF
+        ENDIF
 
 StageHeaders:
+        IFNDEF ZX48
         ld hl, (THEME_CACHE)
         ld (StTypeDir), hl
         ld hl, (THEME_CACHE + 2)
@@ -484,6 +497,7 @@ StageHeaders:
         ld (StName), hl
         ld hl, (THEME_CACHE + 15)
         ld (StTune), hl
+        ENDIF
         ld hl, THEME_CACHE + 6
         ld de, Palette
         ld bc, 9
@@ -541,7 +555,9 @@ ST3_USED        EQU $68             ; St3: row ranges, the fork rows' state ($40
 ; B copied over screen A (CopyScreenBA, resident) - over this overlay too,
 ; so that is the last thing done.
 OvResetDisplay:
+        IFNDEF ZX48
         call WaitFlip
+        ENDIF
         IFNDEF NATIVE_GFX
         ; ---- a Kempston joystick? One reads 0 in bits 5-7 at all times. With
         ; none, port $1F floats: on a 128K or +2 the screen bytes the ULA is
@@ -564,8 +580,8 @@ OvResetDisplay:
         ld (ReadInput.kemp), hl
         ENDIF
         ; screen B: bitmap clear; sky rows get the sky attribute, road rows grass
-        ld hl, $C000
-        ld de, $C001
+        ld hl, RACE_PIXELS
+        ld de, RACE_PIXELS + 1
         ld (hl), 0
         ld bc, 6143
         ldir
@@ -601,10 +617,17 @@ OvResetDisplay:
         ; Fixed sky artwork sits below the message and between the portraits.
         ; Copy just once, before CopyScreenBA duplicates the complete display.
         IFNDEF EINSTEIN
+        IFDEF ZX48
+        ld hl, (RoundClouds)
+        ld de, $5000
+        call Unpack
+        ld hl, $5000
+        ELSE
         IFDEF CPC
         ld hl, CpcCloudData
         ELSE
         ld hl, ART_BITMAP + 512
+        ENDIF
         ENDIF
         ld b, 48
 .cloud: push bc
@@ -616,7 +639,7 @@ OvResetDisplay:
         ld e, a
         inc h
         ld a, (hl)
-        or $80
+        or RACE_HIOR
         ld d, a
         pop hl
         ld bc, 20
@@ -626,15 +649,24 @@ OvResetDisplay:
         ld a, b
         cp 80
         jr nz, .cloud
+        IFDEF ZX48
+        ld hl, $5000
+        ld de, $5001
+        ld (hl), 0
+        ld bc, 639
+        ldir
         ENDIF
-        ld hl, $D800 + 3 * 32
+        ENDIF
+        ld hl, RACE_ATTRS + 3 * 32
         call PaintRaceSky
         ; road state pages (per buffer: St1 D/E = 0, St2 lane = $FF,
         ; St3 row ranges = 0 / row band = $FF)
         ld hl, StateA1
         call .state
+        IFNDEF ZX48
         ld hl, StateB1
         call .state
+        ENDIF
         ; caches
         ld hl, HudCacheA
         ld de, HudCacheA + 1
@@ -664,7 +696,11 @@ OvResetDisplay:
         IFDEF CPC
         jp CpcResetDisplay      ; screen B into both screens (src/cpc)
         ELSE
+        IFDEF ZX48
+        jp ResetRaceClock
+        ELSE
         jp CopyScreenBA
+        ENDIF
         ENDIF
         ENDIF
 .state: ld bc, StAD_end - StAD   ; (just the tables: the rest of each page
@@ -699,10 +735,10 @@ OvResetDisplay:
 
 ; Screen B's HUD labels and the timer's red cells
 InitHud:
-        ld a, $80
+        ld a, RACE_HIOR
         ld (HudOr), a
         ld hl, DashHeader
-        ld de, $C000
+        ld de, RACE_PIXELS
         ld a, 8
 .strip: ld bc, 32
         ldir
@@ -714,12 +750,12 @@ InitHud:
         cp $4F                  ; Riviera blue fascia, cyan lettering
         jr nz, .label
         ld a, $4D
-.label: ld hl, $D800
+.label: ld hl, RACE_ATTRS
         ld b, 32
 .top:   ld (hl), a
         inc hl
         djnz .top
-        ld hl, $D800 + 14
+        ld hl, RACE_ATTRS + 14
         ld a, (PalTime)
         and 7
         rlca
@@ -730,7 +766,7 @@ InitHud:
 .badge: ld (hl), a
         inc hl
         djnz .badge
-        ld hl, $D800 + 32 + 14  ; red attribute cells for the big timer (rows 1-2, columns 14-17)
+        ld hl, RACE_ATTRS + 32 + 14
         ld a, (PalTime)
         ld c, a
         ld b, 2
@@ -758,6 +794,7 @@ TxtStage:       db "STAGE ", 0
 
 ; A = bank, DE = source, BC = length, HL = destination in bank 7 (the
 ; theme cache): copy through TRACK_CACHE in chunks (which it overwrites).
+        IFNDEF ZX48
 CopyToCache:
         IFDEF EINSTEIN
         ex de, hl               ; (no banks: DE's records of STAGES.DAT, BC of them)
@@ -796,6 +833,7 @@ CopyToCache:
         ldir                    ; bounce -> theme cache (bank 7 is paged again)
         ld (LdDst), de
         jr .chunk
+        ENDIF
 
 ; The traffic at a stage start (its moves: src/traffic.asm, bank 2)
 InitTraffic:
@@ -859,7 +897,9 @@ TrafficRows:
         db 4, 4, 6, 6, 7
         db 5, 4, 6, 8, 10
 
+        IFNDEF ZX48
         INCLUDE "stages.asm"    ; the stage table
         ASSERT $ <= ART_INPUT
+        ENDIF
         ASSERT NUM_ROWS == 5    ; (StageTimes, src/vars.asm)
         ASSERT NUM_STAGES == 15 ; (StageBest, src/holes.asm)

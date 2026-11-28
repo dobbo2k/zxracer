@@ -66,7 +66,7 @@ if goal:                                   # stage times: rows 1-4 recorded at t
         ok = False
 if goal:                                   # the route goes through stage 8's tunnel
     s = syms(video.replace(".sna", ".sym"))
-    r = subprocess.run([zxsim, video, "-n", str(goal[0]), "-q", "-w", f"{s['Ceiling.clear']}:1"] + keys,
+    r = subprocess.run([zxsim, video, "-n", str(goal[0]), "-q", "-w", f"{s['PanoramaClear']}:1"] + keys,
                        capture_output=True, text=True, check=True)
     w = [l for l in r.stdout.splitlines() if l.startswith("watch")]
     if w:

@@ -30,6 +30,14 @@ Isr     EQU EinIsr              ; (src/einstein/boot.asm: the VDP's frames, poll
 Isr     EQU CpcIsr              ; (src/cpc/boot.asm: six a frame, one at VSYNC)
         ELSE
 Isr:
+        IFDEF ZX48
+        push af
+        push hl
+        ld hl, FrameCount
+        inc (hl)
+        pop hl
+        pop af
+        ELSE
         push af
         push hl
         push bc
@@ -58,6 +66,7 @@ Isr:
         pop bc
         pop hl
         pop af
+        ENDIF
         ei
         reti
         ENDIF

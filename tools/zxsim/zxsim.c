@@ -21,6 +21,9 @@
  *   -a              print the AY registers at exit
  *   -v FILE         write every frame as raw RGB24 (320x288) to FILE (video capture;
  *                   "-" for stdout)
+ *   --screens ADDR:FILE  record frame number (LE32), then 256x192 palette
+ *                        indices sampled at ADDR (without raster scanning)
+ *   --capture-from F    begin -v and --screens at refresh F
  *   -y FILE         write the 14 AY registers at the end of every frame to FILE
  *                   (register 13's bit 7 set: it was written that frame)
  *   -q              quiet summary
@@ -33,7 +36,11 @@
  *                   following blocks into the EAR input (port $FE bit 6) with
  *                   the ROM's timings (no ROM image is needed)
  *   -x PERCENT      play the tape at PERCENT of its speed (default 100)
- *   -48             no $7FFD paging (as a 48K Spectrum)
+ *   -48             48K frame timing and fixed memory map
+ *   --rom FILE      install a 16 KiB ROM image
+ *   --rom-tape F     boot the ROM and play the complete tape from frame F;
+ *                   use -k to enter LOAD "" from the BASIC prompt
+ *   --eject F        disconnect the tape from the EAR input at frame F
  *   -F              no Kempston interface: port $1F reads the floating bus, as
  *                   on a real 128K or +2 (the byte the ULA is fetching from the
  *                   shown screen during the picture, else $FF)
@@ -48,10 +55,8 @@
 #endif
 #include <ctype.h>
 
-#define FRAME_T   70908
-#define LINE_T    228
-#define CONT_T0   14361
-#define LINE0_T   14364        /* T at which display line 0 starts */
+static long frame_t = 70908, line_t = 228;
+static long cont_t0 = 14361, line0_t = 14364;
 
 /* ------------------------------------------------------------------ memory */
 static uint8_t rom[16384];
@@ -71,9 +76,9 @@ static void update_paging(void) {
 static inline void contend(uint16_t a) {
     static const int pat[8] = {6, 5, 4, 3, 2, 1, 0, 0};
     if (!contended[a >> 14]) return;
-    long t = T - CONT_T0;
-    if (t < 0 || t >= 192L * LINE_T) return;
-    int lt = (int)(t % LINE_T);
+    long t = T - cont_t0;
+    if (t < 0 || t >= 192L * line_t) return;
+    int lt = (int)(t % line_t);
     if (lt >= 128) return;
     T += pat[lt & 7];
 }
@@ -83,9 +88,9 @@ static inline void contend(uint16_t a) {
    $FF elsewhere. (Approximate timing: enough to show what a read of an
    unattached port can return.) */
 static uint8_t floating_bus(void) {
-    long t = T - LINE0_T;
-    if (t < 0 || t >= 192L * LINE_T) return 0xff;
-    int y = (int)(t / LINE_T), lt = (int)(t % LINE_T);
+    long t = T - line0_t;
+    if (t < 0 || t >= 192L * line_t) return 0xff;
+    int y = (int)(t / line_t), lt = (int)(t % line_t);
     if (lt >= 128 || (lt & 7) >= 4) return 0xff;
     int col = (lt >> 3) * 2 + ((lt & 7) >> 1);
     const uint8_t *scr = ram[(p7ffd & 8) ? 7 : 5];
@@ -179,10 +184,10 @@ static void port_out(uint16_t port, uint8_t v) {
 static uint8_t img[IMG_H][IMG_W];  /* palette index 0..15 */
 static int next_row;
 
-static void render_row(int y) {
+static void render_row(uint8_t *row, int y) {
     int line = y - 48;
     uint8_t b = border;
-    for (int x = 0; x < IMG_W; x++) img[y][x] = b;
+    memset(row, b, IMG_W);
     if (line < 0 || line >= 192) return;
     const uint8_t *scr = ram[(p7ffd & 8) ? 7 : 5];
     int addr = ((line & 0xc0) << 5) | ((line & 7) << 8) | ((line & 0x38) << 2);
@@ -195,13 +200,26 @@ static void render_row(int y) {
             uint8_t t = ink; ink = pap; pap = t;
         }
         for (int i = 0; i < 8; i++)
-            img[y][32 + c * 8 + i] = (px & (0x80 >> i)) ? ink : pap;
+            row[32 + c * 8 + i] = (px & (0x80 >> i)) ? ink : pap;
     }
 }
 
 static void render_upto(long t) {
-    while (next_row < IMG_H && LINE0_T + (long)(next_row - 48) * LINE_T <= t)
-        render_row(next_row++);
+    while (next_row < IMG_H && line0_t + (long)(next_row - 48) * line_t <= t) {
+        render_row(img[next_row], next_row);
+        next_row++;
+    }
+}
+
+/* A completed game frame, sampled all at once. Separate from the
+   scanline capture so tests can recognise partially updated rows. */
+static void write_screen(FILE *f) {
+    uint8_t row[IMG_W];
+    for (int i = 0; i < 4; i++) fputc((uint32_t)frame >> (i * 8) & 255, f);
+    for (int y = 48; y < 240; y++) {
+        render_row(row, y);
+        fwrite(row + 32, 1, 256, f);
+    }
 }
 
 static const uint8_t pal[16][3] = {
@@ -627,7 +645,7 @@ static long npulses, pulse_i;
 static long long pulse_end;    /* absolute T when pulse pulse_i ends */
 static int ear;
 
-static long long now_t(void) { return (long long)frame * FRAME_T + T; }
+static long long now_t(void) { return (long long)frame * frame_t + T; }
 
 /* tape blocks (from a .tap, or a .tzx's standard / turbo data blocks) */
 struct tblock {
@@ -732,7 +750,7 @@ static int tape_ear(void) {
 }
 
 /* do what 10 ...: LOAD "" CODE: RANDOMIZE USR n would: the loader block */
-static int tape_boot(const char *fn) {
+static int tape_boot(const char *fn, long rom_tape_frame) {
     FILE *f = fopen(fn, "rb");
     if (!f) { perror(fn); return -1; }
     fseek(f, 0, SEEK_END); tape_len = ftell(f); fseek(f, 0, SEEK_SET);
@@ -740,6 +758,13 @@ static int tape_boot(const char *fn) {
     if (fread(tape, 1, tape_len, f) != (size_t)tape_len) { fclose(f); return -1; }
     fclose(f);
     if (tape_parse()) return -1;
+    if (rom_tape_frame >= 0) {
+        p7ffd = 0x10;
+        update_paging();
+        tape_signal();
+        pulse_end += (long long)rom_tape_frame * frame_t;
+        return 0;
+    }
     long len;
     struct tblock *t;
     while ((t = tape_next(&len))) {
@@ -813,9 +838,14 @@ int main(int argc, char **argv) {
     int nshots = 0, nkeys = 0, njoys = 0, quiet = 0, show_ay = 0;
     FILE *vid = NULL, *aylog = NULL;
     const char *use_file = NULL, *ram_file = NULL;
-    long stop_at = -1, stop_n = 0;
+    long stop_at = -1, stop_n = 0, screen_at = -1;
+    long capture_from = 0;
+    FILE *screens = NULL;
     long dump_addr = -1, dump_len = 0, watch = -1, watch_n = 20, prof_from = -1, rand_seed = -1;
     const char *prof_file = NULL;
+    const char *rom_file = NULL;
+    long rom_tape_frame = -1;
+    long eject_frame = -1;
     static unsigned long long prof[65536];
     for (int i = 1; i < argc; i++) {
         char *a = argv[i];
@@ -852,6 +882,15 @@ int main(int argc, char **argv) {
             stop_n = 1;
             if (*v == ':') stop_n = strtol(v + 1, NULL, 0);
         }
+        else if (!strcmp(a, "--screens") && i + 1 < argc) {
+            char *v = argv[++i];
+            screen_at = strtol(v, &v, 0);
+            if (*v != ':' || !(screens = fopen(v + 1, "wb"))) {
+                fprintf(stderr, "zxsim: expected --screens ADDRESS:FILE\n");
+                return 2;
+            }
+        }
+        else if (!strcmp(a, "--capture-from") && i + 1 < argc) capture_from = atol(argv[++i]);
         else if (!strcmp(a, "-D") && i + 1 < argc) ram_file = argv[++i];
         else if (!strcmp(a, "-u") && i + 1 < argc) {
             char *v = argv[++i];
@@ -871,6 +910,9 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(a, "-T") && i + 1 < argc) sna = argv[++i], tape = (uint8_t *)1;
         else if (!strcmp(a, "-R") && i + 1 < argc) rand_seed = atol(argv[++i]);
+        else if (!strcmp(a, "--rom") && i + 1 < argc) rom_file = argv[++i];
+        else if (!strcmp(a, "--rom-tape") && i + 1 < argc) rom_tape_frame = atol(argv[++i]);
+        else if (!strcmp(a, "--eject") && i + 1 < argc) eject_frame = atol(argv[++i]);
         else if (!strcmp(a, "-x") && i + 1 < argc) tape_speed = atol(argv[++i]);
         else if (!strcmp(a, "-48")) no_paging = 1;
         else if (!strcmp(a, "-F")) no_kempston = 1;
@@ -879,21 +921,39 @@ int main(int argc, char **argv) {
     }
     if (!sna) { fprintf(stderr, "usage: zxsim game.sna [-n frames] [-s F:shot.ppm] [-k F:KEYS] [-j F:BITS] [-b F] [-q]\n"); return 2; }
     init_tables();
+    if (no_paging) {
+        frame_t = 69888;
+        line_t = 224;
+        cont_t0 = 14335;
+        line0_t = 14336;
+    }
     memset(rom, 0xff, sizeof rom);
     if (rand_seed >= 0) {
         srand((unsigned)rand_seed);
         for (int i = 0; i < 16384; i++) rom[i] = (uint8_t)rand();
         for (int b = 0; b < 8; b++) for (int i = 0; i < 16384; i++) ram[b][i] = (uint8_t)rand();
     }
-    if (tape) { if (tape_boot(sna)) return 1; }
+    if (rom_file) {
+        FILE *rf = fopen(rom_file, "rb");
+        if (!rf) { perror(rom_file); return 1; }
+        size_t n = fread(rom, 1, sizeof rom, rf);
+        fclose(rf);
+        if (n != sizeof rom) { fprintf(stderr, "zxsim: short ROM file\n"); return 1; }
+    }
+    if (rom_tape_frame >= 0 && (!rom_file || !tape)) {
+        fprintf(stderr, "zxsim: --rom-tape requires --rom and -T\n");
+        return 2;
+    }
+    if (tape) { if (tape_boot(sna, rom_tape_frame)) return 1; }
     else if (load_sna(sna)) return 1;
 
     long rom_warn = 0;
     for (frame = 0; frame < nframes; frame++) {
+        if (frame == eject_frame) tape = NULL;
         for (int i = 0; i < nkeys; i++) if (keys[i].frame == frame) set_keys(keys[i].arg);
         for (int i = 0; i < njoys; i++) if (joys[i].frame == frame) kempston = (uint8_t)atoi(joys[i].arg);
         next_row = 0;
-        while (T < FRAME_T) {
+        while (T < frame_t) {
             if (T < 32 && iff1 && !ei_delay) interrupt();
             ei_delay = 0;
             if (pc == watch && watch_n > 0 && !halted) {
@@ -902,19 +962,20 @@ int main(int argc, char **argv) {
                        frame, T, pc, af.w, bc.w, de.w, hl.w, ix.w, iy.w, sp);
             }
             if (pc == stop_at && !halted && --stop_n <= 0) goto stopped;
+            if (screens && frame >= capture_from && pc == screen_at && !halted) write_screen(screens);
             uint16_t pc0 = pc; long t0 = T;
             exec();
             if (prof_file && frame >= prof_from) prof[pc0] += (unsigned long long)(T - t0);
-            if (pc < 0x4000 && !rom_warn) {
+            if (pc < 0x4000 && !rom_warn && !rom_file) {
                 rom_warn = 1;
                 fprintf(stderr, "zxsim: warning: execution entered ROM at %04X (frame %ld)\n", pc, frame);
             }
             render_upto(T);
         }
-        render_upto(FRAME_T + LINE_T * 400);
-        T -= FRAME_T;
+        render_upto(frame_t + line_t * 400);
+        T -= frame_t;
         for (int i = 0; i < nshots; i++) if (shots[i].frame == frame) save_ppm(shots[i].arg);
-        if (vid) write_rgb(vid);
+        if (vid && frame >= capture_from) write_rgb(vid);
         if (aylog) {            /* register 13 bit 7: the envelope restarted */
             uint8_t r[14];
             memcpy(r, ay_reg, 14);
@@ -939,6 +1000,7 @@ stopped:
         }
     }
     if (vid) fclose(vid);
+    if (screens) fclose(screens);
     if (aylog) fclose(aylog);
     if (show_ay) {
         printf("ay");

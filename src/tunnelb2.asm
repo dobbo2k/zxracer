@@ -14,11 +14,15 @@ Ceiling:
         ldi
         jr z, .sky
         IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only; screen A's memory
+        IFNDEF ZX48             ; 48K clears after removing the old sky sprites
         ld hl, $4840            ; holds its buffers) going in: the backdrop's pixels
-        call .clear             ; cleared (both screens; drawn again on the way out)
+        call PanoramaClear      ; cleared (both screens; drawn again on the way out)
         ENDIF
+        ENDIF
+        IFNDEF ZX48
         ld hl, $C840
-        call .clear
+        call PanoramaClear
+        ENDIF
         ld a, $FF
         ld (PanoLastA), a
         ld (PanoLastB), a
@@ -27,13 +31,14 @@ Ceiling:
         ld hl, $D800 + 3 * 32   ; the sky and backdrop rows (the frame is put
         jp PaintRaceSky         ; together from them after this)
         ELSE
-        ld a, 2                 ; both buffers' sky and backdrop rows, each as
+        ld a, 1 + (RACE_HIOR / $80) ; both buffers' sky and backdrop rows, each as
         ld (GateWas), a         ; it is drawn next (Gate.gone): not at once -
         ret                     ; the last frame, still to be shown, kept the
                                 ; tunnel's mouth on its road rows under them
         ENDIF
 ; HL = the backdrop's first byte (character rows 10-11): its 8 pixel lines
-.clear: ld b, 8
+PanoramaClear:
+        ld b, 8
 .cl:    push bc
         push hl
         ld d, h
@@ -106,9 +111,13 @@ Gate:
         ld (PtTopB), a
         jp Ceiling.sky
         ELSE
+        IFDEF ZX48
+        xor a                   ; only one set of sky rows needs repainting
+        ELSE
         dec a                   ; this buffer's now (its frame is drawn without
         jr z, .last             ; it), the other's next frame
         ld a, 1
+        ENDIF
 .last:  ld (hl), a
         ld hl, PtTopA           ; (its whole sky: nothing of a portal left on it)
         ld a, (AttrHi)
@@ -166,6 +175,7 @@ Chequer:
         cp (hl)
         ret nc                  ; (a post row)
         call RowAttrHL
+.place:
         ld de, PtN
         ld a, (de)              ; from the first post's column ...
         add a, l

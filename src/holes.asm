@@ -9,10 +9,28 @@
 ; ---------------------------------------------------------------------------
         ORG ScrLo + $C4         ; (ScrLo + $C0..$C3 kept clear)
         ASSERT ScrLo_end <= ScrLo + $C4
+        IFDEF ZX48
+ClassifyRacePortalRow:
+        ld a, (CurRow)
+        ld hl, RacePortalFirst
+        cp (hl)
+        jr c, .plain
+        ld hl, PtRow
+        cp (hl)
+        sbc a, a
+        and 1
+        jr .set
+.plain: xor a
+.set:   ld (RacePortalRow), a
+        ret
+        ASSERT $ <= ScrLo + $E0 ; the fork's list follows
+        ENDIF
 ; Arpeggios (semitones of the 2nd and 3rd notes): 1 major, 2 minor,
 ; 3 seventh, 4 minor seventh, 5 major seventh, 6 sus4, 7 power (5th, octave),
 ; 8 octave
+        IFNDEF ZX48
 ArpTab:         db 4, 7,  3, 7,  4, 10,  3, 10,  4, 11,  5, 7,  7, 12,  12, 12
+        ENDIF
         IFDEF ZX_OBJINK
 OBJ_PART        DEFL 4
         INCLUDE "objinkb2.asm"  ; (objects' inks: OCount)
@@ -24,9 +42,17 @@ TYRE_PART       DEFL 3
         ASSERT $ <= ScrLo + 256
         ORG ScrHi + $C4
         ASSERT ScrHi_end <= ScrHi + $C4
+        IFDEF ZX48
+RaceBitmapBase:   dw 0
+RaceAttrBase:     dw 0
+RacePendingAttrs: db 0
+        ASSERT $ <= ScrHi + $E0 ; the fork's colours follow
+        ENDIF
 ; Envelopes: start volume, the volume it fades to, fade every (mask+1)
 ; 0 pluck, 1 sustained lead, 2 soft, 3 bass, 4 heavy bass, 5 echo
+        IFNDEF ZX48
 EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3,  9, 4, 3
+        ENDIF
         IFDEF EINSTEIN
 TYRE_PART       DEFL 4
         INCLUDE "einstein/eintyres.asm" ; (the tyres' patterns sent: EinTyreSend, EinTyreShow)
@@ -46,6 +72,7 @@ PtGate:         db 0                ; drawing a gantry, not a tunnel
         ORG X1Page + $E0
         ASSERT RoadRW_end <= X1Page + $E0
 ; (src/music.asm's flags: moved here for room)
+        IFNDEF ZX48
 MusicOn:        db 0
 SoundMode:      db 0
 SfxBusy:        db 0                ; a hit has channel B (and the noise)
@@ -53,6 +80,7 @@ MixBits:        db 0                ; the mixer setting being built
 DrumPtr:        dw 0                ; the drum sounding: its next step (0: none)
 SqHold:         db 0                ; interrupts until the next chirp may start
 SqTimer:        db 0                ; interrupts left of a chirp
+        ENDIF
         ASSERT $ <= X1Page + 256
         ORG LWPage + $60
         ASSERT LaneWp_end <= LWPage + $60
@@ -61,11 +89,14 @@ TunWall:        db $48, $08         ; walls: bright blue, blue (light / dark ban
 TUN_LAMP        EQU $76             ; lamps on the walls (src/road.asm RowAttrs): bright yellow
 TunKerbs:       db $78, $00         ; kerbs: bright white, black
 TunSky:         db C_, C_           ; the ceiling (white ink: the message line; the backdrop is cleared)
+        IFNDEF ZX48
         INCLUDE "stageov_pack.asm"
+        ENDIF
         ASSERT $ <= LWPage + $80
         ORG LWPage + $E0
         ASSERT Band_end <= LWPage + $E0
 ; (src/extend.asm JingleTick's: moved here for room)
+        IFNDEF ZX48
 JingleHold:     db 0
 ; A new stage begins: a short high beep (C) on its first frame (extended
 ; play: the flourish instead, src/gap4.asm)
@@ -73,9 +104,13 @@ JingleGo:
         dw 106
         db 8
         dw 0
+        ENDIF
         ASSERT $ <= LWPage + 256
         ORG ZPage + $60
         ASSERT ZLo_end <= ZPage + $60
+        IFDEF ZX48
+Difficulty:     db 1
+        ENDIF
         IFDEF EINSTEIN          ; (src/einstein/eintyres.asm: the tyres' tread)
 ETyreAcc:       db 0            ; depth units towards the next row
 ETyrePhase:     db 1            ; 0-2: rows from line 2 to the first tread line
@@ -96,6 +131,7 @@ NibBits:        db 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
         ASSERT $ <= ZPage + $80
         ORG ZPage + $E0
         ASSERT LaneW_end <= ZPage + $E0
+        IFNDEF ZX48
 ; (src/stage.asm StageOv's: moved here for room)
 OvEntry:        dw 0
 OvArg:          db 0
@@ -104,6 +140,7 @@ OvBlank:        db 0
 ; reads it for the starting time, the checkpoint bonus, the par times and
 ; the weaving (src/stageov.asm DiffTable).
 Difficulty:     db 1
+        ENDIF
         ASSERT $ <= ZPage + 256
         ORG DEPage + $60
         ASSERT RoadD_end <= DEPage + $60
@@ -176,6 +213,10 @@ OBJ_PART        DEFL 3
 HOLD_PART       DEFL 2
         INCLUDE "einstein/rowhold.asm"  ; (no road row shown half written)
         ENDIF
+        IFDEF ZX48
+        INCLUDE "zx48/road_strip_copy.asm"
+        ASSERT $ <= ZHiPage + $E0
+        ENDIF
         ASSERT $ <= ZHiPage + 256
         ORG MaskPage + $20
         ASSERT LMaskIncl_end <= MaskPage + $20
@@ -188,6 +229,7 @@ LampGlyph:
 ; the route of the last game (the stage played on each row; $FF: not reached)
 Route:          ds 5, $FF
 ; the music's snare drum (src/music.asm)
+        IFNDEF ZX48
 DrumSnare:      db 14, (6 * AYN + AYD / 2) / AYD
                 dw (250 * AYN + AYD / 2) / AYD
                 db 13, (7 * AYN + AYD / 2) / AYD
@@ -201,9 +243,13 @@ DrumSnare:      db 14, (6 * AYN + AYD / 2) / AYD
                 db 3, (10 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
+        ENDIF
         ASSERT $ <= MaskPage + 256
         ORG StripPage + $39
         ASSERT StripR_end <= StripPage + $39
+        IFDEF ZX48
+        INCLUDE "zx48/title.asm"
+        ELSE
 ; The high-score table (score: 4 BCD bytes, low byte first; initials)
 HI_ENTRIES      EQU 5
 HI_SIZE         EQU 7
@@ -235,12 +281,14 @@ DrumHat:        db 10, (1 * AYN + AYD / 2) / AYD
                 db 6, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
+        ENDIF
         ASSERT $ <= StripPage + 256
 
 ; The state pages (src/stageov.asm OvResetDisplay clears only their tables)
         ORG StateA2 + $60
         ASSERT StALane_end <= StateA2 + $60
 ; No music: the engine on A, gravel and hits on B, the lights' beeps on C
+        IFNDEF ZX48
 EngineSounds:
         ; engine period with a small wobble every interrupt
         ld hl, (EnginePeriod)
@@ -311,12 +359,15 @@ EngineSounds:
 .mx:    jp TunEcho              ; (src/tunnel.asm: C free - a tunnel's echo?)
 .mw:    ld a, 7
         jp AyWrite
+        ENDIF
 ; (a checkpoint message: moved here from bank 5 for room)
 ; The checkpoint's messages (filled in by OvCheckpoint)
 MsgTime:        db " STAGE TIME 0'00", $22, "00 ", 0
         ASSERT $ <= StateA2 + 256
+        IFNDEF ZX48
         ORG StateB2 + $60
         ASSERT StBLane_end <= StateB2 + $60
+        ENDIF
 ; The demo driver, near no fork: the traffic decides (see DemoTarget)
 DemoTraffic:
         ld hl, DEMO_LOOK
@@ -377,14 +428,20 @@ DemoTraffic:
 ; (the last ten seconds: moved here from bank 5 for room)
 ; The last 10 seconds (GameUpdate, each second): the big timer's cells
 ; FLASH in both screens (the next display reset clears it).
+        IFDEF ZX48
+        ASSERT $ <= StateA2 + 256
+        ORG StateA1 + $E0
+        ENDIF
 TimeWarn:
         ld a, (PalTime)
         or $80
         IFNDEF NATIVE_GFX       ; (the Einstein, the CPC: screen B only)
+        IFNDEF ZX48
         ld hl, $5800 + 32 + 14
         call .cells
         ENDIF
-        ld hl, $D800 + 32 + 14
+        ENDIF
+        ld hl, RACE_ATTRS + 32 + 14
 .cells: ld c, 2
 .row:   ld b, 4
 .c:     ld (hl), a
@@ -394,14 +451,23 @@ TimeWarn:
         add hl, de
         dec c
         jr nz, .row
+        IFDEF ZX48
+        jp WarnBeep
+        ELSE
         ret
+        ENDIF
+        IFDEF ZX48
+        ASSERT $ <= StateA1 + 256
+        ELSE
         ASSERT $ <= StateB2 + 256
+        ENDIF
         ORG StateA3 + $8C
         ASSERT RowABand_end <= StateA3 + $8C
 ; A crash (CrashStart): the AY is its own until it fades. B: a noise burst,
 ; a crack deepening to a rumble, held then fading; A: a falling, gritty
 ; thud (or, spinning, the tyre squeal); C: clattering debris. From the
 ; interrupt (AF, BC, DE, HL free).
+        IFNDEF ZX48
 CrashTick:
         ld a, %00101111         ; mixer: noise B on, the rest as we go
         ld (CrMix), a
@@ -446,9 +512,38 @@ CrashTick:
         ld e, 0
         ld a, 10
         jp AyWrite
+        ENDIF
 ; (a checkpoint message: moved here from bank 5 for room)
 MsgBonus:       ds MSG_LEN + 1
+        IFDEF ZX48
+; Same 1000 points per second left as the illustrated 128K goal screen.
+GoalBonus:
+        ld a, (Time)
+        or a
+        ret z
+        sub 1
+        daa
+        ld (Time), a
+        ld hl, Score + 1
+        ld a, (hl)
+        add a, $10
+        daa
+        ld (hl), a
+        inc hl
+        ld a, (hl)
+        adc a, 0
+        daa
+        ld (hl), a
+        inc hl
+        ld a, (hl)
+        adc a, 0
+        daa
+        ld (hl), a
+        jr GoalBonus
+        INCLUDE "zx48/portal_rows.asm"
+        ENDIF
         ASSERT $ <= StateA3 + 256
+        IFNDEF ZX48
         ORG StateB3 + $8C
         ASSERT RowBBand_end <= StateB3 + $8C
 CrashTickA:                     ; A: squeal while spinning, else the thud
@@ -522,6 +617,8 @@ MusicWaitTick:
         ld a, 10                ; (volume C off)
         jp AyWrite
         ASSERT $ <= StateB3 + 256
+        ENDIF
+        IFNDEF ZX48
         ORG StateA1 + $E0
         ASSERT StAE_end <= StateA1 + $E0
 CrashMix:
@@ -567,7 +664,9 @@ MusicKeep:
 ; until the Spectrum is switched off (the route screen sets them)
 StageBest:      ds 15 * 2
         ASSERT $ <= StateB1 + 256
+        ENDIF
         ORG Gap3Free            ; (after the starting lights, src/main.asm)
+        IFNDEF ZX48
 CrashTickC:                     ; C: debris, a clatter of high notes
         ld e, 0
         ld a, (CrashI)
@@ -595,6 +694,7 @@ CrashTickC:                     ; C: debris, a clatter of high notes
 .c:     ld a, 10
         call AyWrite
         jp CrashMix
+        ENDIF
 ; (tunnels: moved here from bank 5 for room)
 ; Tunnels (src/tunnel.asm): each game frame, which road lines are in this
 ; stage's tunnel and whether the car is in it
@@ -648,6 +748,7 @@ UpdateTunnel:
         ld (TunJN), a
         jp Ceiling
 ; The open hi-hat (src/music.asm DrumTab): moved here for room
+        IFNDEF ZX48
 DrumOpen:       db 11, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 9, (1 * AYN + AYD / 2) / AYD
@@ -659,6 +760,7 @@ DrumOpen:       db 11, (1 * AYN + AYD / 2) / AYD
                 db 3, (1 * AYN + AYD / 2) / AYD
                 dw 0
                 db 0
+        ENDIF
         ASSERT $ <= FILL_END - 64
         ORG Gap2Free            ; (after the starting lights, before the XOR chain)
 ; (src/tunnel.asm DrawPortal's: moved here for room) A tunnel's mouth: B, D,

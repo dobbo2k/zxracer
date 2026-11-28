@@ -29,6 +29,9 @@ STRIP_PAD       EQU 12              ; max kerb cells per side per row
 
         IFNDEF NATIVE_GFX       ; (the Spectrum's drawing: not in the Einstein's or the CPC's)
 DrawRoad:
+        IFDEF ZX48
+        call PrepareRaceRoadCover
+        ENDIF
         ; per-frame constants: state pages and screen high-byte OR
         ld a, (StatePage)
         ld (DrawRoadLine.s1a + 1), a
@@ -41,15 +44,27 @@ DrawRoad:
         ld (DrawRoadRow.rs2 + 1), a
         ld (StalePieces.rs + 1), a
         ld (DrawRoadRow.rs3 + 1), a
+        IFNDEF ZX48
         ld a, (BufHiOr)
         ld (DrawRoadRow.bufOr + 1), a
+        ENDIF
         xor a
         ld (CurI), a
         ld a, ROAD_ROW0
         ld (CurRow), a
         ld b, 24 - ROAD_ROW0
 .row:   push bc
+        IFDEF ZX48
+        call ClassifyRacePortalRow
+        call BeginRaceStrip
+        call nc, EraseRaceRow
+        ENDIF
         call DrawRoadRow
+        IFDEF ZX48
+        call DrawRaceCarRow
+        call PaintRaceRow
+        call ShowRaceStrip
+        ENDIF
         ld hl, CurRow
         inc (hl)
         pop bc
@@ -529,6 +544,10 @@ DrawRoadRow:
         ld a, (hl)
         or a
         jp nz, DrawForkRow
+        IFDEF ZX48
+        ld a, (RacePortalRow)
+        ld (RacePendingAttrs), a ; stage colours if the portal covers the row
+        ENDIF
         ; ---- edges of the row's top (0) and bottom (1) lines
         ld a, (CurI)
         ld l, a
@@ -674,6 +693,12 @@ DrawRoadRow:
         ld h, high Band
         ld a, (hl)
         ld (RowBand), a
+        IFDEF ZX48
+        ; A clean buffered bitmap already has no stale kerbs or sprites.
+        ld a, (RaceBitmapBase + 1)
+        cp high RaceBitmapShadow
+        jr z, .rowStore
+        ENDIF
 
         ; ---- drawn by DrawForkRow last time on this buffer? clear its kerb
         ;      cells and redraw everything
@@ -687,7 +712,11 @@ DrawRoadRow:
         ld (hl), 0
         call ClearKerbCells
         ld a, 1
+        IFDEF ZX48
+        ld (RacePendingAttrs), a ; the ordinary kerbs replace a fork row
+        ELSE
         ld (RowStaleCar), a     ; (anywhere, perhaps under the car)
+        ENDIF
         jr .rowStore
 .notFork:
         ; ---- compare with what this buffer shows for the row
@@ -710,7 +739,9 @@ DrawRoadRow:
         jr .rangesSame
 .rangesChanged:
         call StalePieces        ; old kerb cells no longer in the ranges
+        IFNDEF ZX48
         call StaleHitsCar
+        ENDIF
         call ZeroStaleRow       ; clear them on all 8 lines of the row
 .rowStore:
         ld a, 1
@@ -727,6 +758,11 @@ DrawRoadRow:
         ex de, hl               ; H = row state page
         jr .attrs
 .rangesSame:
+        IFDEF ZX48
+        ld a, (RacePortalRow)
+        or a
+        jr nz, .attrs
+        ENDIF
         ld a, (CurRow)
         sub ROAD_ROW0
         or $80
@@ -741,12 +777,14 @@ DrawRoadRow:
         ld a, (RowBand)
         ld (hl), a
         call RowAttrs
+        IFNDEF ZX48
         ld a, (CurRow)
         cp CAR_ROW
         jr c, .lines
         call z, SaveCockpit
         ld a, 1
         ld (CarAttrDirty), a
+        ENDIF
 
 .lines: ; ---- per-row constants for the line renderer
         ld a, (RowForced)
@@ -790,6 +828,10 @@ DrawRoadRow:
         ld a, $FF               ; road too narrow for a centre line
         ld (DrawRoadLine.lb + 1), a
 .laneOk:
+        IFDEF ZX48
+        ld a, DrawRoadLine.writeGeneric - DrawRoadLine.clipGeneric - 2
+        ld (DrawRoadLine.clipGeneric + 1), a
+        ENDIF
         ; ---- rows under the player's car: no centre line (hidden anyway), and
         ;      tell the car when the road may have written into its block
         ld a, (CurRow)
@@ -797,6 +839,11 @@ DrawRoadRow:
         jr c, .notCar
         ld a, $FF
         ld (DrawRoadLine.lb + 1), a
+        IFDEF ZX48
+        xor a
+        ld (DrawRoadLine.clipGeneric + 1), a
+        call ClipCarKerbs
+        ELSE
         ld a, (RowForced)       ; stale kerb cells cleared under the car?
         or a
         jr z, .k1
@@ -818,8 +865,12 @@ DrawRoadRow:
 .carDirty:
         ld a, 1
         ld (CarDirty), a
+        ENDIF
 .notCar:
         ; ---- bitmap address of the row's first pixel line -> IX
+        IFDEF ZX48
+        ld ix, (RaceBitmapBase)
+        ELSE
         ld a, (CurRow)
         ld b, a
         and 7
@@ -832,6 +883,7 @@ DrawRoadRow:
         or $40
 .bufOr: or 0
         ld ixh, a
+        ENDIF
         ; ---- lines in pairs: every write goes to both lines of a pair
         ld a, (CurI)
         ld c, a
@@ -846,6 +898,11 @@ DrawRoadRow:
         djnz .line
         ld a, c
         ld (CurI), a
+        IFDEF ZX48
+        ld a, (RacePendingAttrs)
+        or a
+        jp nz, PublishRaceAttrs
+        ENDIF
         ret
 
 
@@ -869,6 +926,9 @@ DualEntry:
 
 ; Write the row's attributes: [0,a) grass, [a,b) kerb, [b,c) road, [c,d) kerb, [d,32) grass
 RowAttrs:
+        IFDEF ZX48
+        ld hl, (RaceAttrBase)
+        ELSE
         ld a, (CurRow)
         ld l, a
         ld h, 0
@@ -880,6 +940,20 @@ RowAttrs:
         ld a, (AttrHi)
         add a, h
         ld h, a
+        ENDIF
+        IFDEF ZX48
+        ld a, (CurRow)
+        cp CAR_ROW
+        jr nc, .stageAttrs      ; the car keeps its own attributes
+        ld a, (RacePendingAttrs)
+        or a
+        jr z, .attrTarget
+.stageAttrs:
+        ld hl, ForkCls
+        ld a, 1
+        ld (RacePendingAttrs), a
+.attrTarget:
+        ENDIF
         push hl
         ld a, (RowBand)
         ld bc, (PalGrassL)      ; C = light grass, B = dark grass
@@ -964,6 +1038,9 @@ StalePieces:
         ld d, (hl)              ; old c
         inc l
         ld e, (hl)              ; old d
+        IFDEF ZX48
+        call FlagRaceKerbAdvance
+        ENDIF
         ; piece 1: [old a, min(old b, a))
         ld a, (RowA)
         cp c
@@ -1013,6 +1090,7 @@ StalePieces:
         ret
 
 ; RowStaleCar = 1 if a stale piece (car rows only) overlaps the car's columns
+        IFNDEF ZX48
 StaleHitsCar:
         xor a
         ld (RowStaleCar), a
@@ -1040,12 +1118,22 @@ StaleHitsCar:
         ld a, 1
         ld (RowStaleCar), a
         ret
+        ENDIF
 
 ; Clear the stale kerb cells (pieces patched by StalePieces) on all 8 lines
 ; of the current row, a column strip at a time.
 ZeroStaleRow:
         ld a, (CurRow)
         ld b, a
+        IFDEF ZX48
+        cp CAR_ROW
+        ld a, .write - .clip - 2
+        jr c, .clipSet
+        xor a
+.clipSet:
+        ld (.clip + 1), a
+        ld de, (RaceBitmapBase)
+        ELSE
         and 7
         rrca
         rrca
@@ -1057,6 +1145,7 @@ ZeroStaleRow:
         ld hl, BufHiOr
         or (hl)
         ld d, a                 ; row's first line high byte
+        ENDIF
 .p1:    ld bc, 0                ; C = start, B = count (patched)
         call .zero
 .p2:    ld bc, 0
@@ -1071,12 +1160,25 @@ ZeroStaleRow:
         add a, c
         ld l, a
         xor a
-.col:   ld h, d                 ; a column of 8 lines, unrolled
+.col:
+        IFDEF ZX48
+.clip:  jr .write
+        ld a, l
+        and 31
+        sub CAR_COL
+        cp CAR_W
+        jr c, .skip
+.write:
+        call CoverStaleRaceKerb
+        xor a
+        ENDIF
+        ld h, d                 ; a column of 8 lines, unrolled
         DUP 7
         ld (hl), a
         inc h
         EDUP
         ld (hl), a
+.skip:
         inc l
         djnz .col
         ret
@@ -1252,10 +1354,28 @@ DrawRoadLine:
 .g2:    ex af, af'
         jr .gw
 .g0:    xor a
-.gw:    ld (hl), a
+.gw:
+        IFDEF ZX48
+.clipGeneric:
+        jr .writeGeneric
+        ex af, af'
+        ld a, c
+        sub CAR_COL
+        cp CAR_W
+        jr c, .skipGeneric
+        ex af, af'
+.writeGeneric:
+        ENDIF
+        ld (hl), a
         inc h
         ld (hl), a
         dec h
+        IFDEF ZX48
+        jr .advanceGeneric
+.skipGeneric:
+        ex af, af'
+.advanceGeneric:
+        ENDIF
         inc l
         inc c
         djnz .gl
@@ -1354,4 +1474,7 @@ DrawRoadLine:
         dec h
         ld (hl), a
         ret
+        IFDEF ZX48
+        INCLUDE "zx48/road_clip.asm"
+        ENDIF
         ENDIF

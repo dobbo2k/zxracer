@@ -24,6 +24,10 @@ EXIT_SEE        EQU 1536            ; the way out shows from this near (src/hole
 C_              EQU $07             ; the ceiling: black, white ink
 
 DrawPortal:
+        IFDEF ZX48
+        ld a, CAR_ROW
+        ld (RacePortalFirst), a
+        ENDIF
         xor a
         ld (PtGate), a
         ld a, (TunJN)
@@ -201,9 +205,19 @@ DrawPortal:
         ld (hl), a
         xor a
         ld (PatRoad + 2), a
-.clean: call PortalClean        ; (the sky rows a portal left above this
+.clean:
+        IFDEF ZX48
+        ld a, (PtR)
+        ld (RacePortalFirst), a
+        call ClearRacePortalTail
+        ENDIF
+        call PortalClean        ; (the sky rows a portal left above this
         ld a, (PtR)             ; frame's first: src/tunnelaside.asm)
 .row:   ld (PtR), a
+        IFDEF ZX48
+        cp ROAD_ROW0            ; road rows apply the portal as they are drawn
+        ret nc
+        ENDIF
         ld hl, PtRow
         cp (hl)
         ret nc
@@ -299,6 +313,7 @@ PortalRow:
 ; booms - C plays it again a little off its pitch and quieter, beating
 ; against it like an echo off the walls. (With music on, A, B and C are all
 ; the music's.)
+        IFNDEF ZX48
 TunEcho:
         ld a, (TunInside)
         or a
@@ -319,6 +334,7 @@ TunEcho:
         call AyWrite
         ld e, %00101010         ; tone A and C, noise B
         jp EngineSounds.mw
+        ENDIF
 
 ; C = character row. Preserve BC, DE and HL.
 SkyRowAttr:

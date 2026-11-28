@@ -2,7 +2,7 @@
 
 (Formerly "ZX Racer"; the repository keeps that name.)
 
-An original pseudo-3D arcade road racer for the **ZX Spectrum 128K**, inspired by
+An original pseudo-3D arcade road racer for the **ZX Spectrum**, inspired by
 the late-80s sprite-scaling coast-road racers.
 
 See **[PLAN.md](PLAN.md)** for the full technical design and milestone plan.
@@ -19,6 +19,8 @@ make test     # Z80 core self-test, headless runs with screenshots in build/, ta
 make profile  # T-states per phase per game frame (border timing bars)
 make run      # launches Fuse in 128K mode
 make video    # build/gameplay.mp4: 48 s of autopilot gameplay with synthesised AY sound
+make zx48     # -> build/zx48/speedrun48.tap (single-load 48K edition)
+make run-zx48 # launches Fuse in 48K mode with the 48K tape
 ```
 
 **Loading the tape:** on a 128K / +2 / +2A / +3 choose *Tape Loader* (or type
@@ -33,6 +35,14 @@ fast-forward / turbo tape option for the rest.
 On a 48K Spectrum it stops with "128K ONLY"; if a block fails to load it says
 "TAPE ERROR, BLOCK n". `build/release.sna` is the same game as
 a snapshot.
+
+**48K tape:** type `LOAD ""` and play `build/zx48/speedrun48.tap` at standard
+speed. The complete game loads in about 3 minutes 55 seconds. All 15 stages
+and all five destinations are available after that load. The 48K edition
+uses the 128K title artwork and has a beeper arrangement of its title tune.
+Press **ENTER** on the title for controls, sound and difficulty. The beeper
+also plays the engine, starting lights, crashes and low-time warning.
+See the [48K port notes](docs/port_zx48_plan.md) for the memory map and tests.
 
 Controls: **O/P** steer, **Q** accelerate, **A** brake, **SPACE** change gear
 (LOW / HIGH), **H** pause; or a Kempston joystick (fire changes gear). On the

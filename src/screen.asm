@@ -3,6 +3,7 @@
 ; ---------------------------------------------------------------------------
 
 ; Page in the back buffer and point the renderer at it.
+        IFNDEF ZX48
 SelectBackBuffer:
         ld a, (BackBuf)
         or a
@@ -79,6 +80,55 @@ WaitFlip:
         ret z
         halt
         jr .wait
+        ELSE
+; Synchronise single-screen drawing to the clock. Poll with interrupts
+; enabled so an interrupt between the test and a HALT cannot cost a tick.
+WaitRaceFrame:
+        ld a, (LastFlip)
+        add a, MIN_FRAMES
+        ld b, a
+        ld a, (FrameCount)
+        sub b
+        jp p, .ready
+        call RacePitch
+        call ToneUntil
+.ready: ld a, (FrameCount)
+        ld (LastFlip), a
+        ret
+
+; B = target tick (modulo 256), C = half-period in polling loops (0 silent).
+; The ULA speaker shares port FE with the border. Poll the clock between
+; speaker samples and finish with the speaker off and the border black.
+ToneUntil:
+        ld de, 1
+.poll:  ld a, (FrameCount)
+        sub b
+        jp p, .end
+        ld a, c
+        or a
+        jr z, .poll
+        dec e
+        jr nz, .poll
+        ld e, c
+        inc a                   ; $FF selects a noisy crash burst
+        jr nz, .level
+        ld a, r
+        and 63
+        add a, 12
+        ld e, a
+.level:
+        ld a, d
+        xor $10
+        ld d, a
+.edge:  out ($FE), a
+        jr .poll
+.end:   ld a, d
+        or a
+        ret z
+        xor a
+        out ($FE), a
+        ret
+        ENDIF
 
 ; A = value, B = count (0-32), HL = destination; advances L only.
 FillA:

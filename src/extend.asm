@@ -94,6 +94,7 @@ WeaveTo:
 ; MusicWaitTick). A new stage's (OvCheckpoint sets
 ; JingleHold) waits for its first frame: the interrupt that flips to it
 ; (LastFlip = FrameCount, src/interrupt.asm).
+        IFNDEF ZX48
 JingleTick:
         ld a, (MusicWait)       ; a new stage's tune waiting (src/holes.asm)
         or a
@@ -128,6 +129,7 @@ JingleRun:
         jp BeepOn
 .end:   ld (JinglePtr), de
         ret
+        ENDIF
 ; (JingleHold, JingleGo, Difficulty: src/holes.asm)
 
 ; ---------------------------------------------------------------------------

@@ -13,7 +13,11 @@
         IFDEF CPC
         DEVICE AMSTRADCPC6128
         ELSE
+        IFDEF ZX48
+        DEVICE ZXSPECTRUM48, $BFFF
+        ELSE
         DEVICE ZXSPECTRUM128
+        ENDIF
         ENDIF
         ENDIF
         INCLUDE "defs.asm"
@@ -25,19 +29,29 @@
         ENDIF
 
         ORG $8000
+        IFDEF ZX48
+        INCLUDE "zx48/boot.asm"
+        ENDIF
 start:
         di
         ld sp, STACK_TOP
         IFNDEF NATIVE_GFX
+        IFNDEF ZX48
         ld a, P7FFD_ROM48 | 7   ; display bank 5, bank 7 paged at $C000
         ld (Port7FFD), a
         ld bc, PORT_7FFD
         out (c), a
+        ENDIF
         xor a                   ; black border
         out ($FE), a
         ENDIF
         call InitInterrupts     ; (first: the music stops and starts with ei)
         ei
+        IFDEF ZX48
+        ld hl, Sprites_Shared
+        ld de, SharedSprites
+        call ExpandScenery
+        ENDIF
         call Restart            ; stage 1: packs, display, track state
         call GoTitle
 
@@ -88,15 +102,34 @@ MainLoop:
         ENDIF
         IFNDEF NATIVE_GFX
 MainLoop:
+        IFDEF ZX48
+        call WaitRaceFrame
+RaceFrame:
+        ENDIF
         call CheckPause
         BORDER 1                ; blue: game logic
         call ReadInput
         call UpdatePlayer
+        IFDEF ZX48
+        call DrawHud            ; the ULA reaches these rows first
+        ENDIF
         BORDER 2                ; red: road
         call RoadPrepare
         BORDER 0                ; black: waiting for the last flip
+        IFNDEF ZX48
         call WaitFlip
         call SelectBackBuffer
+        ENDIF
+        IFDEF ZX48
+        call DrawSprites        ; project commands without touching the display
+        call IndexRaceSprites
+        call RaceSky
+        call DrawPortal         ; calculate the mouth before composing the road
+        call BeginRaceCar
+        call DrawRoad           ; replace objects one character row at a time
+        call FinishRaceCar
+        call SwapRaceSprites
+        ELSE
         BORDER 3                ; magenta: sprites
         call EraseSprites
         BORDER 2                ; red: road
@@ -113,6 +146,7 @@ MainLoop:
         BORDER 5                ; cyan: HUD
         call DrawHud
         call RequestFlip
+        ENDIF
         jr MainLoop
         ENDIF
 
@@ -131,8 +165,10 @@ MainLoop:
         INCLUDE "horizon.asm"
         INCLUDE "hud.asm"
         INCLUDE "game.asm"
+        IFNDEF ZX48
         INCLUDE "sound.asm"
         INCLUDE "musicb2.asm"
+        ENDIF
         INCLUDE "traffic.asm"
         INCLUDE "fork.asm"
         INCLUDE "hills.asm"
@@ -141,6 +177,11 @@ MainLoop:
         INCLUDE "tunnelaside.asm"   ; (the Spectrum's: in bank 5, src/tunnel.asm)
         ENDIF
         INCLUDE "vars.asm"
+        IFDEF ZX48
+        INCLUDE "zx48/sprite_index.asm"
+        INCLUDE "zx48/sprite_inks.asm"
+        INCLUDE "zx48/road_strip.asm"
+        ENDIF
         IFDEF EINSTEIN          ; (in the room the Spectrum's drawing code leaves)
         INCLUDE "pause.asm"
         INCLUDE "beep.asm"
@@ -168,12 +209,20 @@ HOLD_PART       DEFL 1
         ENDIF
 CodeEnd:
         ASSERT CodeEnd <= TABLES
+        IFDEF ZX48
+        ASSERT CodeEnd <= THEME_CACHE && THEME_CACHE + 28 <= TABLES
+        ENDIF
 
         ORG TABLES
         INCLUDE "tables.asm"
 TablesEnd:
         ASSERT TablesEnd <= PANO_LDI_END - 64
+        IFNDEF ZX48
         INCLUDE "tyres.asm"     ; (in the gap before the panorama's chain)
+        ELSE
+        INCLUDE "zx48_table.asm"
+        INCLUDE "zx48/sprite_rows.asm"
+        ENDIF
         IFDEF CPC               ; (no panorama bitmap nor road pass 2: their
         INCLUDE "cpc/chains.asm"        ; chains' room for the CPC's)
         ENDIF
@@ -263,8 +312,10 @@ FillBlock:
         ret
         IFNDEF NATIVE_GFX
         INCLUDE "pause.asm"     ; (in the gap before the interrupt vector)
+        IFNDEF ZX48
         INCLUDE "beep.asm"
         INCLUDE "gap4.asm"
+        ENDIF
         ENDIF
         ASSERT $ <= ISR_JP
 
@@ -304,7 +355,9 @@ THEME_TOP       EQU 120
         IFDEF EINSTEIN
 CmdListB        EQU EIN_CMDLISTB    ; (src/einstein/platform.asm: above the shadow screen)
         ELSE
+        IFNDEF ZX48
 CmdListB        EQU $10000 - THEME_TOP
+        ENDIF
         ENDIF
         ASSERT 1 + MAX_SPR * CMD_SIZE <= THEME_TOP
 
@@ -321,7 +374,11 @@ CmdListB        EQU $10000 - THEME_TOP
         INCLUDE "cpc_objects.asm"       ; (build/cpc: the resident objects in Mode 0)
         ASSERT Scn_traffic == SCN_DATA  ; (tools/make_cpc.py assembles the packs so)
         ELSE
+        IFDEF ZX48
+        INCLUDE "zx48_resident.asm"
+        ELSE
         INCLUDE "resident_data.asm"
+        ENDIF
         ENDIF
         ENDIF
         INCLUDE "font_data.asm"
@@ -338,8 +395,10 @@ CmdListB        EQU $10000 - THEME_TOP
         INCLUDE "screens.asm"   ; title and goal screens (not time-critical)
         INCLUDE "stage.asm"     ; stage loading, checkpoints (between stages only)
         INCLUDE "lampdraw.asm"  ; the starting lights' lamps
+        IFNDEF ZX48
         INCLUDE "pics.asm"      ; the front end's picture unpacker
         INCLUDE "music.asm"     ; the music player
+        ENDIF
         INCLUDE "extend.asm"    ; stage times, extended play, weaving traffic
         INCLUDE "tunnel.asm"    ; tunnels
         IFNDEF EINSTEIN
@@ -351,10 +410,20 @@ CmdListB        EQU $10000 - THEME_TOP
         IFDEF ZX_OBJINK         ; (the Spectrum's: NATIVE_GFX never has it)
         INCLUDE "objink.asm"    ; objects in their own inks, in front of the road
         ENDIF
+        IFDEF ZX48
+        INCLUDE "zx48/scenery.asm"
+        INCLUDE "unpack.asm"
+CmdListB:       ds 1 + MAX_SPR * CMD_SIZE
+RaceMasksA:     ds (24 - ROAD_ROW0) * 2
+RaceMasksB:     ds (24 - ROAD_ROW0) * 2
+        ENDIF
 PrevHillInputs: ds 2 + 3 * MAX_BOUNDS + 1
 ScnEnd:
         ASSERT ScnEnd <= TRACK_CACHE
 
+        IFDEF ZX48
+        INCLUDE "zx48/layout.asm"
+        ELSE
 ; Stage packs in banks 0, 1, 3, 4 and 6 (copied to the caches at a stage start)
         INCLUDE "packs.asm"
 
@@ -402,6 +471,7 @@ ScnEnd:
         SAVESNA "build/release.sna", start     ; (no timing bars: the tape is made from this)
         ELSE
         SAVESNA "build/zxracer.sna", start
+        ENDIF
         ENDIF
         ENDIF
         ENDIF
