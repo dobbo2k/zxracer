@@ -108,7 +108,7 @@ EinCarGroundSync:
 .next:  inc hl
         bit 5, d
         jr z, .row
-        ret
+        jp EinTyrePrep          ; (the tyres' tread: src/einstein/eintyres.asm)
 ; D = a car cell: its 8 colour lines (BC, D, HL kept)
 .paint: push bc
         push de

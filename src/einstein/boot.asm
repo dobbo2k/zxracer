@@ -30,12 +30,15 @@ ELongWait:      db 0            ; (the CTC on its 16 ms wait)
 EFirstPoll:     db 0            ; (this poll: the first after that wait)
 EGrid:          db 0            ; (the TV frame the last sent was due at)
         IFNDEF EIN_MIN_FRAMES   ; (-D: the benchmark measures the work unlocked)
-EIN_MIN_FRAMES  EQU 4           ; frames sent on a grid of 4 TV frames: a
-        ENDIF                   ; steady 12.5 fps (the Spectrum: MIN_FRAMES)
-EIN_MIN_GAP     EQU 3           ; but after a late one, up to EIN_DEBT TV
-        IFNDEF EIN_DEBT         ; frames are made up, one a frame sent: at
-EIN_DEBT        EQU 4           ; least 3 apart (-DEIN_DEBT=0: always 4)
-        ENDIF
+EIN_MIN_FRAMES  EQU 3           ; frames sent on a grid of 3 TV frames: at
+        ENDIF                   ; most 16.7 fps, as fast as the work allows (a
+                                ; frame takes about 4 on average: 13 fps,
+                                ; uneven; -DEIN_MIN_FRAMES=4: a steadier 12)
+EIN_MIN_GAP     EQU 3           ; with a grid of 4, after a late frame, up to
+        IFNDEF EIN_DEBT         ; EIN_DEBT TV frames are made up, one a frame
+EIN_DEBT        EQU 4           ; sent: at least 3 apart (-DEIN_DEBT=0: always
+        ENDIF                   ; 4); with 3, nothing to make up
+        ASSERT EIN_MIN_GAP <= EIN_MIN_FRAMES
 
 EinCtcInit:
         xor a

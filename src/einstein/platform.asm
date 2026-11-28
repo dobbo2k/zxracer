@@ -64,7 +64,7 @@ VRAM_SPRPAT     EQU $3800           ; sprite patterns
 ;     (pattern 0, the colour behind it) in the middle and bottom thirds, and
 ;     slots from 16, patterns made each frame (silhouettes', and the road's
 ;     where it is drawn the exact way: a fork's row, a tunnel's, one whose
-;     road is in one cell): rows 12-15 5 each, rows 16-23 22 each. The kerb's
+;     road is in one cell): rows 12-15 5 each, rows 16-23 20 each. The kerb's
 ;     edges are ready-made patterns (EinStaticInit), 7 left edges and 7 right
 ;     in the open road's light and dark kerb: the middle third's KERB_T1 on,
 ;     the bottom third's KERB_T2 on. The player's car is CAR_PAT on (224).
@@ -77,7 +77,7 @@ SLOTS_T1        EQU 11              ; (the middle third's ready-made kerb edges'
         ELSE
 SLOTS_T1        EQU 5
         ENDIF
-SLOTS_T2        EQU 22
+SLOTS_T2        EQU 20              ; (rows 16-23: never more needed in the attract demo)
 SLOT_FIRST      EQU 16
 N_SLOTS         EQU 4 * SLOTS_T1 + 8 * SLOTS_T2     ; 196 in all
         IFDEF EIN_KERB
@@ -88,12 +88,14 @@ SLOT_SIZE       EQU 9               ; 8 pattern bytes, the colour byte
         ENDIF
 KERB_N          EQU 2 * 14                          ; kerb edges: light, dark
 KERB_T1         EQU SLOT_FIRST + 4 * SLOTS_T1       ; 36: the middle third's
-KERB_T2         EQU SLOT_FIRST + 8 * SLOTS_T2       ; 192: the bottom third's
+KERB_T2         EQU SLOT_FIRST + 8 * SLOTS_T2       ; 176: the bottom third's
         IFDEF EIN_KERB          ; (no ready-made kerb edges in the middle third)
         ASSERT SLOT_FIRST + 4 * SLOTS_T1 <= SKY_PAT_T1
         ELSE
         ASSERT KERB_T1 + KERB_N <= SKY_PAT_T1
         ENDIF
+TYRE_PAT        EQU KERB_T2 + KERB_N + 2            ; 206: the tyres' tread, 12
+                                    ; (src/einstein/eintyres.asm; after the verge's 2)
 SKY_PAT_T1      EQU 64              ; rows 8-9's patterns in the middle third
 PANO_PAT        EQU 128             ; the panorama's
 MIRROR_ROWS     EQU 10
@@ -125,7 +127,9 @@ EDashEnd        EQU EDashAttr + 12 * 4 + 1      ; (then $D0: no more sprites)
         ELSE
 EDashEnd        EQU EIN_BUF_END                 ; (no centre line: no buffers)
         ENDIF
-ECarCol         EQU (EDashEnd + 7) & $FFF8      ; the car's colours (a cell's 8 in
+ETyreSet        EQU EDashEnd                    ; the tyres' tread: 12 patterns' pixels
+                                                ; (96), then their colours (eintyres.asm)
+ECarCol         EQU (ETyreSet + 192 + 7) & $FFF8    ; the car's colours (a cell's 8 in
         ASSERT ECarCol + 4 * CAR_W * 8 <= $EC00 ; one page: EinCarGroundSync)
 
 ; Buffers in the Spectrum's screen A ($4000-$5AFF), around the resident stage
@@ -172,7 +176,7 @@ EGroundPapers   EQU EGroundPatterns + 32
 
         ORG EIN_TAIL            ; (the theme cache's last bytes: no theme pack
 TYRE_PART       DEFL 2          ; reaches them, tools/make_einstein.py)
-        INCLUDE "eintyres.asm"  ; (the rear tyres drawn)
+        INCLUDE "eintyres.asm"  ; (the rear tyres' tread made)
         ASSERT $ <= PANO_CACHE
 
         ORG EIN_CODE

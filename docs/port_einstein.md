@@ -239,7 +239,7 @@ As planned, with the details above. Per third (256 patterns each):
 |---|---|
 | top (rows 0-7) | rows 0-7 mirrored, one pattern a cell |
 | middle (rows 8-15) | 0-15 solid colours, 16-59 slots (rows 12-15, 11 each: the kerbs', silhouettes', and the road's where it is drawn the exact way), 60-63 free, 64-127 rows 8-9 mirrored, 128-191 the panorama (2 rows x 32), 192-255 the panorama's cells under a silhouette. (`-DEIN_BLOCKS`: 16-35 slots, 5 a row, 36-63 the kerb's edges) |
-| bottom (rows 16-23) | 0-15 solid colours, 16-191 slots (22 a row), 192-219 the kerb's ready-made edges (used with `-DEIN_BLOCKS`), 220-221 the verges' textures, 222-223 free, 224-255 the player's car |
+| bottom (rows 16-23) | 0-15 solid colours, 16-175 slots (20 a row), 176-203 the kerb's ready-made edges (used with `-DEIN_BLOCKS`), 204-205 the verges' textures, 206-217 the tyres' tread, 218-223 free, 224-255 the player's car |
 
 The kerb's ready-made edges (`-DEIN_BLOCKS`; the bottom third's are
 written in any build): 7 left edges (road from pixel 1-7) and 7 right
@@ -261,9 +261,10 @@ sky's cyan). All 15 stages were checked in the harness for the rest.
 
 ## 6. Speed
 
-A frame is sent every 4 TV frames (`EIN_MIN_FRAMES` in
-`src/einstein/boot.asm`): a steady 12.5 fps when the work fits, 10 when a
-frame takes longer. Since 24 November 2026 a late frame's TV frames are made
+Since 28 November 2026 a frame is sent as soon as it is ready, at least 3 TV
+frames after the last (`EIN_MIN_FRAMES` in `src/einstein/boot.asm`; below,
+**The frame lock at 3**). Before, every 4 TV frames: a steady 12.5 fps when
+the work fits, 10 when a frame takes longer. Since 24 November 2026 a late frame's TV frames are made
 up, up to 4 of them: the frames after it come 3 TV frames apart, one TV
 frame made up each, till the grid of 4 is kept again (`EIN_DEBT`; below). In the attract demo with normal timing (`wait16
 GameFrames 20`, then `fliphist 1300`), 243 intervals take 4 TV refreshes,
@@ -348,6 +349,31 @@ plan for drawing them the Einstein's own way is in
 [einstein_objects_plan.md](einstein_objects_plan.md). A prototype of hardware
 sprites for them took normal play from 11.96 to 12.12 fps but made small objects
 one colour (black palms), so it was dropped; the results are in its section 5.
+
+**The frame lock at 3** (28 November 2026). The road's raster holds and
+the rolling tyres (27 November) had cost about 39K T a game frame: the
+benchmark unlocked went from 1,158 to 1,310 TV frames, and normal play
+(`fliphist 1300`) from 12.3 to 11.3 fps. The tyres rewrote their cells'
+40 pattern and colour bytes, paced, at every step of the tread (28K T);
+the holds checked every row (about 650 T each) and waited for the raster.
+Now the tread's phases are patterns made ready, a step only changes 4
+names, and they are made again only when the pose or the tyres' ground
+changes, and sent in the blank; the holds are checked from the first row
+that could meet the raster (`EinHoldPlan`). The bottom third's rows have 20
+slots, not 22, for the tread's 12 patterns: in the attract demo a row
+found its slots all used 71 times with 22, 21 or 20 (all in rows 12-15).
+Then, with the work at about 4 TV frames a game frame, a lock of 4 could
+only smooth the rate, never raise it; at 3 every saving shows:
+
+| Build | Benchmark, unlocked | Benchmark, locked | Normal play: 3 / 4 / 5 / 6 / 7 TV frames | fps |
+|---|---|---|---|---|
+| without the holds and tyres | 1,160 | | 33 / 239 / 41 / 6 / 0 (lock 4) | 12.31 |
+| the holds and tyres as on 27 November | 1,310 | 1,367 | 22 / 158 / 82 / 25 / 5 (lock 4) | 11.29 |
+| the holds and tyres now, lock 4 | 1,201 | 1,275 | 35 / 212 / 57 / 8 / 1 | 12.10 |
+| **the same, lock 3 (the default)** | 1,201 | 1,201 | **112 / 141 / 64 / 13 / 0** | **12.71** |
+
+The lock of 3 is faster but less even: a mix of 3, 4 and 5 TV frames
+where 4 was the rule. `-DEIN_MIN_FRAMES=4` builds the grid of 4.
 
 **Late frames made up** (24 November 2026). A frame that came a TV frame
 late used to push every later one back by a TV frame. Now the frames are due

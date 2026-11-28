@@ -194,3 +194,6 @@ EKGN:   db 0                    ; the grass's name
 EKMerged:       db 0            ; the runs share a cell
 EComM:  db 0                    ; (EinCommitSlot: the lines over the second
 EComC2: db 0                    ; colour byte, and it; 0 but for the kerb)
+
+HOLD_PART       DEFL 3          ; (src/einstein/rowhold.asm: EinHoldPlan, here
+        INCLUDE "rowhold.asm"   ; after the page alignment, where bank 2 has room)

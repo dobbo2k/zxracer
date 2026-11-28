@@ -1626,7 +1626,7 @@ EinAllocSlot:
         IFDEF EIN_KERB
         add a, b
         add a, a
-        add a, b                ; x 11 (SLOT_SIZE; a row's 22 slots: < 256)
+        add a, b                ; x 11 (SLOT_SIZE; a row's 20 slots: < 256)
         ASSERT SLOT_SIZE == 11
         ELSE
         add a, a

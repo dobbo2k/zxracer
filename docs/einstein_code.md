@@ -76,7 +76,7 @@ included in bank 5 too.
 | $B900 | `static.asm`, the OUTI chain ($B9C0, `OutiEnd` = $BA00), `reset.asm`, `respawn.asm`, `lights.asm` |
 | $BAD8 | The XOR chain (`XorEnd` = $BB00), the hill tables, `FillBlock`, `jp Isr` at $BDBD, the IM2 table at $BE00, BSS, the stack (to $C000) |
 | $C000-$DAFF | Screen B: the shared code's drawing (bitmap $C000, attributes $D800) |
-| $DB00 `EIN_BUF` | `NameBuf` (768), `SlotShadow` (220 x 11; `-DEIN_BLOCKS`: 196 x 9), `DirtyList` (220), `EDirtyRowN` (12), `EMirrorBits` (40), the Spectrum's command list B (`EIN_CMDLISTB`), the centre line's state (`EDashX` ... `EDashAttr`, with `-DEIN_DASH` only), `ECarCol`, `EObjectLower` ($EA00) |
+| $DB00 `EIN_BUF` | `NameBuf` (768), `SlotShadow` (204 x 11; `-DEIN_BLOCKS`: 180 x 9), `DirtyList` (204), `EDirtyRowN` (12), `EMirrorBits` (40), the Spectrum's command list B (`EIN_CMDLISTB`), the centre line's state (`EDashX` ... `EDashAttr`, with `-DEIN_DASH` only), `ETyreSet` (192: the tyres' tread), `ECarCol`, `EObjectLower` ($EA00) |
 | $EC00 | XtalDOS, kept for reading the disc |
 
 Screen A ($4000-$5AFF) is the overlay's and the Einstein's buffers' during play: the game
@@ -106,7 +106,7 @@ The patterns, per third:
 |---|---|
 | top (rows 0-7) | one a cell, in order: the HUD and the sky, mirrored |
 | middle (rows 8-15) | 0-15 solid colours; 16-35 slots (rows 12-15, `SLOTS_T1` = 5 each); 36-63 the ready-made kerb edges (`KERB_T1`); 64-127 rows 8-9 mirrored (`SKY_PAT_T1`); 128-191 the panorama (`PANO_PAT`); 192-255 panorama cells under silhouettes (`PANO_SPR`) |
-| bottom (rows 16-23) | 0-15 solid colours; 16-191 slots (rows 16-23, `SLOTS_T2` = 22 each); 192-219 the ready-made kerb edges (`KERB_T2`); 220-221 the verge textures (`GROUND_PAT`); 224-255 the car (`CAR_PAT`) |
+| bottom (rows 16-23) | 0-15 solid colours; 16-175 slots (rows 16-23, `SLOTS_T2` = 20 each); 176-203 the ready-made kerb edges (`KERB_T2`); 204-205 the verge textures (`GROUND_PAT`); 206-217 the tyres' tread (`TYRE_PAT`); 224-255 the car (`CAR_PAT`) |
 
 A solid cell's name is its TMS colour: pattern k (k < 16) is blank with colour k behind it.
 A **slot** is a pattern made each frame (8 pixel bytes and one colour byte for all 8
@@ -147,9 +147,10 @@ The VDP's frame interrupt is not wired to the Z80. CTC channel 2 interrupts ever
 (timer, /16, 250) and the handler reads the VDP's status. When the frame flag is set (at
 the start of the vertical blank), it counts a TV frame (`FrameCount`). If a frame is
 pending, it calls `EinUpload` when the frame is due: frames go on a grid of
-`EIN_MIN_FRAMES` (4) TV frames (`EGrid`, the tick the last was due at), and a late one
-puts the grid's next ticks no more than `EIN_DEBT` (4) TV frames behind; while it is
-behind, frames go 3 TV frames apart (`EIN_MIN_GAP`), one TV frame made up each.
+`EIN_MIN_FRAMES` (3; `-DEIN_MIN_FRAMES=4` for the steadier grid of 4) TV frames (`EGrid`,
+the tick the last was due at). With a grid of 4 a late one puts the grid's next ticks no
+more than `EIN_DEBT` (4) TV frames behind; while it is behind, frames go 3 TV frames
+apart (`EIN_MIN_GAP`), one TV frame made up each. With 3 there is nothing to make up.
 `LastFlip` stays the TV frame the last was sent in (the stage's jingle waits for it). Then it plays the sound (`SoundTick`). After seeing a frame it sets
 the CTC to a 16 ms wait (/256, 250) and goes back to 1 ms polls after that, so the flag is
 seen at most 1 ms late. A frame seen at the very first poll after the wait may be late by
@@ -157,8 +158,9 @@ an unknown time (`EFirstPoll`): its upload is all paced. A frame that begins whi
 interrupt is still busy is counted at its end, with its sound (the `.over` loop;
 `EinMirror` checks too, through `EinLateFrame`).
 
-A game frame takes 4 TV frames here, or 3 while one late is made up. `Elapsed` goes up to 8 (`player.asm`) so the
-clock and the car keep real time.
+A game frame takes 3 TV frames at best and about 4 on average (with a grid of 4: 4, or
+3 while one late is made up). `Elapsed` goes up to 8 (`player.asm`) so the clock and the
+car keep real time.
 
 ### Sending a frame (`flip.asm` `EinUpload`)
 
@@ -177,6 +179,10 @@ patterns and its colours). So before each road row's writes, and the car's
 wait, started as the frame was seen), the raster's place is worked out from the CTC
 (`EinElapsed`, a count each 256 T, its reloads counted): a row whose writes could meet it
 waits till it has gone past. The row then shows its old frame, whole, for that TV frame.
+A check costs about 650 T, so `EinHoldPlan`, once before the rows, works out from the
+rows' writes (6 counts for a row's names, 3 a changed slot, each row begun when the last's
+are done) the first row that could meet the raster (`EHoldFrom`): the rows before it go
+unchecked, and when none could, only the car is checked.
 Rows written before the raster got there and rows written after it still show different
 frames in that one TV frame (a torn picture: about 3.5% of TV frames in the attract
 demo). Only an upload that starts behind the raster at row 10, or fits before it gets
@@ -451,18 +457,23 @@ The Spider's 32 cells are the bottom third's patterns 224-255, at rows 20-23, co
   uploads contiguous runs of marked colours from `ECarCol`. A left smoke-puff change
   sends 16 pattern bytes and a right one sends 24.
 - **Rolling tyres** (`eintyres.asm`, as the Spectrum's `src/tyres.asm`): the rear tyres
-  are the bottom row's cells 0-1 and 6-7 (patterns 248, 249, 254, 255), their tread on
-  line 3. Each TV frame the interrupt moves the tread on by the speed (`EinTyreTick`: a
-  row each 21 depth units, three positions); when it has moved, `EinTyreDraw` writes the
-  four cells' lines 2-6 (the shown pose's tread line or plain line 4, two tread lines
-  three apart, colours with the ground's paper where the art has none). `EinUpload` also
-  draws them after `EinCarSync` (under the car's raster hold), since that may have sent
-  the cells again, and notes the pose now shown (`ETyrePose`). Not in the front end, a
-  display reset or the smoke poses. `EinTyreTick` is at the platform code's end, the
-  drawing at the theme cache's last 192 bytes (`EIN_TAIL`: `tools/make_einstein.py`
-  keeps theme packs below it; the alpine pack, the fullest, ends 14 bytes short), the
-  data in the ZPage table page's hole. About 3-4K T in a TV frame when the tread moves;
-  the frame rate is unchanged (694 game frames in 6,000 TV frames).
+  are the bottom row's cells 0-1 and 6-7, their tread on line 3. Their three phases are
+  12 patterns of their own (`TYRE_PAT`: tyre cell k's phase p is `TYRE_PAT + 3k + p`):
+  the pose's cell with lines 2-6 its tread line or its plain line 4, two tread lines
+  three apart, and its colours from `ECarCol` (the ground's paper where the art has
+  none). Each TV frame the interrupt moves the tread on by the speed (`EinTyreTick`: a
+  row each 21 depth units); when it has moved, `EinTyreNames` points the four cells'
+  names at the phase (4 names, about 250 T). The main loop makes the 12 in RAM
+  (`EinTyrePrep`, from `EinCarGroundSync`, into `ETyreSet`) when the pose changes, or
+  only their colours when the tyres' ground does (the road's bands passing: about half
+  the game frames); the upload sends them first, in the blank (`EinTyreSend`), and after
+  the car's cells puts the names right for the pose it shows (`EinTyreShow`: in a smoke
+  pose the car's own). Never in `NameBuf`: the road's names under the car stay as they
+  were. Not in the front end or a display reset. About 5K T a game frame with their
+  sends (rewriting the cells' patterns each step, before 28 November 2026, took 28K).
+  The code is spread over the room there was: the tick at the platform code's end, the
+  making at the theme cache's last 192 bytes (`EIN_TAIL`: `tools/make_einstein.py` keeps
+  theme packs below it), the rest and the data in table pages' holes (`src/holes.asm`).
 
 ## 12. The display reset
 

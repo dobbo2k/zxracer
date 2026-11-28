@@ -71,6 +71,8 @@ EinUpload:
         call EinDashSend        ; (the centre line's sprites)
         ENDIF
         call EinPanoSend        ; (the panorama's cells under silhouettes)
+        call EinTyreSend        ; (the tyres' tread: src/einstein/eintyres.asm)
+        call EinHoldPlan        ; (which rows could meet the raster: rowhold.asm)
         ld c, MIRROR_ROWS       ; (the panorama's and the road's rows)
 .row:   push bc
         call EinRowHold         ; (not while the raster could reach it)
@@ -136,9 +138,7 @@ EinUpload:
         jr nz, .row
         call EinCarHold         ; (not while the raster could reach it)
         call EinCarSync         ; ---- the car's cells
-        ld a, (CarShownB)       ; (the pose now shown: its tyres' tread, which
-        ld (ETyrePose), a       ; may have been sent again, at its place:
-        call EinTyreDraw        ; src/einstein/eintyres.asm)
+        call EinTyreShow        ; (its tyres' names)
         jp EinMirror            ; ---- the sky's cells written
 
 

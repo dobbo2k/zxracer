@@ -17,12 +17,20 @@ ArpTab:         db 4, 7,  3, 7,  4, 10,  3, 10,  4, 11,  5, 7,  7, 12,  12, 12
 OBJ_PART        DEFL 4
         INCLUDE "objinkb2.asm"  ; (objects' inks: OCount)
         ENDIF
+        IFDEF EINSTEIN
+TYRE_PART       DEFL 3
+        INCLUDE "einstein/eintyres.asm" ; (the tyres' names: EinTyreNames)
+        ENDIF
         ASSERT $ <= ScrLo + 256
         ORG ScrHi + $C4
         ASSERT ScrHi_end <= ScrHi + $C4
 ; Envelopes: start volume, the volume it fades to, fade every (mask+1)
 ; 0 pluck, 1 sustained lead, 2 soft, 3 bass, 4 heavy bass, 5 echo
 EnvTab:         db 13, 9, 3,  13, 11, 15,  11, 8, 3,  12, 8, 1,  13, 10, 3,  9, 4, 3
+        IFDEF EINSTEIN
+TYRE_PART       DEFL 4
+        INCLUDE "einstein/eintyres.asm" ; (the tyres' patterns sent: EinTyreSend, EinTyreShow)
+        ENDIF
         ASSERT $ <= ScrHi + 256
         ORG X1Page + $60
         ASSERT RoadX1_end <= X1Page + $60
@@ -69,14 +77,15 @@ JingleGo:
         ORG ZPage + $60
         ASSERT ZLo_end <= ZPage + $60
         IFDEF EINSTEIN          ; (src/einstein/eintyres.asm: the tyres' tread)
-; Per phase (rows to the next tread line), the source of lines 2-6
-ETyreLines:     db 3, 4, 4, 3, 4,  4, 3, 4, 4, 3,  4, 4, 3, 4, 4
 ETyreAcc:       db 0            ; depth units towards the next row
 ETyrePhase:     db 1            ; 0-2: rows from line 2 to the first tread line
         ASSERT ETyrePhase == ETyreAcc + 1
-ETyreShown:     db $FF          ; the phase drawn ($FF: the car sent again)
+ETyreShown:     db $FF          ; the phase whose names are shown
 ETyrePose:      db $FF          ; the pose the screen shows (EinUpload)
-ETyreBuf:       ds 10
+ETyreNew:       db 0            ; ETyreSet made again, to be sent: bit 0
+                                ; the colours, bit 1 the pixels too
+TYRE_PART       DEFL 5
+        INCLUDE "einstein/eintyres.asm" ; (ETyrePair)
         ENDIF
         IFDEF ZX_OBJINK         ; (src/objink.asm: a cell's object and ground
 OS:             ds 8            ; pixels, and the bits in a nibble)

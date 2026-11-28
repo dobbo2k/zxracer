@@ -11,11 +11,72 @@
 ; seen, at most EIN_SEEN counts after it began), the raster's place is
 ; worked out from the CTC (EinElapsed): if it could reach the row while the
 ; writes go, the upload waits till it has gone past. The row then shows its
-; old frame in that TV frame, whole, and the new one in the next.
-; EinElapsed in bank 2's code, the rest in the ZHiPage table page's hole
-; (src/holes.asm): neither the platform code below $4000 nor bank 2 had room.
+; old frame in that TV frame, whole, and the new one in the next. A check
+; costs about 650 T, and most rows can't meet the raster: EinHoldPlan, once
+; before the rows, works out from their writes the first row that could
+; (EHoldFrom), and only from there are they checked.
+; EinElapsed in bank 2's code (part 1, src/main.asm), EinHoldPlan after the
+; kerbs' (3, src/einstein/kerbrow.asm), the rest in the ZHiPage table
+; page's hole (2, src/holes.asm): no one place had room.
 ; ---------------------------------------------------------------------------
-        IF HOLD_PART == 1
+        IF HOLD_PART == 3
+; Before the road's rows (EinUpload): the first row whose writes could meet
+; the raster, counted as EinRowHold counts them, each row's begun when the
+; last's are done: EHoldFrom (24: none; EinCarHold checks the car's). V:
+; the counts when a row's writes would begin, less 8 a row from row 10 (its
+; first line, 200 counts in, 8 more each row) (A, BC, DE, HL spent)
+EinHoldPlan:
+        ld a, MIRROR_ROWS
+        ld (EHoldFrom), a
+        ld a, (EHoldOn)
+        or a
+        ret z
+        call EinElapsed
+        ld a, h
+        or a
+        ret nz
+        ld a, l
+        add a, EIN_SEEN + 2
+        ret c
+        ld c, a                 ; C: V
+        ld hl, ERowDrawn + MIRROR_ROWS
+        ld de, EDirtyRowN
+        ld b, MIRROR_ROWS       ; B: the row
+.r:     ld a, (hl)              ; 6 for its names
+        inc hl
+        or a
+        jr z, .w
+        ld a, 6
+.w:     add a, c
+        ld c, a
+        ld a, b
+        cp ROAD_ROW0
+        jr c, .t
+        ld a, (de)              ; 3 a changed slot
+        add a, a
+        ex de, hl
+        add a, (hl)
+        ex de, hl
+        inc de
+        add a, c
+        jr c, .hold
+        ld c, a
+.t:     ld a, c
+        cp 120 + 8 * MIRROR_ROWS
+        jr nc, .hold
+        sub 8
+        jr nc, .v
+        xor a
+.v:     ld c, a
+        inc b
+        ld a, b
+        cp 24
+        jr nz, .r
+.hold:  ld a, b                 ; (24: the car's still checked, EinCarHold)
+        ld (EHoldFrom), a
+        ret
+
+        ELSEIF HOLD_PART == 1
 ; HL = counts (256 T) since the frame was seen: the CTC's 16 ms wait, from
 ; 250 down and reloading at 0, each reload counted
 EinElapsed:
@@ -40,6 +101,7 @@ EinElapsed:
         ret
 EHoldBase:      dw 0
 EHoldLast:      db 0
+
         ELSE
 EIN_SEEN        EQU 17          ; (counts of 256 T: the 1 ms poll, the interrupt's entry)
 
@@ -48,6 +110,10 @@ EinRowHold:
         ld a, (EHoldOn)
         or a
         ret z
+        ld a, (EHoldFrom)       ; (before the first that could meet it)
+        dec a
+        cp c
+        ret nc
         push bc
         push de
         push hl
@@ -100,12 +166,8 @@ EinCarHold:
         ld a, (EHoldOn)
         or a
         ret z
-        ld a, (ECarRuns + 1)    ; (a new pose: its patterns, 0 none; then the
-        or a                    ; tyres, src/einstein/eintyres.asm)
-        ld c, 12 + 6
-        jr z, .c
-        ld c, 48 + 6
-.c:     ld hl, 120 + 8 * 20
+        call EinCarCounts
+        ld hl, 120 + 8 * 20
         ld b, 8 * 4 + 1
 
 ; HL = the first line of the rows about to be written (counts after the
@@ -138,4 +200,15 @@ EinHold:
         jr c, .w
         ret
 EHoldOn:        db 0            ; (this upload timed: EinUpload)
+EHoldFrom:      db 0            ; (the first row that could meet the raster)
+
+; C = the car's writes in counts: its colours and the tyres' names, a new
+; pose's patterns (A spent)
+EinCarCounts:
+        ld c, 12 + 2
+        ld a, (ECarRuns + 1)
+        or a
+        ret z
+        ld c, 48 + 2
+        ret
         ENDIF
