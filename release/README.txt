@@ -1,6 +1,6 @@
 SPEED RUN
-A road race for the ZX Spectrum 128K family, the Tatung Einstein TC-01
-and the Amstrad CPC 6128
+A road race for the ZX Spectrum 128K family and 48K, the Tatung Einstein
+TC-01 and the Amstrad CPC 6128
 =======================================================================
 
 FILES
@@ -11,6 +11,8 @@ FILES
   speedrun.tap       The same at the normal tape speed: about 6 minutes.
                      Use it if your player or emulator cannot play turbo
                      TZX blocks.
+  speedrun48.tap     The 48K Spectrum edition, at the normal tape speed:
+                     about 4 minutes.
   inlay_outside.png  A cassette inlay to print at 300 dpi (101.6 mm tall):
   inlay_inside.png   back flap, spine and front outside; screenshots and
                      how to play inside. Fold at the marks.
@@ -39,6 +41,15 @@ LOADING
 
   In an emulator, choose a 128K model. Instant "flash" loading only covers
   the first two blocks; use the emulator's fast-forward for the rest.
+
+  ZX Spectrum 48K
+
+  Type LOAD "" and press ENTER, then play speedrun48.tap. The whole game
+  loads at once: all fifteen stages and the five goals, and new games,
+  with the tape stopped. It has the 128K title picture, a beeper version
+  of its tune, and the engine, the starting lights, crashes and the
+  low-time warning on the beeper. Its roadside scenery has fewer sizes
+  than the 128K edition's.
 
 CONTROLS
 
